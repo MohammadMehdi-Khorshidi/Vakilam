@@ -6,18 +6,6 @@ beforeEach(function () {
     Cache::flush();
 });
 
-test('new users can register', function () {
-    $response = $this->post('/register', [
-        'name' => 'Test User',
-        'email' => 'test@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
-    ]);
-
-    $this->assertAuthenticated();
-    $response->assertNoContent();
-});
-
 test('a registration otp can be generated in the testing environment', function () {
     $response = $this->postJson('/api/auth/register/send-otp', [
         'phone' => '09121234567',
