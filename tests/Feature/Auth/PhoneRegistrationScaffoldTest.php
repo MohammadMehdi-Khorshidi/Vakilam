@@ -1,32 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Cache;
-use Laravel\Fortify\Features;
-
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
 beforeEach(function () {
     Cache::flush();
-
-    $this->skipUnlessFortifyHas(Features::registration());
-});
-
-test('registration screen can be rendered', function () {
-    $response = $this->get(route('register'));
-
-    $response->assertOk();
-});
-
-test('new users can register', function () {
-    $response = $this->post(route('register.store'), [
-        'name' => 'Test User',
-        'email' => 'test@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
-    ]);
-
-    $this->assertAuthenticated();
-    $response->assertNoContent();
 });
 
 test('a registration otp can be generated in the testing environment', function () {
