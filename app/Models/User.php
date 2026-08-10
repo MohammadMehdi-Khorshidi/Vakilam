@@ -13,6 +13,8 @@ use Illuminate\Support\Carbon;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use App\Models\Client;
+use App\Models\Lawyer;
 
 /**
  * @property int $id
@@ -34,6 +36,17 @@ class User extends Authenticatable implements PasskeyUser
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
+    // A user can have one client profile.
+    public function client()
+    {
+        return $this->hasOne(Client::class);
+    }
+
+    // A user can have one lawyer profile.
+    public function lawyer()
+    {
+        return $this->hasOne(Lawyer::class);
+    }
     /**
      * Get the attributes that should be cast.
      *
