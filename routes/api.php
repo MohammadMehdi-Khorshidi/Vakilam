@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+//register
 Route::prefix('auth/register')
     ->name('api.register.')
     ->controller(RegisterController::class)
@@ -18,6 +20,20 @@ Route::prefix('auth/register')
 
         Route::post('/', 'store')
             ->name('store');
+    });
+
+//login and logout
+Route::prefix('auth')
+    ->name('api.auth.')
+    ->controller(LoginController::class)
+    ->group(function () {
+        Route::post('/login', 'store')
+            ->middleware('throttle:5,1')
+            ->name('login');
+
+        Route::post('/logout', 'destroy')
+            ->middleware('auth:sanctum')
+            ->name('logout');
     });
 
 Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
