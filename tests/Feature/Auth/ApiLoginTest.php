@@ -7,7 +7,7 @@ test('a user can log in with phone and password', function () {
     $user = User::factory()->create([
         'phone' => '09121234567',
         'password' => Hash::make('password123'),
-        'is_active' => true,
+        'status' => 'active',
     ]);
 
     $response = $this->postJson('/api/auth/login', [
@@ -49,7 +49,7 @@ test('an inactive user cannot log in', function () {
     User::factory()->create([
         'phone' => '09121234567',
         'password' => Hash::make('password123'),
-        'is_active' => false,
+        'status' => 'suspended',
     ]);
 
     $response = $this->postJson('/api/auth/login', [

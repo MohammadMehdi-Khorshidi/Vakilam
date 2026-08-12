@@ -26,7 +26,7 @@ class LoginController extends Controller
             ->where('phone', $data['phone'])
             ->first();
 
-        if (! $user || ! $user->is_active || ! Hash::check($data['password'], $user->password)) {
+        if (! $user || $user->status !== 'active' || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'phone' => 'شماره موبایل یا رمز عبور اشتباه است.',
             ]);
@@ -42,7 +42,7 @@ class LoginController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'phone' => $user->phone,
-                'role' => $user->role,
+                'status' => $user->status,
             ],
         ]);
     }

@@ -13,7 +13,7 @@ function createPasswordResetUser(array $attributes = []): User
     return User::factory()->create(array_merge([
         'phone' => '09121234567',
         'password' => Hash::make('old-password'),
-        'is_active' => true,
+        'status' => 'active',
     ], $attributes));
 }
 
@@ -44,7 +44,7 @@ test('an unknown or inactive user cannot request a password reset otp', function
     ])->assertUnprocessable()
         ->assertJsonValidationErrors('phone');
 
-    createPasswordResetUser(['phone' => '09121111111', 'is_active' => false]);
+    createPasswordResetUser(['phone' => '09121111111', 'status' => 'suspended']);
 
     $this->postJson('/api/auth/password/forgot/send-otp', [
         'phone' => '09121111111',

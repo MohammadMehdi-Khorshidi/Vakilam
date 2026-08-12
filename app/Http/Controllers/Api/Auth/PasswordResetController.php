@@ -33,7 +33,7 @@ class PasswordResetController extends Controller
 
         $user = User::query()
             ->where('phone', $data['phone'])
-            ->where('is_active', true)
+            ->where('status', 'active')
             ->first();
 
         if (! $user) {
@@ -128,7 +128,7 @@ class PasswordResetController extends Controller
         $user = User::query()
             ->whereKey($otpData['user_id'])
             ->where('phone', $data['phone'])
-            ->where('is_active', true)
+            ->where('status', 'active')
             ->first();
 
         if (! $user) {
@@ -178,7 +178,7 @@ class PasswordResetController extends Controller
         $user = User::query()
             ->whereKey($resetData['user_id'])
             ->where('phone', $data['phone'])
-            ->where('is_active', true)
+            ->where('status', 'active')
             ->first();
 
         if (! $user) {
