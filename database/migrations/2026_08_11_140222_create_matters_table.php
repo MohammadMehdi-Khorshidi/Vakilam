@@ -86,10 +86,9 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('matter_timeline');
-        Schema::dropIfExists('matter_actions');
-        Schema::dropIfExists('matter_members');
         Schema::dropIfExists('legal_matters');
-        Schema::dropIfExists('engagements');
+        Schema::dropIfExists('matter_members');
+        Schema::dropIfExists('matter_actions');
+        Schema::dropIfExists('matter_timeline');
     }
 };
