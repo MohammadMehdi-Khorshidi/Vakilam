@@ -22,6 +22,8 @@ class LawyerProfile extends Model
         'is_available',
     ];
 
+
+    //Get the user associated with the lawyer profile.
     public function user()
     {
         return $this->belongsTo(User::class);

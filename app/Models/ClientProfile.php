@@ -18,6 +18,8 @@ class ClientProfile extends Model
         'city_id',
     ];
 
+    
+    //Get the user associated with the client profile
     public function user()
     {
         return $this->belongsTo(User::class);
