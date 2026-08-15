@@ -38,4 +38,11 @@ class LegalRequest extends Model
     {
         return $this->belongsTo(Province::class);
     }
+
+    
+    // A legal request belongs to one city.
+    public function city()
+    {
+        return $this->belongsTo(City::class);
+    }
 }
