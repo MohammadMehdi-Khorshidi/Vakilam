@@ -25,10 +25,17 @@ class LegalRequest extends Model
         'cancelled_at',
     ];
 
-    
+
     // A legal request belongs to one client user.
     public function client()
     {
         return $this->belongsTo(User::class, 'client_user_id');
+    }
+
+  
+    // A legal request belongs to one province.
+    public function province()
+    {
+        return $this->belongsTo(Province::class);
     }
 }
