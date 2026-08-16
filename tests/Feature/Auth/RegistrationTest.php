@@ -15,12 +15,17 @@ test('registration screen can be rendered', function () {
     $response = $this->get(route('register'));
 
     $response->assertOk();
+
+beforeEach(function () {
+    Cache::flush();
 });
 
 test('new users can register', function () {
-    $response = $this->post(route('register.store'), [
+    $response = $this->post('/register', [
         'name' => 'Test User',
+        'last_name' => 'Example',
         'email' => 'test@example.com',
+        'phone' => '09121234567',
         'password' => 'password',
         'password_confirmation' => 'password',
     ]);
@@ -73,4 +78,5 @@ test('admin cannot be selected as a public registration role', function () {
     $response
         ->assertUnprocessable()
         ->assertJsonValidationErrors('role');
+});
 });

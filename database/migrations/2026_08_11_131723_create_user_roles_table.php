@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('user_roles', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->unsignedBigInteger('user_id');
+            $table->uuid('user_id');
             $table->unsignedBigInteger('role_id');
             $table->dateTime('granted_at', 6)->useCurrent();
             $table->dateTime('revoked_at', 6)->nullable();
