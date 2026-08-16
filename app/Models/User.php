@@ -66,6 +66,12 @@ class User extends Authenticatable implements PasskeyUser
         return $this->hasOne(LawyerProfile::class);
     }
 
+    // A user has many roles.
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class, 'user_roles');
+    }
+
     /**
      * Get the attributes that should be cast.
      *
