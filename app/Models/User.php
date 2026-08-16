@@ -71,11 +71,17 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->belongsToMany(Role::class, 'user_roles');
     }
-    
+
     // A user has many consultations.
     public function consultations()
     {
         return $this->hasMany(Consultation::class, 'client_user_id');
+    }
+    
+    // A user has many engagements.
+    public function engagements()
+    {
+        return $this->hasMany(Engagement::class, 'client_user_id');
     }
 
     /**
