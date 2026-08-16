@@ -1,6 +1,20 @@
 <?php
 
 use Illuminate\Support\Facades\Cache;
+use Laravel\Fortify\Features;
+
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+beforeEach(function () {
+    Cache::flush();
+
+    $this->skipUnlessFortifyHas(Features::registration());
+});
+
+test('registration screen can be rendered', function () {
+    $response = $this->get(route('register'));
+
+    $response->assertOk();
 
 beforeEach(function () {
     Cache::flush();
@@ -64,4 +78,5 @@ test('admin cannot be selected as a public registration role', function () {
     $response
         ->assertUnprocessable()
         ->assertJsonValidationErrors('role');
+});
 });

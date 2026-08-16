@@ -53,6 +53,19 @@ class User extends Authenticatable implements PasskeyUser
         return ['id', 'public_id'];
     }
 
+
+    //Get the client profile associated with the user.
+    public function clientProfile()
+    {
+        return $this->hasOne(ClientProfile::class);
+    }
+
+    //Get the lawyer profile associated with the user.
+    public function lawyerProfile()
+    {
+        return $this->hasOne(LawyerProfile::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
