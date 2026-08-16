@@ -71,6 +71,12 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->belongsToMany(Role::class, 'user_roles');
     }
+    
+    // A user has many consultations.
+    public function consultations()
+    {
+        return $this->hasMany(Consultation::class, 'client_user_id');
+    }
 
     /**
      * Get the attributes that should be cast.
