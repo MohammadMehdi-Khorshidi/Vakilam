@@ -6,7 +6,6 @@ use App\Http\Controllers\Api\Auth\RegisterController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-//register
 Route::prefix('auth/register')
     ->name('api.register.')
     ->controller(RegisterController::class)
@@ -22,6 +21,10 @@ Route::prefix('auth/register')
         Route::post('/', 'store')
             ->name('store');
     });
+
+Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');
 
 //login and logout
 Route::prefix('auth')
