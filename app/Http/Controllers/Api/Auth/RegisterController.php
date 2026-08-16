@@ -7,7 +7,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -20,7 +19,7 @@ class RegisterController extends Controller
     public function sendOtp(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
+            'phone' => 'required|string|regex:/^09\d{9}$/',
         ]);
 
         $otp = (string) random_int(100000, 999999);
@@ -47,8 +46,8 @@ class RegisterController extends Controller
     public function verifyOtp(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
-            'otp' => ['required', 'string', 'digits:6'],
+            'phone' => 'required|string|regex:/^09\d{9}$/',
+            'otp' => 'required|string|digits:6',
         ]);
 
         $expectedOtp = Cache::get($this->otpCacheKey($data['phone']));
@@ -86,13 +85,13 @@ class RegisterController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
+            'first_name' => 'required|string|max:100',
+            'last_name' => 'required|string|max:100',
+            'phone' => 'required|string|regex:/^09\d{9}$/',
             'password' => ['required', 'confirmed', Password::defaults()],
-            'role' => ['required', Rule::in(['client', 'lawyer'])],
-            'terms_accepted' => ['accepted'],
-            'verification_token' => ['required', 'string', 'size:64'],
+            'role' => 'required|in:client,lawyer',
+            'terms_accepted' => 'accepted',
+            'verification_token' => 'required|string|size:64',
         ]);
 
         $verifiedPhone = Cache::get(
