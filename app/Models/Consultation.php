@@ -3,15 +3,24 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class Consultation extends Model
 {
-    public $incrementing = false;
+    use HasUuids;
 
-    protected $keyType = 'string';
+    /**
+     * Generate UUIDs for both the internal primary key and the public identifier.
+     *
+     * @return array<int, string>
+     */
+    public function uniqueIds(): array
+    {
+        return ['id', 'public_id'];
+    }
 
+    /** Attributes that may be mass assigned. */
     protected $fillable = [
-        'public_id',
         'legal_request_id',
         'client_user_id',
         'lawyer_profile_id',
@@ -22,21 +31,47 @@ class Consultation extends Model
         'notes',
     ];
 
-    // A consultation belongs to one legal request.
+    /**
+     * Cast database values to useful PHP types.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'scheduled_start_at' => 'datetime',
+            'scheduled_end_at' => 'datetime',
+            'completed_at' => 'datetime',
+        ];
+    }
+
+    /** Legal request that produced this consultation. */
     public function legalRequest()
     {
         return $this->belongsTo(LegalRequest::class);
     }
 
-    // A consultation belongs to one client user.
+    /** Client user who requested this consultation. */
     public function client()
     {
         return $this->belongsTo(User::class, 'client_user_id');
     }
 
-    // A consultation belongs to one lawyer profile.
+    /** Optional lawyer assigned to this consultation. */
     public function lawyerProfile()
     {
         return $this->belongsTo(LawyerProfile::class);
+    }
+
+    /** Conversations connected directly to this consultation. */
+    public function conversations()
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
+    /** Meetings connected directly to this consultation. */
+    public function meetings()
+    {
+        return $this->hasMany(Meeting::class);
     }
 }
