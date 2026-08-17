@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+    --green-1000: #08231f;
+    --green-950: #0d302a;
+    --green-900: #123c35;
+    --green-850: #17483f;
+    --green-800: #1c554a;
+    --green-700: #28685c;
+    --green-600: #3d7b70;
+    --green-200: #cfe0da;
+    --green-100: #e8f1ee;
+    --green-50: #f3f8f6;
+    --gold-800: #7f6427;
+    --gold-700: #94742e;
+    --gold-600: #ad8b43;
+    --gold-500: #c5a35a;
+    --gold-400: #d3b776;
+    --gold-300: #e2ce9d;
+    --gold-200: #eee1bf;
+    --gold-100: #f8f1e2;
+    --gold-50: #fcf9f1;
+    --ink-950: #111917;
+    --ink-900: #17211f;
+    --ink-800: #26312e;
+    --ink-700: #40504c;
+    --muted: #697570;
+    --muted-light: #89928f;
+    --line-strong: #d5ddd9;
+    --line: #e2e8e5;
+    --line-soft: #edf1ef;
+    --surface: #fff;
+    --surface-soft: #fafbf9;
+    --canvas: #f4f6f3;
+    --danger: #a73d42;
+    --success: #257056;
+    --shadow-sm: 0 7px 20px #0a29240f;
+    --shadow-md: 0 16px 40px #0a292417;
+    --shadow-lg: 0 26px 70px #08231f21;
+    --radius-xl: 24px;
+    --radius-lg: 19px;
+    --radius-md: 14px;
+    --sidebar: 286px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    min-width: 320px;
+    margin: 0;
+    color: var(--ink-900);
+    background:
+        radial-gradient(circle at 88% 4%, #c5a35a12, transparent 25%), var(--canvas);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-size: 15px;
 }
