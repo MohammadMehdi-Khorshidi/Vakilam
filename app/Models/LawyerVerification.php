@@ -3,13 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class LawyerVerification extends Model
 {
-    public $incrementing = false;
+    use HasUuids;
 
-    protected $keyType = 'string';
+    /** The table has created_at but no updated_at column. */
+    public const UPDATED_AT = null;
 
+    /** Attributes that may be mass assigned. */
     protected $fillable = [
         'lawyer_profile_id',
         'status',
@@ -20,15 +23,30 @@ class LawyerVerification extends Model
         'reviewed_at',
     ];
 
-    // A lawyer verification belongs to one lawyer profile.
+    /**
+     * Cast database values to useful PHP types.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'submitted_data' => 'array',
+            'submitted_at' => 'datetime',
+            'reviewed_at' => 'datetime',
+        ];
+    }
+
+    /** Lawyer profile being verified. */
     public function lawyerProfile()
     {
         return $this->belongsTo(LawyerProfile::class);
     }
 
-    // A lawyer verification is reviewed by one user.
+    /** User who reviewed this verification, when reviewed. */
     public function reviewer()
     {
         return $this->belongsTo(User::class, 'reviewed_by');
     }
+
 }
