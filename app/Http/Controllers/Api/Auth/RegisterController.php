@@ -35,7 +35,7 @@ class RegisterController extends Controller
         Cache::put($this->otpCacheKey($data['phone']), $otp, self::OTP_TTL_SECONDS);
 
         $response = [
-            'message' => 'کد تأیید ساخته شد.',
+            'message' => 'Verification code generated.',
             'expires_in' => self::OTP_TTL_SECONDS,
             'resend_after' => 60,
         ];
@@ -67,7 +67,7 @@ class RegisterController extends Controller
 
         if (! is_string($expectedOtp) || ! hash_equals($expectedOtp, $data['otp'])) {
             throw ValidationException::withMessages([
-                'otp' => 'کد تأیید نامعتبر یا منقضی شده است.',
+                'otp' => 'The verification code is invalid or has expired.',
             ]);
         }
 
@@ -82,7 +82,7 @@ class RegisterController extends Controller
         );
 
         return response()->json([
-            'message' => 'شماره موبایل تأیید شد.',
+            'message' => 'Phone number verified.',
             'verification_token' => $verificationToken,
             'expires_in' => self::VERIFICATION_TTL_SECONDS,
         ]);
@@ -122,13 +122,13 @@ class RegisterController extends Controller
 
         if (! is_string($verifiedPhone) || ! hash_equals($verifiedPhone, $data['phone'])) {
             throw ValidationException::withMessages([
-                'verification_token' => 'تأیید شماره موبایل نامعتبر یا منقضی شده است.',
+                'verification_token' => 'The phone verification is invalid or has expired.',
             ]);
         }
 
         // TODO: پس از نهایی‌شدن migration و مدل User، کاربر اینجا داخل transaction ساخته شود.
         return response()->json([
-            'message' => 'اطلاعات معتبر است؛ ذخیره کاربر هنوز پیاده‌سازی نشده است.',
+            'message' => 'The data is valid; user persistence has not been implemented yet.',
             'ready_for_persistence' => false,
         ], 501);
     }

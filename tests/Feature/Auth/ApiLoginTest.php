@@ -89,7 +89,7 @@ test('an authenticated user can fetch their profile and log out', function () {
     $this->withToken($token)
         ->postJson('/api/auth/logout')
         ->assertOk()
-        ->assertJsonPath('message', 'خروج با موفقیت انجام شد.');
+        ->assertJsonPath('message', 'Logged out successfully.');
 
     $this->assertDatabaseCount('personal_access_tokens', 0);
     $this->app['auth']->forgetGuards();
