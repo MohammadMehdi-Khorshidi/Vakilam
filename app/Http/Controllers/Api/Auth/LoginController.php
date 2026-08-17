@@ -28,14 +28,14 @@ class LoginController extends Controller
 
         if (! $user || $user->status !== 'active' || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
-                'phone' => 'شماره موبایل یا رمز عبور اشتباه است.',
+                'phone' => 'The phone number or password is incorrect.',
             ]);
         }
 
         $token = $user->createToken($data['device_name'] ?? 'web')->plainTextToken;
 
         return response()->json([
-            'message' => 'ورود با موفقیت انجام شد.',
+            'message' => 'Logged in successfully.',
             'token_type' => 'Bearer',
             'access_token' => $token,
             'user' => [
@@ -52,7 +52,7 @@ class LoginController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
-            'message' => 'خروج با موفقیت انجام شد.',
+            'message' => 'Logged out successfully.',
         ]);
     }
 }

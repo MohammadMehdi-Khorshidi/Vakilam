@@ -122,7 +122,7 @@ test('a verified user can set a different password and existing tokens are revok
         'password' => 'new-password',
         'password_confirmation' => 'new-password',
     ])->assertOk()
-        ->assertJsonPath('message', 'رمز عبور با موفقیت تغییر کرد؛ دوباره وارد شوید.');
+        ->assertJsonPath('message', 'Password reset successfully. Please log in again.');
 
     $user->refresh();
 
