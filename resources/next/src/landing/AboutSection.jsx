@@ -17,6 +17,17 @@ const AboutSection = () => {
             <div className="mx-auto max-w-7xl">
                 {/* گرید اصلی */}
                 <div className="grid items-center gap-10 lg:grid-cols-2">
+                    {/* سمت چپ - عکس */}
+                    <div className="order-2 hidden overflow-hidden rounded-3xl sm:block">
+                        <Image
+                            src={AboutImage}
+                            alt="دفتر حقوقی"
+
+                            width={900}
+                            height={650}
+                            className="h-[320px] w-full object-cover md:h-[420px]"
+                        />
+                    </div>
                     {/* سمت راست - متن */}
                     <div className="order-1">
                         <span className="block text-3xl font-bold text-[#c9a96e]">
@@ -54,17 +65,6 @@ const AboutSection = () => {
                             همکاری با ما
                             <ArrowLeft className="h-4 w-4" />
                         </button>
-                    </div>
-
-                    {/* سمت چپ - عکس */}
-                    <div className="order-2 hidden overflow-hidden rounded-3xl sm:block">
-                        <Image
-                            src={AboutImage}
-                            alt="دفتر حقوقی"
-                            width={900}
-                            height={650}
-                            className="h-[320px] w-full object-cover md:h-[420px]"
-                        />
                     </div>
                 </div>
             </div>
