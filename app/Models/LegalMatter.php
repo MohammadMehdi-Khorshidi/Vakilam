@@ -61,13 +61,13 @@ class LegalMatter extends Model
         return $this->belongsTo(User::class, 'client_user_id');
     }
 
-    /** Membership records attached to this matter. */
+    /** Reserved membership metadata; client/lawyer authorization comes from client_user_id and engagement. */
     public function memberships()
     {
         return $this->hasMany(MatterMember::class);
     }
 
-    /** Users registered as members of this matter. */
+    /** Reserved member records; this relation is not an authorization source. */
     public function members()
     {
         return $this->belongsToMany(User::class, 'matter_members', 'legal_matter_id', 'user_id')
