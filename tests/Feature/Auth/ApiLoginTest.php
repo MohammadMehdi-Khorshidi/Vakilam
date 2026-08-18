@@ -24,6 +24,7 @@ test('a user can log in with phone and password', function () {
         ->assertJsonStructure(['message', 'token_type', 'access_token', 'user']);
 
     expect($response->json('access_token'))->toBeString()->not->toBeEmpty();
+    expect($user->fresh()->last_login_at)->not->toBeNull();
     $this->assertDatabaseCount('personal_access_tokens', 1);
 });
 

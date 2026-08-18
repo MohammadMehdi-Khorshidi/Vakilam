@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RegisterController;
+use App\Http\Controllers\Api\DocumentController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -31,4 +32,23 @@ Route::prefix('auth/password')->name('apiPassword.')
 
 Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
     return $request->user();
+});
+
+Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(function () {
+    Route::prefix('legal-requests/{legalRequest}/documents')->group(function () {
+        Route::get('/', 'index');
+        Route::post('/', 'store');
+    });
+
+    Route::prefix('legal-matters/{legalMatter}/documents')->group(function () {
+        Route::get('/', 'indexMatter');
+        Route::post('/', 'storeMatter');
+    });
+
+    Route::prefix('documents/{document}')->group(function () {
+        Route::get('/', 'show');
+        Route::get('/download', 'download');
+        Route::post('/versions', 'storeVersion');
+        Route::delete('/', 'destroy');
+    });
 });
