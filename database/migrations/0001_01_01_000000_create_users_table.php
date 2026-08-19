@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('last_name');
             $table->uuid('public_id')->unique();
+            $table->string('two_factor_secret')->nullable();
             $table->string('email')->unique()->nullable();
             $table->string('phone', 15)->unique()->comment('E.164 without + e.g. 98912...');
             $table->dateTime('phone_verified_at', 6)->nullable();
