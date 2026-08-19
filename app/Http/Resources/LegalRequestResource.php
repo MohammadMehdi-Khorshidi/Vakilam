@@ -34,6 +34,10 @@ class LegalRequestResource extends JsonResource
                     'relation_note' => $party->relation_note,
                     'is_client' => $party->is_client,
                 ])),
+            'documents' => $this->whenLoaded(
+                'documents',
+                fn () => DocumentResource::collection($this->documents)->resolve(),
+            ),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

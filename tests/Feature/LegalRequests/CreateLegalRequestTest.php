@@ -132,9 +132,24 @@ test('creation validates enums active references city ownership and client party
 test('only the owner can submit a draft legal request and it cannot be submitted twice', function () {
     $client = legalRequestTestUser();
     $otherClient = legalRequestTestUser();
+    $category = LegalCategory::query()->create([
+        'code' => 'submission-test',
+        'name' => 'Submission Test',
+        'status' => true,
+    ]);
+    $province = Province::query()->create(['name' => 'Submission Province']);
+    $city = City::query()->create([
+        'name' => 'Submission City',
+        'province_id' => $province->id,
+    ]);
     $legalRequest = LegalRequest::query()->create([
         'client_user_id' => $client->id,
         'description' => 'Ready for submission.',
+        'legal_category_id' => $category->id,
+        'province_id' => $province->id,
+        'city_id' => $city->id,
+        'urgency' => 'normal',
+        'service_intent' => 'lawyer_selection',
         'status' => 'draft',
     ]);
 

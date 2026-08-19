@@ -2,19 +2,23 @@
 
 namespace App\Http\Requests\LegalRequests;
 
+use App\Models\LegalRequest;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
-class StoreLegalRequestRequest extends FormRequest
+class UpdateLegalRequestRequest extends FormRequest
 {
     public function authorize(): bool
     {
         $user = $this->user();
+        $legalRequest = $this->route('legalRequest');
 
         return $user instanceof User
             && $user->status === 'active'
+            && $legalRequest instanceof LegalRequest
+            && $legalRequest->client_user_id === $user->id
             && $user->roles()
                 ->where('roles.code', 'client')
                 ->wherePivotNull('revoked_at')
@@ -39,27 +43,37 @@ class StoreLegalRequestRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
+        /** @var LegalRequest|null $legalRequest */
+        $legalRequest = $this->route('legalRequest');
+        $provinceId = $this->has('province_id')
+            ? $this->input('province_id')
+            : $legalRequest?->province_id;
+
         return [
-            'title' => ['nullable', 'string', 'max:200'],
-            'description' => ['required', 'string'],
+            'title' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'description' => ['sometimes', 'required', 'string'],
             'legal_category_id' => [
+                'sometimes',
                 'nullable',
                 'uuid',
                 Rule::exists('legal_categories', 'id')->where('status', true),
             ],
-            'province_id' => ['nullable', 'integer', Rule::exists('provinces', 'id')],
+            'province_id' => ['sometimes', 'nullable', 'integer', Rule::exists('provinces', 'id')],
             'city_id' => [
+                'sometimes',
                 'nullable',
                 'integer',
-                Rule::exists('cities', 'id')->where(function ($query): void {
-                    if ($this->filled('province_id')) {
-                        $query->where('province_id', $this->integer('province_id'));
-                    }
-                }),
+                Rule::exists('cities', 'id')->where(
+                    fn ($query) => $query->where('province_id', $provinceId),
+                ),
             ],
-            'urgency' => ['nullable', Rule::in(['low', 'normal', 'high', 'urgent'])],
-            'service_intent' => [
+            'urgency' => [
+                'sometimes',
                 'nullable',
+                Rule::in(['low', 'normal', 'high', 'urgent']),
+            ],
+            'service_intent' => [
+                'sometimes',
                 Rule::in(['undecided', 'consultation', 'lawyer_selection']),
             ],
             'parties' => ['sometimes', 'array'],

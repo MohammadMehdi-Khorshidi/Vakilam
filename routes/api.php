@@ -5,7 +5,7 @@ use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\LegalRequestController;
-use App\Http\Controllers\Api\ReferenceLocationController;
+use App\Http\Controllers\Api\LocationReferenceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -36,15 +36,18 @@ Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
     return $request->user();
 });
 
-Route::prefix('reference')->name('apiReference.')
-    ->controller(ReferenceLocationController::class)
+Route::controller(LocationReferenceController::class)
+    ->prefix('reference')
     ->group(function () {
-        Route::get('/provinces', 'provinces')->name('provinces');
-        Route::get('/provinces/{province}/cities', 'cities')->name('provinceCities');
+        Route::get('/provinces', 'provinces');
+        Route::get('/provinces/{province}/cities', 'cities');
     });
 
 Route::middleware('auth:sanctum')->controller(LegalRequestController::class)->group(function () {
+    Route::get('/legal-requests/draft', 'draft');
     Route::post('/legal-requests', 'store');
+    Route::get('/legal-requests/{legalRequest}', 'show');
+    Route::patch('/legal-requests/{legalRequest}', 'update');
     Route::post('/legal-requests/{legalRequest}/submit', 'submit');
 });
 
