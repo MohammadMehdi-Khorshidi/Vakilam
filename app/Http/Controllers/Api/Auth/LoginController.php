@@ -32,6 +32,8 @@ class LoginController extends Controller
             ]);
         }
 
+        $user->forceFill(['last_login_at' => now()])->save();
+
         $token = $user->createToken($data['device_name'] ?? 'web')->plainTextToken;
 
         return response()->json([

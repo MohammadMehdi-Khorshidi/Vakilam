@@ -3,6 +3,9 @@
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RegisterController;
+use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\LegalRequestController;
+use App\Http\Controllers\Api\LocationReferenceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -31,4 +34,38 @@ Route::prefix('auth/password')->name('apiPassword.')
 
 Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
     return $request->user();
+});
+
+Route::controller(LocationReferenceController::class)
+    ->prefix('reference')
+    ->group(function () {
+        Route::get('/provinces', 'provinces');
+        Route::get('/provinces/{province}/cities', 'cities');
+    });
+
+Route::middleware('auth:sanctum')->controller(LegalRequestController::class)->group(function () {
+    Route::get('/legal-requests/draft', 'draft');
+    Route::post('/legal-requests', 'store');
+    Route::get('/legal-requests/{legalRequest}', 'show');
+    Route::patch('/legal-requests/{legalRequest}', 'update');
+    Route::post('/legal-requests/{legalRequest}/submit', 'submit');
+});
+
+Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(function () {
+    Route::prefix('legal-requests/{legalRequest}/documents')->group(function () {
+        Route::get('/', 'index');
+        Route::post('/', 'store');
+    });
+
+    Route::prefix('legal-matters/{legalMatter}/documents')->group(function () {
+        Route::get('/', 'indexMatter');
+        Route::post('/', 'storeMatter');
+    });
+
+    Route::prefix('documents/{document}')->group(function () {
+        Route::get('/', 'show');
+        Route::get('/download', 'download');
+        Route::post('/versions', 'storeVersion');
+        Route::delete('/', 'destroy');
+    });
 });
