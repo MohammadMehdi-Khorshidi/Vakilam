@@ -44,6 +44,7 @@ Route::controller(LocationReferenceController::class)
     });
 
 Route::middleware('auth:sanctum')->controller(LegalRequestController::class)->group(function () {
+    Route::get('/legal-requests', 'index');
     Route::get('/legal-requests/draft', 'draft');
     Route::post('/legal-requests', 'store');
     Route::get('/legal-requests/{legalRequest}', 'show');

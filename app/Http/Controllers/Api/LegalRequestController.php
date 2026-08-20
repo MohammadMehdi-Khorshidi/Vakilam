@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LegalRequests\StoreLegalRequestRequest;
 use App\Http\Requests\LegalRequests\UpdateLegalRequestRequest;
+use App\Http\Resources\LegalRequestListResource;
 use App\Http\Resources\LegalRequestResource;
 use App\Models\LegalRequest;
 use App\Models\User;
@@ -17,6 +18,25 @@ use Illuminate\Validation\Rule;
 
 class LegalRequestController extends Controller
 {
+    public function index(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $legalRequests = $user->legalRequests()
+            ->with([
+                'legalCategory',
+                'province',
+                'city',
+            ])
+            ->where('status', '!=', 'draft')
+            ->latest('updated_at')
+            ->get();
+
+        return response()->json([
+            'active_cases' => LegalRequestListResource::collection($legalRequests),
+        ]);
+    }
     public function store(StoreLegalRequestRequest $request): JsonResponse
     {
         /** @var User $client */
