@@ -22,7 +22,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
-    public function __construct(private DocumentAccessService $access) {}
+    public function __construct(private DocumentAccessService $access)
+    {
+    }
 
     public function index(Request $request, LegalRequest $legalRequest): JsonResponse
     {
@@ -83,9 +85,10 @@ class DocumentController extends Controller
 
     public function storeMatter(
         StoreLegalMatterDocumentRequest $request,
-        LegalMatter $legalMatter,
-        DocumentUploadService $service,
-    ): JsonResponse {
+        LegalMatter                     $legalMatter,
+        DocumentUploadService           $service,
+    ): JsonResponse
+    {
         abort_if(
             in_array($legalMatter->status, ['completed', 'closed'], true),
             409,
@@ -128,8 +131,8 @@ class DocumentController extends Controller
         $storedFile = $document->currentFile;
         abort_if(
             $storedFile === null
-                || $storedFile->status !== 'ready'
-                || ! Storage::disk($storedFile->disk)->exists($storedFile->path),
+            || $storedFile->status !== 'ready'
+            || !Storage::disk($storedFile->disk)->exists($storedFile->path),
             404,
             'The document file was not found.',
         );
@@ -143,9 +146,10 @@ class DocumentController extends Controller
 
     public function storeVersion(
         StoreDocumentVersionRequest $request,
-        Document $document,
-        DocumentUploadService $service,
-    ): JsonResponse {
+        Document                    $document,
+        DocumentUploadService       $service,
+    ): JsonResponse
+    {
         abort_if($document->status === 'archived', 409, 'Archived documents cannot accept new versions.');
         $this->ensureDocumentContextIsOpen($document);
 
