@@ -59,7 +59,7 @@ class LegalRequestController extends Controller
                         'relation_note',
                         'is_client',
                     ]),
-                    'is_client' => (bool) ($party['is_client'] ?? false),
+                    'is_client' => (bool)($party['is_client'] ?? false),
                 ]);
             }
 
@@ -109,8 +109,9 @@ class LegalRequestController extends Controller
 
     public function update(
         UpdateLegalRequestRequest $request,
-        LegalRequest $legalRequest,
-    ): JsonResponse {
+        LegalRequest              $legalRequest,
+    ): JsonResponse
+    {
         abort_unless(
             $legalRequest->status === 'draft',
             409,
@@ -142,8 +143,8 @@ class LegalRequestController extends Controller
             ]);
 
             if (array_key_exists('province_id', $attributes)
-                && ! array_key_exists('city_id', $attributes)
-                && (string) $attributes['province_id'] !== (string) $lockedRequest->province_id) {
+                && !array_key_exists('city_id', $attributes)
+                && (string)$attributes['province_id'] !== (string)$lockedRequest->province_id) {
                 $attributes['city_id'] = null;
             }
 
@@ -160,7 +161,7 @@ class LegalRequestController extends Controller
                             'relation_note',
                             'is_client',
                         ]),
-                        'is_client' => (bool) ($party['is_client'] ?? false),
+                        'is_client' => (bool)($party['is_client'] ?? false),
                     ]);
                 }
             }
@@ -215,7 +216,7 @@ class LegalRequestController extends Controller
                     'required',
                     'integer',
                     Rule::exists('cities', 'id')->where(
-                        fn ($query) => $query->where('province_id', $lockedRequest->province_id),
+                        fn($query) => $query->where('province_id', $lockedRequest->province_id),
                     ),
                 ],
                 'urgency' => ['required', Rule::in(['low', 'normal', 'high', 'urgent'])],
@@ -256,7 +257,7 @@ class LegalRequestController extends Controller
     {
         $legalRequest->load([
             'parties',
-            'documents' => fn ($query) => $query
+            'documents' => fn($query) => $query
                 ->where('status', '!=', 'archived')
                 ->latest('created_at'),
             'documents.documentType',
