@@ -14,7 +14,9 @@ return new class extends Migration
         Schema::create('roles', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('code', 30)->unique(); // client|lawyer|admin
-            $table->string('name_fa', 60);
+            $table->string('name', 60);
+            $table->string('description', 255)->nullable();
+            $table->boolean('is_system')->default(false);
             $table->timestamps();
         });
     }

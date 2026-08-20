@@ -39,7 +39,7 @@ class RegisterController extends Controller
             ]);
         }
 
-        if (! Cache::add(
+        if (!Cache::add(
             $this->resendCacheKey($data['phone']),
             true,
             self::OTP_RESEND_AFTER_SECONDS,
@@ -50,7 +50,7 @@ class RegisterController extends Controller
             ], 429);
         }
 
-        $otp = (string) random_int(100000, 999999);
+        $otp = (string)random_int(100000, 999999);
 
         Cache::put($this->otpCacheKey($data['phone']), [
             'otp_hash' => hash('sha256', $otp),
@@ -85,7 +85,7 @@ class RegisterController extends Controller
         $cacheKey = $this->otpCacheKey($data['phone']);
         $otpData = Cache::get($cacheKey);
 
-        if (! is_array($otpData) || ($otpData['expires_at'] ?? 0) <= now()->timestamp) {
+        if (!is_array($otpData) || ($otpData['expires_at'] ?? 0) <= now()->timestamp) {
             Cache::forget($cacheKey);
 
             throw ValidationException::withMessages([
@@ -101,7 +101,7 @@ class RegisterController extends Controller
             ]);
         }
 
-        if (! hash_equals((string) $otpData['otp_hash'], hash('sha256', $data['otp']))) {
+        if (!hash_equals((string)$otpData['otp_hash'], hash('sha256', $data['otp']))) {
             $otpData['attempts']++;
             $remainingSeconds = max(1, $otpData['expires_at'] - now()->timestamp);
 
@@ -152,7 +152,7 @@ class RegisterController extends Controller
             $this->verificationCacheKey($data['verification_token']),
         );
 
-        if (! is_string($verifiedPhone) || ! hash_equals($verifiedPhone, $data['phone'])) {
+        if (!is_string($verifiedPhone) || !hash_equals($verifiedPhone, $data['phone'])) {
             throw ValidationException::withMessages([
                 'verification_token' => 'The phone verification is invalid or has expired.',
             ]);
@@ -188,7 +188,7 @@ class RegisterController extends Controller
                 'granted_at' => now(),
             ]);
 
-            $fullName = $data['first_name'].' '.$data['last_name'];
+            $fullName = $data['first_name'] . ' ' . $data['last_name'];
 
             if ($data['role'] === 'lawyer') {
                 LawyerProfile::query()->create([
@@ -232,11 +232,11 @@ class RegisterController extends Controller
 
     private function resendCacheKey(string $phone): string
     {
-        return 'registration:resend:'.hash('sha256', $phone);
+        return 'registration:resend:' . hash('sha256', $phone);
     }
 
     private function verificationCacheKey(string $token): string
     {
-        return 'registration:verified:'.hash('sha256', $token);
+        return 'registration:verified:' . hash('sha256', $token);
     }
 }

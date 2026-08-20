@@ -26,7 +26,7 @@ class LoginController extends Controller
             ->where('phone', $data['phone'])
             ->first();
 
-        if (! $user || $user->status !== 'active' || ! Hash::check($data['password'], $user->password)) {
+        if (!$user || $user->status !== 'active' || !Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'phone' => 'The phone number or password is incorrect.',
             ]);
