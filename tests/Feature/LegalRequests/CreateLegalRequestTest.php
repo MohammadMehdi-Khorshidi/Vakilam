@@ -12,10 +12,12 @@ use Laravel\Sanctum\Sanctum;
 function legalRequestTestUser(string $roleCode = 'client'): User
 {
     $user = User::factory()->create();
+
     $role = Role::query()->firstOrCreate(
         ['code' => $roleCode],
-        ['name_fa' => $roleCode === 'lawyer' ? 'وکیل' : 'موکل'],
+        ['name' => $roleCode === 'lawyer' ? 'وکیل' : 'موکل'],
     );
+
     UserRole::query()->create([
         'user_id' => $user->id,
         'role_id' => $role->id,
@@ -28,29 +30,36 @@ function legalRequestTestUser(string $roleCode = 'client'): User
 test('legal request creation requires authentication and an active client role', function () {
     $payload = ['description' => 'A contract payment has not been made.'];
 
-    $this->postJson('/api/legal-requests', $payload)->assertUnauthorized();
+    $this->postJson('/api/legal-requests', $payload)
+        ->assertUnauthorized();
 
     Sanctum::actingAs(legalRequestTestUser('lawyer'));
-    $this->postJson('/api/legal-requests', $payload)->assertForbidden();
+
+    $this->postJson('/api/legal-requests', $payload)
+        ->assertForbidden();
 });
 
 test('a client can create a draft legal request with its parties', function () {
     $client = legalRequestTestUser();
+
     $category = LegalCategory::query()->create([
         'code' => 'civil',
         'name' => 'Civil',
         'status' => true,
     ]);
-    $province = Province::query()->create(['name' => 'Tehran']);
+
+    $province = Province::query()->create([
+        'name' => 'Tehran',
+    ]);
+
     $city = City::query()->create([
         'name' => 'Tehran',
         'province_id' => $province->id,
     ]);
+
     Sanctum::actingAs($client);
 
     $response = $this->postJson('/api/legal-requests', [
-        'client_user_id' => User::factory()->create()->id,
-        'status' => 'closed',
         'title' => 'Contract payment claim',
         'description' => 'The other party has not paid the agreed amount.',
         'legal_category_id' => $category->id,
@@ -71,7 +80,8 @@ test('a client can create a draft legal request with its parties', function () {
                 'is_client' => false,
             ],
         ],
-    ])->assertCreated()
+    ])
+        ->assertCreated()
         ->assertJsonPath('message', 'Legal request created successfully.')
         ->assertJsonPath('legal_request.client_user_id', $client->id)
         ->assertJsonPath('legal_request.status', 'draft')
@@ -79,13 +89,16 @@ test('a client can create a draft legal request with its parties', function () {
         ->assertJsonCount(2, 'legal_request.parties');
 
     $legalRequestId = $response->json('legal_request.id');
+
     expect($legalRequestId)->toBeString()
         ->and($response->json('legal_request.public_id'))->toBeString();
+
     $this->assertDatabaseHas('legal_requests', [
         'id' => $legalRequestId,
         'client_user_id' => $client->id,
         'status' => 'draft',
     ]);
+
     $this->assertDatabaseHas('legal_request_parties', [
         'legal_request_id' => $legalRequestId,
         'party_role' => 'plaintiff',
@@ -95,17 +108,26 @@ test('a client can create a draft legal request with its parties', function () {
 
 test('creation validates enums active references city ownership and client party uniqueness', function () {
     $client = legalRequestTestUser();
+
     $inactiveCategory = LegalCategory::query()->create([
         'code' => 'inactive',
         'name' => 'Inactive',
         'status' => false,
     ]);
-    $firstProvince = Province::query()->create(['name' => 'First']);
-    $secondProvince = Province::query()->create(['name' => 'Second']);
+
+    $firstProvince = Province::query()->create([
+        'name' => 'First',
+    ]);
+
+    $secondProvince = Province::query()->create([
+        'name' => 'Second',
+    ]);
+
     $city = City::query()->create([
         'name' => 'Second City',
         'province_id' => $secondProvince->id,
     ]);
+
     Sanctum::actingAs($client);
 
     $this->postJson('/api/legal-requests', [
@@ -116,10 +138,17 @@ test('creation validates enums active references city ownership and client party
         'urgency' => 'immediate',
         'service_intent' => 'unknown',
         'parties' => [
-            ['party_role' => 'plaintiff', 'is_client' => true],
-            ['party_role' => 'witness', 'is_client' => true],
+            [
+                'party_role' => 'plaintiff',
+                'is_client' => true,
+            ],
+            [
+                'party_role' => 'witness',
+                'is_client' => true,
+            ],
         ],
-    ])->assertUnprocessable()
+    ])
+        ->assertUnprocessable()
         ->assertJsonValidationErrors([
             'legal_category_id',
             'city_id',
@@ -132,18 +161,25 @@ test('creation validates enums active references city ownership and client party
 test('only the owner can submit a draft legal request and it cannot be submitted twice', function () {
     $client = legalRequestTestUser();
     $otherClient = legalRequestTestUser();
+
     $category = LegalCategory::query()->create([
         'code' => 'submission-test',
         'name' => 'Submission Test',
         'status' => true,
     ]);
-    $province = Province::query()->create(['name' => 'Submission Province']);
+
+    $province = Province::query()->create([
+        'name' => 'Submission Province',
+    ]);
+
     $city = City::query()->create([
         'name' => 'Submission City',
         'province_id' => $province->id,
     ]);
+
     $legalRequest = LegalRequest::query()->create([
         'client_user_id' => $client->id,
+        'title' => 'Submission Test Matter',
         'description' => 'Ready for submission.',
         'legal_category_id' => $category->id,
         'province_id' => $province->id,
@@ -154,16 +190,48 @@ test('only the owner can submit a draft legal request and it cannot be submitted
     ]);
 
     Sanctum::actingAs($otherClient);
-    $this->postJson("/api/legal-requests/{$legalRequest->id}/submit")->assertForbidden();
+
+    $this->postJson("/api/legal-requests/{$legalRequest->id}/submit")
+        ->assertForbidden();
 
     Sanctum::actingAs($client);
+
     $this->postJson("/api/legal-requests/{$legalRequest->id}/submit")
         ->assertOk()
         ->assertJsonPath('message', 'Legal request submitted successfully.')
         ->assertJsonPath('legal_request.status', 'submitted');
 
     $legalRequest->refresh();
+
     expect($legalRequest->submitted_at)->not->toBeNull();
 
-    $this->postJson("/api/legal-requests/{$legalRequest->id}/submit")->assertStatus(409);
+    $this->assertDatabaseHas('legal_matters', [
+        'source_legal_request_id' => $legalRequest->id,
+        'client_user_id' => $client->id,
+        'status' => 'onboarding',
+    ]);
+
+    $this->postJson("/api/legal-requests/{$legalRequest->id}/submit")
+        ->assertStatus(409);
+});
+
+test('creating a matter from the same legal request does not create duplicates', function () {
+    $client = legalRequestTestUser();
+
+    $legalRequest = LegalRequest::query()->create([
+        'client_user_id' => $client->id,
+        'title' => 'Duplicate Matter Test',
+        'description' => 'Testing duplicate matter prevention.',
+        'status' => 'submitted',
+        'submitted_at' => now(),
+    ]);
+
+    $service = app(\App\Services\LegalMatters\LegalMatterFormationService::class);
+
+    $firstMatter = $service->createFromLegalRequest($legalRequest);
+    $secondMatter = $service->createFromLegalRequest($legalRequest);
+
+    expect($firstMatter->id)->toBe($secondMatter->id);
+
+    $this->assertDatabaseCount('legal_matters', 1);
 });

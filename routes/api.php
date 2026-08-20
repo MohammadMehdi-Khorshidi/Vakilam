@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\LegalRequestController;
 use App\Http\Controllers\Api\LocationReferenceController;
 use Illuminate\Http\Request;
@@ -35,6 +36,12 @@ Route::prefix('auth/password')->name('apiPassword.')
 Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
     return $request->user();
 });
+
+Route::middleware('auth:sanctum')
+    ->controller(ClientDashboardController::class)
+    ->group(function () {
+        Route::get('/client/dashboard', 'index');
+    });
 
 Route::controller(LocationReferenceController::class)
     ->prefix('reference')
