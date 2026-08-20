@@ -37,4 +37,12 @@ class Role extends Model
             ->using(UserRole::class)
             ->withPivot(['id', 'granted_at', 'revoked_at']);
     }
+    /**
+     * Permissions assigned to this role.
+     */
+    public function permissions()
+    {
+        return $this->belongsToMany(Permission::class, 'role_permissions');
+    }
+
 }
