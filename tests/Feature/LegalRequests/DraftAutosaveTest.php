@@ -14,7 +14,7 @@ function autosaveTestClient(): User
     $user = User::factory()->create();
     $role = Role::query()->firstOrCreate(
         ['code' => 'client'],
-        ['name_fa' => 'موکل'],
+        ['name' => 'موکل'],
     );
     UserRole::query()->create([
         'user_id' => $user->id,

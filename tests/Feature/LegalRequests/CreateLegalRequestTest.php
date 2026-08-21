@@ -14,7 +14,7 @@ function legalRequestTestUser(string $roleCode = 'client'): User
     $user = User::factory()->create();
     $role = Role::query()->firstOrCreate(
         ['code' => $roleCode],
-        ['name_fa' => $roleCode === 'lawyer' ? 'وکیل' : 'موکل'],
+        ['name' => $roleCode === 'lawyer' ? 'وکیل' : 'موکل'],
     );
     UserRole::query()->create([
         'user_id' => $user->id,
