@@ -179,7 +179,7 @@ class RegisterController extends Controller
 
             $role = Role::query()->firstOrCreate(
                 ['code' => $data['role']],
-                ['name_fa' => $data['role'] === 'lawyer' ? 'وکیل' : 'موکل'],
+                ['name' => $data['role'] === 'lawyer' ? 'Lawyer' : 'Client'],
             );
 
             UserRole::query()->create([

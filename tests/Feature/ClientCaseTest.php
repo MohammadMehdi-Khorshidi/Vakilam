@@ -23,7 +23,7 @@ $matter = app(LegalMatterFormationService::class)
     MatterTimeline::query()->create([
         'legal_matter_id' => $matter->id,
         'event_type' => 'matter_created',
-        'summary' => 'پرونده تشکیل شد',
+        'summary' => 'Matter created',
         'occurred_at' => now(),
     ]);
 
