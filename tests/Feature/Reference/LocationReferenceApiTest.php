@@ -11,9 +11,9 @@ test('provinces can be listed without authentication', function () {
 
     $response
         ->assertOk()
-        ->assertJsonCount(2, 'provinces')
+        ->assertJsonCount(2, 'data')
         ->assertJsonStructure([
-            'provinces' => [
+            'data' => [
                 '*' => ['id', 'name'],
             ],
         ]);
@@ -40,7 +40,7 @@ test('only cities belonging to the selected province are returned', function () 
 
     $response
         ->assertOk()
-        ->assertJsonCount(2, 'cities')
+        ->assertJsonCount(2, 'data')
         ->assertJsonFragment([
             'name' => 'تهران',
             'province_id' => $tehran->id,
