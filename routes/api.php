@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\LegalRequestController;
+use App\Http\Controllers\Api\LegalRequestServiceIntentController;
 use App\Http\Controllers\Api\LocationReferenceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -50,6 +51,13 @@ Route::middleware('auth:sanctum')->controller(LegalRequestController::class)->gr
     Route::patch('/legal-requests/{legalRequest}', 'update');
     Route::post('/legal-requests/{legalRequest}/submit', 'submit');
 });
+
+Route::middleware('auth:sanctum')
+    ->controller(LegalRequestServiceIntentController::class)
+    ->group(function () {
+        Route::get('/legal-requests/{legalRequest}/service-options', 'options');
+        Route::post('/legal-requests/{legalRequest}/service-intent', 'store');
+    });
 
 Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(function () {
     Route::prefix('legal-requests/{legalRequest}/documents')->group(function () {
