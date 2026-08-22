@@ -38,9 +38,7 @@ const AboutPage = () => {
             dir="rtl"
             className={`${vazir.className} min-h-screen w-full bg-[#e8f1ee] text-[#0d302a]`}
         >
-            {/* ================= Hero ================= */}
             <section className="relative overflow-hidden bg-[#163f38] px-6 pt-14 pb-20 text-white md:px-12 md:pt-20 md:pb-24 lg:px-20">
-                {/* خط طلایی */}
                 <div className="absolute top-0 right-0 h-1 w-full bg-[#c9a96e]" />
 
                 <div className="mx-auto max-w-7xl">
@@ -64,11 +62,9 @@ const AboutPage = () => {
                     </p>
                 </div>
 
-                {/* تزئین پایین */}
                 <div className="absolute -bottom-12 left-1/2 h-24 w-[120%] -translate-x-1/2 rounded-[50%] bg-[#e8f1ee]" />
             </section>
 
-            {/* ================= Why Vakilam ================= */}
             <section className="px-6 py-16 md:px-12 md:py-20 lg:px-20">
                 <div className="mx-auto max-w-7xl">
                     <div className="max-w-3xl">
@@ -94,7 +90,6 @@ const AboutPage = () => {
                 </div>
             </section>
 
-            {/* ================= Principles ================= */}
             <section className="px-6 pb-16 md:px-12 md:pb-20 lg:px-20">
                 <div className="mx-auto max-w-7xl">
                     <div className="border-y border-[#0d302a]/15">
@@ -103,17 +98,14 @@ const AboutPage = () => {
                                 key={item.number}
                                 className={`flex flex-col gap-5 py-8 md:flex-row md:items-center md:gap-10 ${index !== principles.length - 1 ? 'border-b border-[#0d302a]/15' : ''} `}
                             >
-                                {/* شماره */}
                                 <span className="text-sm font-semibold text-[#c9a96e] md:w-16">
                                     {item.number}
                                 </span>
 
-                                {/* عنوان */}
                                 <h3 className="text-2xl font-bold text-[#0d302a] md:w-48 md:text-3xl">
                                     {item.title}
                                 </h3>
 
-                                {/* توضیحات */}
                                 <p className="max-w-2xl text-sm leading-8 text-[#0d302a]/60 md:text-base">
                                     {item.description}
                                 </p>
@@ -123,7 +115,6 @@ const AboutPage = () => {
                 </div>
             </section>
 
-            {/* ================= Our Path ================= */}
             <section className="px-6 pb-20 md:px-12 lg:px-20">
                 <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-20">
                     <div>
@@ -153,9 +144,7 @@ const AboutPage = () => {
                 </div>
             </section>
 
-            {/* ================= Bottom CTA ================= */}
             <section className="relative overflow-hidden bg-[#163f38] px-6 py-16 text-white md:px-12 md:py-20 lg:px-20">
-                {/* خط طلایی */}
                 <div className="absolute top-0 right-0 h-1 w-full bg-[#c9a96e]" />
 
                 <div className="relative z-10 mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 md:flex-row md:items-center">

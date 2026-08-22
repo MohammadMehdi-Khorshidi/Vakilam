@@ -35,6 +35,7 @@ class MatterMember extends Model
     }
 
     /** Matter that owns this membership record. */
+    /** Matter that owns this reserved metadata record. */
     public function legalMatter()
     {
         return $this->belongsTo(LegalMatter::class);

@@ -14,7 +14,6 @@ const ContactPage = () => {
             dir="rtl"
             className={`${vazir.className} min-h-screen w-full bg-white text-[#0d302a]`}
         >
-            {/* ================= Hero ================= */}
             <section className="relative px-6 pt-12 pb-10 md:px-12 md:pt-16 lg:px-20">
                 <div className="mx-auto max-w-7xl">
                     <span className="text-3xl font-bold text-[#c9a96e] md:text-4xl">
@@ -37,20 +36,15 @@ const ContactPage = () => {
                 </div>
             </section>
 
-            {/* ================= Form ================= */}
             <section className="relative px-6 pb-20 md:px-12 lg:px-20">
                 <ContactForm/>
             </section>
 
-            {/* ================= Bottom Decoration ================= */}
             <div className="relative mt-4 h-32 overflow-hidden bg-[#163f38]">
-                {/* خط طلایی */}
                 <div className="absolute top-0 right-0 h-1 w-full bg-[#c9a96e]" />
 
-                {/* موج بالا */}
                 <div className="absolute -top-10 left-1/2 h-20 w-[120%] -translate-x-1/2 rounded-[50%] bg-[#e8f1ee]" />
 
-                {/* متن */}
                 <div className="relative z-10 flex h-full items-end justify-center pb-5">
                     <p className="text-xs text-white/50 md:text-sm">
                         در کنار شما برای حل مسائل حقوقی

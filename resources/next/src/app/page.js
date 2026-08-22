@@ -2,6 +2,7 @@ import Hero from '@/landing/Hero';
 import AboutSection from '@/landing/AboutSection';
 import ContactUsLanding from '@/landing/ContactUsLanding';
 import TeamSection from '@/landing/TeamSection';
+
 export default function Home() {
     return (
         <>
@@ -9,6 +10,7 @@ export default function Home() {
             <AboutSection/>
             <ContactUsLanding/>
             <TeamSection/>
+
         </>
     );
 }

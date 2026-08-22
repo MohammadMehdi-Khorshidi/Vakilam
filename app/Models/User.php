@@ -105,12 +105,14 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /** Matter membership records for this user. */
+    /** Reserved matter membership metadata; this relation does not grant matter access. */
     public function matterMemberships()
     {
         return $this->hasMany(MatterMember::class);
     }
 
     /** Matters in which this user is registered as a member. */
+    /** Reserved member records; client/lawyer access is derived from the matter engagement. */
     public function memberMatters()
     {
         return $this->belongsToMany(LegalMatter::class, 'matter_members', 'user_id', 'legal_matter_id')

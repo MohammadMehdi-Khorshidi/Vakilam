@@ -15,7 +15,6 @@ const TeamSection = () => {
             className={`${vazir.className} w-full bg-white px-6 py-20 md:px-12 lg:px-20`}
         >
             <div className="mx-auto max-w-7xl">
-                {/* ================= Header ================= */}
                 <div className="max-w-3xl">
                     <span className="mb-4 inline-block text-3xl font-bold text-[#c9a96e] md:text-4xl">
                         تیم ما
@@ -33,12 +32,9 @@ const TeamSection = () => {
                     </p>
                 </div>
 
-                {/* ================= Divider ================= */}
                 <div className="my-12 h-px w-full bg-[#0d302a]/15" />
 
-                {/* ================= Values ================= */}
                 <div className="grid grid-cols-1 md:grid-cols-3">
-                    {/* Item 1 */}
                     <div className="border-b border-[#0d302a]/15 py-7 md:border-b-0 md:border-l md:px-8 md:py-4 first:md:pr-0">
                         <h3 className="mt-3 text-xl font-bold text-[#0d302a] md:text-2xl">
                             تخصص حقوقی
@@ -50,7 +46,6 @@ const TeamSection = () => {
                         </p>
                     </div>
 
-                    {/* Item 2 */}
                     <div className="border-b border-[#0d302a]/15 py-7 md:border-b-0 md:border-l md:px-8 md:py-4">
                         <h3 className="mt-3 text-xl font-bold text-[#0d302a] md:text-2xl">
                             تجربه و دقت
@@ -62,7 +57,6 @@ const TeamSection = () => {
                         </p>
                     </div>
 
-                    {/* Item 3 */}
                     <div className="py-7 md:px-8 md:py-4">
                         <h3 className="mt-3 text-xl font-bold text-[#0d302a] md:text-2xl">
                             همراهی مستمر
@@ -75,10 +69,8 @@ const TeamSection = () => {
                     </div>
                 </div>
 
-                {/* ================= Bottom CTA ================= */}
                 <div className="mt-12 overflow-hidden rounded-[24px] bg-[#163f38]">
                     <div className="flex flex-col items-start justify-between gap-8 px-7 py-8 md:flex-row md:items-center md:px-10 md:py-9">
-                        {/* Text */}
                         <div>
                             <span className="text-xs font-semibold text-[#c9a96e]">
                                 همراه شما
@@ -93,7 +85,6 @@ const TeamSection = () => {
                             </p>
                         </div>
 
-                        {/* Button */}
                         <button
                             type="button"
                             className="inline-flex shrink-0 items-center gap-3 rounded-xl bg-[#c9a96e] px-7 py-3.5 text-sm font-bold text-[#0d302a] transition-all duration-300 hover:-translate-y-1 hover:bg-[#d8bb82] hover:shadow-lg"

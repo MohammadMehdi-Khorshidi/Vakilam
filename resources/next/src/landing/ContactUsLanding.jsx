@@ -36,7 +36,6 @@ const ContactPage = () => {
             dir="rtl"
             className={`${vazir.className} w-full bg-[#e8f1ee] text-[#0d302a]`}
         >
-            {/* ================= Desktop ================= */}
             <section className="hidden px-6 py-12 md:hidden lg:block lg:px-20">
                 <div className="mx-auto grid max-w-7xl grid-cols-2 items-center gap-20">
                     {/* Steps */}
@@ -47,14 +46,11 @@ const ContactPage = () => {
                                     key={step.number}
                                     className="relative flex w-full flex-col items-center"
                                 >
-                                    {/* مربع مرحله */}
                                     <div className="relative z-10 flex min-h-[120px] w-full items-center rounded-[20px] border border-[#0d302a]/20 bg-[#163f38] px-6 py-5 transition-all duration-300 hover:-translate-y-1 hover:border-[#c9a96e]/70 hover:shadow-lg">
-                                        {/* شماره */}
                                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#c9a96e] text-lg font-bold text-[#0d302a]">
                                             {step.number}
                                         </div>
 
-                                        {/* متن */}
                                         <div className="mr-5 text-right">
                                             <h3 className="text-base font-bold text-white">
                                                 {step.title}
@@ -66,7 +62,6 @@ const ContactPage = () => {
                                         </div>
                                     </div>
 
-                                    {/* خط بین مراحل */}
                                     {index !== steps.length - 1 && (
                                         <div className="relative z-0 h-7 w-[2px] bg-[#c9a96e]" />
                                     )}
@@ -75,7 +70,6 @@ const ContactPage = () => {
                         </div>
                     </div>
 
-                    {/* Text */}
                     <div className="text-right">
                         <span className="mb-3 inline-block text-4xl font-bold text-[#c9a96e]">
                             ارتباط با ما
@@ -114,9 +108,7 @@ const ContactPage = () => {
                 </div>
             </section>
 
-            {/* ================= Mobile & Tablet ================= */}
             <section className="block px-6 py-10 md:px-12 lg:hidden">
-                {/* متن ارتباط با ما - بالا */}
                 <div className="mb-10 text-right">
                     <span className="mb-3 inline-block text-3xl font-bold text-[#c9a96e] md:text-4xl">
                         ارتباط با ما
@@ -137,26 +129,22 @@ const ContactPage = () => {
                     </p>
                 </div>
 
-                {/* مراحل ۲×۲ */}
                 <div className="grid grid-cols-2 overflow-hidden rounded-[24px] border border-[#0d302a]/15 bg-[#163f38]">
                     {steps.map((step, index) => (
                         <div
                             key={step.number}
                             className={`min-h-[170px] p-5 transition-all duration-300 hover:bg-[#1b4a42] ${index % 2 === 0 ? 'border-l border-[#c9a96e]/50' : ''} ${index < 2 ? 'border-b border-[#c9a96e]/50' : ''} `}
                         >
-                            {/* شماره */}
                             <div className="mb-5 flex justify-start">
                                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#c9a96e] text-sm font-bold text-[#0d302a]">
                                     {step.number}
                                 </span>
                             </div>
 
-                            {/* عنوان */}
                             <h3 className="text-sm font-bold text-white md:text-base">
                                 {step.title}
                             </h3>
 
-                            {/* توضیحات */}
                             <p className="mt-2 text-xs leading-6 text-white/65 md:text-sm">
                                 {step.description}
                             </p>
@@ -164,7 +152,6 @@ const ContactPage = () => {
                     ))}
                 </div>
 
-                {/* متن پایین */}
                 <div className="mt-10 text-right">
                     <h2 className="text-2xl font-bold text-[#0d302a] md:text-3xl">
                         برای شروع، با ما در ارتباط باشید

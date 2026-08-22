@@ -32,14 +32,12 @@ const ContactForm = () => {
         e.preventDefault();
 
         console.log(formData);
-
-        // بعداً اینجا API لاراول قرار می‌گیرد
+    // api
     };
 
     return (
         <section dir="rtl" className={`${vazir.className} w-full`}>
             <div className="mx-auto max-w-5xl">
-                {/* عنوان */}
                 <div className="mb-8 text-right">
                     <span className="text-sm font-semibold text-[#c9a96e]">
                         درخواست مشاوره
@@ -54,14 +52,11 @@ const ContactForm = () => {
                     </p>
                 </div>
 
-                {/* فرم */}
                 <form
                     onSubmit={handleSubmit}
                     className="rounded-[24px] border border-[#0d302a]/10 bg-white p-6 shadow-sm md:p-8"
                 >
-                    {/* نام + موبایل */}
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                        {/* نام */}
                         <div>
                             <label
                                 htmlFor="name"
@@ -82,7 +77,6 @@ const ContactForm = () => {
                             />
                         </div>
 
-                        {/* موبایل */}
                         <div>
                             <label
                                 htmlFor="phone"
@@ -105,9 +99,7 @@ const ContactForm = () => {
                         </div>
                     </div>
 
-                    {/* موضوع + روش ارتباط */}
                     <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                        {/* موضوع */}
                         <div>
                             <label
                                 htmlFor="subject"
@@ -148,7 +140,6 @@ const ContactForm = () => {
                             </select>
                         </div>
 
-                        {/* روش ارتباط */}
                         <div>
                             <label
                                 htmlFor="contactMethod"
@@ -178,7 +169,6 @@ const ContactForm = () => {
                         </div>
                     </div>
 
-                    {/* شرح مسئله */}
                     <div className="mt-5">
                         <label
                             htmlFor="message"
@@ -199,7 +189,6 @@ const ContactForm = () => {
                         />
                     </div>
 
-                    {/* فایل */}
                     <div className="mt-5">
                         <label
                             htmlFor="file"
@@ -239,7 +228,6 @@ const ContactForm = () => {
                         </label>
                     </div>
 
-                    {/* دکمه */}
                     <div className="mt-7 flex justify-start">
                         <button
                             type="submit"

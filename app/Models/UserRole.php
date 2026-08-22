@@ -9,6 +9,8 @@ class UserRole extends Pivot
 {
     use HasUuids;
 
+    protected $table = 'user_roles';
+
     /** The pivot table uses a UUID primary key. */
     public $incrementing = false;
 
