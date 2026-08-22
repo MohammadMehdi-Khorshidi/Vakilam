@@ -45,7 +45,6 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
 
         return 'client';
     };
-
     const role = getRole();
 
     const currentRole = roleLabels?.[role] || 'موکل';
