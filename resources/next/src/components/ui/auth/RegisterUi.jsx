@@ -47,7 +47,6 @@ const RegisterUi = () => {
                 onSubmit={handleSubmit}
                 className={`${vazir.className} mt-7 space-y-5`}
             >
-                {/* نام */}
                 <div>
                     <label
                         htmlFor="first_name"
@@ -67,7 +66,6 @@ const RegisterUi = () => {
                     />
                 </div>
 
-                {/* نام خانوادگی */}
                 <div>
                     <label
                         htmlFor="last_name"
@@ -87,7 +85,6 @@ const RegisterUi = () => {
                     />
                 </div>
 
-                {/* شماره موبایل */}
                 <div>
                     <label
                         htmlFor="phone"
