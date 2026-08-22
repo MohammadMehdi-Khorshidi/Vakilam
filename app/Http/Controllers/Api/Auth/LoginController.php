@@ -26,11 +26,13 @@ class LoginController extends Controller
             ->where('phone', $data['phone'])
             ->first();
 
-        if (! $user || $user->status !== 'active' || ! Hash::check($data['password'], $user->password)) {
+        if (!$user || $user->status !== 'active' || !Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'phone' => 'The phone number or password is incorrect.',
             ]);
         }
+
+        $user->forceFill(['last_login_at' => now()])->save();
 
         $token = $user->createToken($data['device_name'] ?? 'web')->plainTextToken;
 

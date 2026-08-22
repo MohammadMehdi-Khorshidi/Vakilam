@@ -36,13 +36,13 @@ class PasswordResetController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (! $user) {
+        if (!$user) {
             throw ValidationException::withMessages([
                 'phone' => 'No active user was found with this phone number.',
             ]);
         }
 
-        if (! Cache::add(
+        if (!Cache::add(
             $this->resendCacheKey($data['phone']),
             true,
             self::OTP_RESEND_AFTER_SECONDS,
@@ -53,7 +53,7 @@ class PasswordResetController extends Controller
             ], 429);
         }
 
-        $otp = (string) random_int(100000, 999999);
+        $otp = (string)random_int(100000, 999999);
 
         Cache::put($this->otpCacheKey($data['phone']), [
             'user_id' => $user->id,
@@ -90,7 +90,7 @@ class PasswordResetController extends Controller
         $cacheKey = $this->otpCacheKey($data['phone']);
         $otpData = Cache::get($cacheKey);
 
-        if (! is_array($otpData)
+        if (!is_array($otpData)
             || ($otpData['phone'] ?? null) !== $data['phone']
             || ($otpData['expires_at'] ?? 0) <= now()->timestamp) {
             Cache::forget($cacheKey);
@@ -108,7 +108,7 @@ class PasswordResetController extends Controller
             ]);
         }
 
-        if (! Hash::check($data['otp'], $otpData['otp_hash'])) {
+        if (!Hash::check($data['otp'], $otpData['otp_hash'])) {
             $otpData['attempts']++;
             $remainingSeconds = max(1, $otpData['expires_at'] - now()->timestamp);
 
@@ -131,7 +131,7 @@ class PasswordResetController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (! $user) {
+        if (!$user) {
             Cache::forget($cacheKey);
 
             throw ValidationException::withMessages([
@@ -169,7 +169,7 @@ class PasswordResetController extends Controller
         $resetTokenKey = $this->resetTokenCacheKey($data['reset_token']);
         $resetData = Cache::get($resetTokenKey);
 
-        if (! is_array($resetData) || ($resetData['phone'] ?? null) !== $data['phone']) {
+        if (!is_array($resetData) || ($resetData['phone'] ?? null) !== $data['phone']) {
             throw ValidationException::withMessages([
                 'reset_token' => 'The reset token is invalid or has expired.',
             ]);
@@ -181,7 +181,7 @@ class PasswordResetController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (! $user) {
+        if (!$user) {
             throw ValidationException::withMessages([
                 'reset_token' => 'The reset token is invalid or has expired.',
             ]);
@@ -195,7 +195,7 @@ class PasswordResetController extends Controller
 
         $consumedResetData = Cache::pull($resetTokenKey);
 
-        if (! is_array($consumedResetData)
+        if (!is_array($consumedResetData)
             || ($consumedResetData['user_id'] ?? null) !== $user->id
             || ($consumedResetData['phone'] ?? null) !== $data['phone']) {
             throw ValidationException::withMessages([
@@ -219,16 +219,16 @@ class PasswordResetController extends Controller
 
     private function otpCacheKey(string $phone): string
     {
-        return 'password-reset:otp:'.hash('sha256', $phone);
+        return 'password-reset:otp:' . hash('sha256', $phone);
     }
 
     private function resendCacheKey(string $phone): string
     {
-        return 'password-reset:resend:'.hash('sha256', $phone);
+        return 'password-reset:resend:' . hash('sha256', $phone);
     }
 
     private function resetTokenCacheKey(string $token): string
     {
-        return 'password-reset:verified:'.hash('sha256', $token);
+        return 'password-reset:verified:' . hash('sha256', $token);
     }
 }
