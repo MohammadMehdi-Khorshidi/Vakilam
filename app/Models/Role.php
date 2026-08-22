@@ -2,14 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
 class Role extends Model
 {
     use HasUuids;
 
-    /** Attributes that may be mass assigned. */
     protected $fillable = [
         'code',
         'name',
@@ -17,18 +16,33 @@ class Role extends Model
         'is_system',
     ];
 
-    /** Pivot records that assign this role to users. */
+    protected $casts = [
+        'is_system' => 'boolean',
+    ];
+
+    /**
+     * Pivot records that assign this role to users.
+     */
     public function assignments()
     {
         return $this->hasMany(UserRole::class);
     }
 
-    /** Users assigned to this role through user_roles. */
+    /**
+     * Users assigned to this role through user_roles.
+     */
     public function users()
     {
         return $this->belongsToMany(User::class, 'user_roles')
             ->using(UserRole::class)
             ->withPivot(['id', 'granted_at', 'revoked_at']);
+    }
+    /**
+     * Permissions assigned to this role.
+     */
+    public function permissions()
+    {
+        return $this->belongsToMany(Permission::class, 'role_permissions');
     }
 
 }

@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             DocumentTypeSeeder::class,
             ProvinceSeeder::class,
             CitySeeder::class,
+            RoleSeeder::class,
         ]);
     }
 }

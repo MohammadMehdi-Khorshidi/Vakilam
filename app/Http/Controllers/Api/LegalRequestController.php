@@ -6,9 +6,11 @@ use App\Enums\LegalRequestServiceIntent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LegalRequests\StoreLegalRequestRequest;
 use App\Http\Requests\LegalRequests\UpdateLegalRequestRequest;
+use App\Http\Resources\LegalRequestListResource;
 use App\Http\Resources\LegalRequestResource;
 use App\Models\LegalRequest;
 use App\Models\User;
+use App\Services\LegalMatters\LegalMatterFormationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -18,6 +20,25 @@ use Illuminate\Validation\Rule;
 
 class LegalRequestController extends Controller
 {
+    public function index(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $legalRequests = $user->legalRequests()
+            ->with([
+                'legalCategory',
+                'province',
+                'city',
+            ])
+            ->where('status', '!=', 'draft')
+            ->latest('updated_at')
+            ->get();
+
+        return response()->json([
+            'active_cases' => LegalRequestListResource::collection($legalRequests),
+        ]);
+    }
     public function store(StoreLegalRequestRequest $request): JsonResponse
     {
         /** @var User $client */
@@ -178,7 +199,11 @@ class LegalRequestController extends Controller
         ]);
     }
 
-    public function submit(Request $request, LegalRequest $legalRequest): JsonResponse
+    public function submit(
+        Request $request,
+        LegalRequest $legalRequest,
+        LegalMatterFormationService $formationService
+        ): JsonResponse
     {
         $user = $request->user();
 
@@ -188,7 +213,7 @@ class LegalRequestController extends Controller
             'You are not allowed to submit this legal request.',
         );
 
-        $legalRequest = DB::transaction(function () use ($legalRequest, $user): LegalRequest {
+       $legalRequest = DB::transaction(function () use ($legalRequest, $user, $formationService): LegalRequest {
             $lockedRequest = LegalRequest::query()
                 ->whereKey($legalRequest->id)
                 ->lockForUpdate()
@@ -231,6 +256,8 @@ class LegalRequestController extends Controller
                 'status' => 'submitted',
                 'submitted_at' => now(),
             ])->save();
+
+            $formationService->createFromLegalRequest($lockedRequest);
 
             return $lockedRequest->load('parties');
         });

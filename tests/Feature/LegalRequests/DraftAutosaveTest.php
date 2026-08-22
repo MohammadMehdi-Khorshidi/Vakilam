@@ -14,6 +14,7 @@ function autosaveTestClient(): User
     $user = User::factory()->create();
     $role = Role::query()->firstOrCreate(
         ['code' => 'client'],
+        ['name' => 'موکل'],
         ['name' => 'Client'],
     );
     UserRole::query()->create([
@@ -171,6 +172,7 @@ test('submitting a complete draft frees the client to create a new draft', funct
     ]);
     $draft = LegalRequest::query()->create([
         'client_user_id' => $client->id,
+        'title' => 'Complete Final Request',
         'description' => 'Complete final request.',
         'legal_category_id' => $category->id,
         'province_id' => $province->id,

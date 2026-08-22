@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\ClientDashboardController;
+use App\Http\Controllers\Api\ClientCaseController;
 use App\Http\Controllers\Api\LegalRequestController;
 use App\Http\Controllers\Api\LegalRequestServiceIntentController;
 use App\Http\Controllers\Api\LocationReferenceController;
@@ -37,6 +39,18 @@ Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
     return $request->user();
 });
 
+Route::middleware('auth:sanctum')
+    ->controller(ClientDashboardController::class)
+    ->group(function () {
+        Route::get('/client/dashboard', 'index');
+    });
+
+Route::middleware('auth:sanctum')
+    ->controller(ClientCaseController::class)
+    ->group(function () {
+        Route::get('/client/cases/{legalMatter}', 'show');
+    });
+
 Route::controller(LocationReferenceController::class)
     ->prefix('reference')
     ->group(function () {
@@ -45,6 +59,7 @@ Route::controller(LocationReferenceController::class)
     });
 
 Route::middleware('auth:sanctum')->controller(LegalRequestController::class)->group(function () {
+    Route::get('/legal-requests', 'index');
     Route::get('/legal-requests/draft', 'draft');
     Route::post('/legal-requests', 'store');
     Route::get('/legal-requests/{legalRequest}', 'show');
