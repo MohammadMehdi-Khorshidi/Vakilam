@@ -15,6 +15,7 @@ function autosaveTestClient(): User
     $role = Role::query()->firstOrCreate(
         ['code' => 'client'],
         ['name' => 'موکل'],
+        ['name' => 'Client'],
     );
     UserRole::query()->create([
         'user_id' => $user->id,
@@ -152,7 +153,6 @@ test('submission validates all final required values', function () {
             'province_id',
             'city_id',
             'urgency',
-            'service_intent',
         ]);
 
     expect($draft->fresh()->status)->toBe('draft');
@@ -178,14 +178,14 @@ test('submitting a complete draft frees the client to create a new draft', funct
         'province_id' => $province->id,
         'city_id' => $city->id,
         'urgency' => 'normal',
-        'service_intent' => 'consultation',
         'status' => 'draft',
     ]);
     Sanctum::actingAs($client);
 
     $this->postJson("/api/legal-requests/{$draft->id}/submit")
         ->assertOk()
-        ->assertJsonPath('legal_request.status', 'submitted');
+        ->assertJsonPath('legal_request.status', 'submitted')
+        ->assertJsonPath('legal_request.service_intent', 'undecided');
 
     $this->postJson('/api/legal-requests', [
         'description' => 'A new draft after submission.',

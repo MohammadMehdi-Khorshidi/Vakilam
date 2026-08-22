@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\LegalRequestServiceIntent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LegalRequests\StoreLegalRequestRequest;
 use App\Http\Requests\LegalRequests\UpdateLegalRequestRequest;
@@ -73,7 +74,7 @@ class LegalRequestController extends Controller
             ]);
 
             foreach ($data['parties'] ?? [] as $party) {
-                $legalRequest->parties()->create([
+                $legalRequest->parties()->forceCreate([
                     ...Arr::only($party, [
                         'party_role',
                         'full_name',
@@ -175,7 +176,7 @@ class LegalRequestController extends Controller
                 $lockedRequest->parties()->delete();
 
                 foreach ($data['parties'] as $party) {
-                    $lockedRequest->parties()->create([
+                    $lockedRequest->parties()->forceCreate([
                         ...Arr::only($party, [
                             'party_role',
                             'full_name',
@@ -247,10 +248,8 @@ class LegalRequestController extends Controller
                 'urgency' => ['required', Rule::in(['low', 'normal', 'high', 'urgent'])],
                 'service_intent' => [
                     'required',
-                    Rule::in(['consultation', 'lawyer_selection']),
+                    Rule::in(LegalRequestServiceIntent::draftValues()),
                 ],
-            ], [
-                'service_intent.in' => 'A final service intent must be selected before submission.',
             ])->validate();
 
             $lockedRequest->forceFill([

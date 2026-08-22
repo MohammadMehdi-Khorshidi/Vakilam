@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\LegalRequests;
 
+use App\Enums\LegalRequestServiceIntent;
 use App\Models\LegalRequest;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
@@ -74,7 +75,7 @@ class UpdateLegalRequestRequest extends FormRequest
             ],
             'service_intent' => [
                 'sometimes',
-                Rule::in(['undecided', 'consultation', 'lawyer_selection']),
+                Rule::in(LegalRequestServiceIntent::draftValues()),
             ],
             'parties' => ['sometimes', 'array'],
             'parties.*.party_role' => [
