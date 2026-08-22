@@ -13,7 +13,7 @@ export default function Header() {
     const menuItems = [
         { label: 'تیم‌ما', path: '/teams' },
         { label: 'ارتباط با ما', path: '/contact' },
-        { label: 'درباره ما', path: '/teams' },
+        { label: 'درباره ما', path: '/about' },
         { label: 'خانه', path: '/' },
     ];
 

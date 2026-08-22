@@ -17,7 +17,6 @@ const Footer = () => {
         <footer
             className={`${vazir.className} w-full bg-[#e8f1ee] px-6 py-8 text-[#2C3639] md:px-30`}
         >
-            {/* TOP BADGES */}
             <div className="flex flex-col items-center justify-center gap-4 md:flex-row">
                 {[
                     'وکلای حرفه‌ای',
@@ -35,15 +34,11 @@ const Footer = () => {
                 ))}
             </div>
 
-            {/* DIVIDER */}
             <div className="my-8 h-[1px] w-full bg-white" />
 
-            {/* MIDDLE */}
             <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-                {/* SOCIAL */}
-                {/* SOCIAL */}
+
                 <div className="flex gap-3">
-                    {/* INSTAGRAM */}
                     <div className="group flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg bg-white shadow-sm transition hover:bg-[#0E9A8A]">
                         <svg
                             className="h-4 w-4 text-[#2C3639] group-hover:text-white"
@@ -64,7 +59,6 @@ const Footer = () => {
                         </svg>
                     </div>
 
-                    {/* TWITTER / X */}
                     <div className="group flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg bg-white shadow-sm transition hover:bg-[#0E9A8A]">
                         <svg
                             className="h-4 w-4 text-[#2C3639] group-hover:text-white"
@@ -75,7 +69,6 @@ const Footer = () => {
                         </svg>
                     </div>
 
-                    {/* LINKEDIN */}
                     <div className="group flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg bg-white shadow-sm transition hover:bg-[#0E9A8A]">
                         <svg
                             className="h-4 w-4 text-[#2C3639] group-hover:text-white"
@@ -87,7 +80,6 @@ const Footer = () => {
                     </div>
                 </div>
 
-                {/* MENU */}
                 <div className="hidden gap-5 text-sm font-medium md:flex">
                     {menuItems.map((item) => (
                         <span
@@ -99,14 +91,12 @@ const Footer = () => {
                     ))}
                 </div>
 
-                {/* MOBILE MENU */}
                 <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm md:hidden">
                     {menuItems.map((item) => (
                         <span key={item}>{item}</span>
                     ))}
                 </div>
 
-                {/* LOGO */}
                 <div className="text-lg font-bold">
                     <Image
                         src={HeaderIcon}
@@ -118,12 +108,9 @@ const Footer = () => {
                 </div>
             </div>
 
-            {/* DIVIDER */}
             <div className="my-8 h-[1px] w-full bg-white" />
 
-            {/* BOTTOM */}
             <div className="flex flex-col justify-between gap-6 md:flex-row">
-                {/* CONTACT */}
                 <div className="flex gap-3 text-right">
                     <div className="flex flex-col gap-3 text-sm">
                         <div>۰۹۸۷۵۶۵۳۴۶۳</div>
@@ -152,7 +139,6 @@ const Footer = () => {
                     </div>
                 </div>
 
-                {/* ABOUT */}
                 <div className="max-w-sm text-right">
                     <h3 className="mb-1 font-bold">چرا وکیلم؟</h3>
                     <p className="text-sm leading-6">
