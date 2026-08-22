@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\LegalRequests;
 
+use App\Enums\LegalRequestServiceIntent;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -60,7 +61,7 @@ class StoreLegalRequestRequest extends FormRequest
             'urgency' => ['nullable', Rule::in(['low', 'normal', 'high', 'urgent'])],
             'service_intent' => [
                 'nullable',
-                Rule::in(['undecided', 'consultation', 'lawyer_selection']),
+                Rule::in(LegalRequestServiceIntent::draftValues()),
             ],
             'parties' => ['sometimes', 'array'],
             'parties.*.party_role' => [

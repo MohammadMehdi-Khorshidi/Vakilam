@@ -12,7 +12,9 @@ class Role extends Model
     /** Attributes that may be mass assigned. */
     protected $fillable = [
         'code',
-        'name_fa',
+        'name',
+        'description',
+        'is_system',
     ];
 
     /** Pivot records that assign this role to users. */
