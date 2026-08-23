@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\LegalRequestController;
 use App\Http\Controllers\Api\LegalRequestServiceIntentController;
 use App\Http\Controllers\Api\LawyerDirectoryController;
 use App\Http\Controllers\Api\LawyerProfileController;
+use App\Http\Controllers\Api\LawyerMatchingController;
 use App\Http\Controllers\Api\LawyerServiceAreaController;
 use App\Http\Controllers\Api\LawyerSpecialtyController;
 use App\Http\Controllers\Api\LocationReferenceController;
@@ -91,6 +92,14 @@ Route::middleware('auth:sanctum')
     ->group(function () {
         Route::get('/legal-requests/{legalRequest}/service-options', 'options');
         Route::post('/legal-requests/{legalRequest}/service-intent', 'store');
+    });
+
+Route::middleware('auth:sanctum')
+    ->controller(LawyerMatchingController::class)
+    ->group(function () {
+        Route::post('/legal-requests/{legalRequest}/matching', 'store');
+        Route::get('/legal-requests/{legalRequest}/matching', 'show');
+        Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
     });
 
 Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(function () {
