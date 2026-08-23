@@ -10,7 +10,6 @@ use App\Http\Resources\LegalRequestListResource;
 use App\Http\Resources\LegalRequestResource;
 use App\Models\LegalRequest;
 use App\Models\User;
-use App\Services\LegalMatters\LegalMatterFormationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -202,8 +201,7 @@ class LegalRequestController extends Controller
     public function submit(
         Request $request,
         LegalRequest $legalRequest,
-        LegalMatterFormationService $formationService
-        ): JsonResponse
+    ): JsonResponse
     {
         $user = $request->user();
 
@@ -213,7 +211,7 @@ class LegalRequestController extends Controller
             'You are not allowed to submit this legal request.',
         );
 
-       $legalRequest = DB::transaction(function () use ($legalRequest, $user, $formationService): LegalRequest {
+        $legalRequest = DB::transaction(function () use ($legalRequest, $user): LegalRequest {
             $lockedRequest = LegalRequest::query()
                 ->whereKey($legalRequest->id)
                 ->lockForUpdate()
@@ -256,8 +254,6 @@ class LegalRequestController extends Controller
                 'status' => 'submitted',
                 'submitted_at' => now(),
             ])->save();
-
-            $formationService->createFromLegalRequest($lockedRequest);
 
             return $lockedRequest->load('parties');
         });

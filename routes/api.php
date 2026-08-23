@@ -8,8 +8,14 @@ use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\ClientCaseController;
 use App\Http\Controllers\Api\LegalRequestController;
 use App\Http\Controllers\Api\LegalRequestServiceIntentController;
+use App\Http\Controllers\Api\LawyerDirectoryController;
+use App\Http\Controllers\Api\LawyerProfileController;
+use App\Http\Controllers\Api\LawyerMatchingController;
+use App\Http\Controllers\Api\LawyerServiceAreaController;
+use App\Http\Controllers\Api\LawyerSpecialtyController;
 use App\Http\Controllers\Api\LocationReferenceController;
 use App\Http\Controllers\Api\LawyerProposalController;
+use App\Http\Controllers\Api\SpecialtyReferenceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -18,7 +24,7 @@ Route::prefix('auth/register')->name('apiRegister.')
     ->group(function () {
         Route::post('/send-otp', 'sendOtp')->middleware('throttle:3,1')->name('sendOtp');
         Route::post('/verify-otp', 'verifyOtp')->middleware('throttle:10,1')->name('verifyOtp');
-        Route::post('/', 'store')->name('store');
+        Route::post('/', 'store')->middleware('throttle:10,1')->name('store');
     });
 
 Route::prefix('auth')->name('apiAuth.')
@@ -59,6 +65,20 @@ Route::controller(LocationReferenceController::class)
         Route::get('/provinces/{province}/cities', 'cities');
     });
 
+Route::get('/reference/specialties', [SpecialtyReferenceController::class, 'index']);
+
+Route::controller(LawyerDirectoryController::class)->group(function () {
+    Route::get('/lawyers', 'index');
+    Route::get('/lawyers/{publicId}', 'show');
+});
+
+Route::middleware('auth:sanctum')->prefix('lawyer/profile')->group(function () {
+    Route::get('/', [LawyerProfileController::class, 'show']);
+    Route::patch('/', [LawyerProfileController::class, 'update']);
+    Route::put('/specialties', [LawyerSpecialtyController::class, 'update']);
+    Route::put('/service-areas', [LawyerServiceAreaController::class, 'update']);
+});
+
 Route::middleware('auth:sanctum')->controller(LegalRequestController::class)->group(function () {
     Route::get('/legal-requests', 'index');
     Route::get('/legal-requests/draft', 'draft');
@@ -73,6 +93,14 @@ Route::middleware('auth:sanctum')
     ->group(function () {
         Route::get('/legal-requests/{legalRequest}/service-options', 'options');
         Route::post('/legal-requests/{legalRequest}/service-intent', 'store');
+    });
+
+Route::middleware('auth:sanctum')
+    ->controller(LawyerMatchingController::class)
+    ->group(function () {
+        Route::post('/legal-requests/{legalRequest}/matching', 'store');
+        Route::get('/legal-requests/{legalRequest}/matching', 'show');
+        Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
     });
 
 Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(function () {
