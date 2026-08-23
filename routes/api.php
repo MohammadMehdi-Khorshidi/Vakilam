@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\LawyerMatchingController;
 use App\Http\Controllers\Api\LawyerServiceAreaController;
 use App\Http\Controllers\Api\LawyerSpecialtyController;
 use App\Http\Controllers\Api\LocationReferenceController;
+use App\Http\Controllers\Api\LawyerProposalController;
 use App\Http\Controllers\Api\SpecialtyReferenceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -120,3 +121,16 @@ Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(
         Route::delete('/', 'destroy');
     });
 });
+    
+Route::middleware('auth:sanctum')
+    ->controller(LawyerProposalController::class)
+    ->group(function () {
+        // Create a new proposal draft for a lawyer distribution.
+        Route::post('/lawyer/distributions/{distribution}/proposal', 'store');
+
+        // Update an existing proposal draft.
+        Route::patch('/lawyer/proposals/{proposal}', 'update');
+
+        // Submit an existing proposal draft.
+        Route::post('/lawyer/proposals/{proposal}/submit', 'submit');
+    });
