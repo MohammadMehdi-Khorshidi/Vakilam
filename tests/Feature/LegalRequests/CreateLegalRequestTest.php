@@ -205,10 +205,8 @@ test('only the owner can submit a draft legal request and it cannot be submitted
 
     expect($legalRequest->submitted_at)->not->toBeNull();
 
-    $this->assertDatabaseHas('legal_matters', [
+    $this->assertDatabaseMissing('legal_matters', [
         'source_legal_request_id' => $legalRequest->id,
-        'client_user_id' => $client->id,
-        'status' => 'onboarding',
     ]);
 
     $this->postJson("/api/legal-requests/{$legalRequest->id}/submit")
