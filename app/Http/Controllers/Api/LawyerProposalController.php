@@ -3,14 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Proposals\SelectLawyerProposalRequest;
 use App\Http\Requests\Proposals\StoreLawyerProposalRequest;
 use App\Http\Requests\Proposals\SubmitLawyerProposalRequest;
 use App\Http\Requests\Proposals\UpdateLawyerProposalRequest;
 use App\Http\Requests\Proposals\WithdrawLawyerProposalRequest;
-use App\Http\Requests\Proposals\SelectLawyerProposalRequest;
 use App\Models\AuditLog;
 use App\Models\Engagement;
 use App\Models\LawyerProposal;
+use App\Models\LegalRequest;
 use App\Models\LegalRequestDistribution;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -207,7 +208,7 @@ class LawyerProposalController extends Controller
             'proposal' => $proposal,
         ]);
     }
-        
+
     /**
      * Withdraw a previously submitted proposal.
      *
@@ -273,7 +274,7 @@ class LawyerProposalController extends Controller
                 'Proposal distribution is not available.',
             );
 
-            $legalRequest = \App\Models\LegalRequest::query()
+            $legalRequest = LegalRequest::query()
                 ->whereKey($distribution->legal_request_id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -285,9 +286,9 @@ class LawyerProposalController extends Controller
             );
 
             /*
-            * Make retries idempotent when this proposal
-            * has already been selected successfully.
-            */
+             * Make retries idempotent when this proposal
+             * has already been selected successfully.
+             */
             if ($lockedProposal->status === 'selected') {
                 $existingEngagement = Engagement::query()
                     ->where('proposal_id', $lockedProposal->id)
@@ -298,6 +299,12 @@ class LawyerProposalController extends Controller
                     409,
                     'Selected proposal has no engagement.',
                 );
+
+                /*
+                 * Distribution is required only for server-side validation
+                 * and should not be exposed in the API response.
+                 */
+                $lockedProposal->unsetRelation('distribution');
 
                 return [
                     'proposal' => $lockedProposal,
@@ -327,9 +334,9 @@ class LawyerProposalController extends Controller
             );
 
             /*
-            * Prevent two simultaneous active/pre-contract engagements
-            * for the same legal request.
-            */
+             * Prevent two simultaneous active/pre-contract engagements
+             * for the same legal request.
+             */
             $existingEngagement = Engagement::query()
                 ->where('legal_request_id', $legalRequest->id)
                 ->whereIn('status', [
@@ -345,10 +352,17 @@ class LawyerProposalController extends Controller
                 'A lawyer has already been selected for this legal request.',
             );
 
+            /*
+             * Mark this proposal as the selected proposal.
+             */
             $lockedProposal->forceFill([
                 'status' => 'selected',
             ])->save();
 
+            /*
+             * Create the pre-contract engagement.
+             * LegalMatter is intentionally not created here.
+             */
             $engagement = Engagement::query()->create([
                 'legal_request_id' => $legalRequest->id,
                 'proposal_id' => $lockedProposal->id,
@@ -357,6 +371,9 @@ class LawyerProposalController extends Controller
                 'status' => 'pending_contract',
             ]);
 
+            /*
+             * Record the final lawyer selection for auditing.
+             */
             AuditLog::query()->create([
                 'actor_user_id' => $client->id,
                 'action' => 'lawyer_proposal.selected',
@@ -369,6 +386,12 @@ class LawyerProposalController extends Controller
                     'lawyer_profile_id' => $lockedProposal->lawyer_profile_id,
                 ],
             ]);
+
+            /*
+             * Distribution is required only for server-side validation
+             * and should not be exposed in the API response.
+             */
+            $lockedProposal->unsetRelation('distribution');
 
             return [
                 'proposal' => $lockedProposal,
