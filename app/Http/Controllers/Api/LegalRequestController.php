@@ -38,6 +38,7 @@ class LegalRequestController extends Controller
             'active_cases' => LegalRequestListResource::collection($legalRequests),
         ]);
     }
+
     public function store(StoreLegalRequestRequest $request): JsonResponse
     {
         /** @var User $client */
@@ -47,7 +48,10 @@ class LegalRequestController extends Controller
         [$legalRequest, $created] = DB::transaction(function () use ($client, $data): array {
             // Serialise draft creation for this user so two simultaneous autosaves
             // cannot create two active drafts.
-            User::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
+            User::query()
+                ->whereKey($client->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $existingDraft = LegalRequest::query()
                 ->where('client_user_id', $client->id)
@@ -80,7 +84,7 @@ class LegalRequestController extends Controller
                         'relation_note',
                         'is_client',
                     ]),
-                    'is_client' => (bool)($party['is_client'] ?? false),
+                    'is_client' => (bool) ($party['is_client'] ?? false),
                 ]);
             }
 
@@ -101,6 +105,7 @@ class LegalRequestController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
+
         $legalRequest = LegalRequest::query()
             ->where('client_user_id', $user->id)
             ->where('status', 'draft')
@@ -108,7 +113,9 @@ class LegalRequestController extends Controller
             ->first();
 
         if ($legalRequest === null) {
-            return response()->json(['legal_request' => null]);
+            return response()->json([
+                'legal_request' => null,
+            ]);
         }
 
         $this->loadResumeRelations($legalRequest);
@@ -118,8 +125,10 @@ class LegalRequestController extends Controller
         ]);
     }
 
-    public function show(Request $request, LegalRequest $legalRequest): JsonResponse
-    {
+    public function show(
+        Request $request,
+        LegalRequest $legalRequest,
+    ): JsonResponse {
         $this->ensureOwner($request, $legalRequest);
         $this->loadResumeRelations($legalRequest);
 
@@ -130,9 +139,8 @@ class LegalRequestController extends Controller
 
     public function update(
         UpdateLegalRequestRequest $request,
-        LegalRequest              $legalRequest,
-    ): JsonResponse
-    {
+        LegalRequest $legalRequest,
+    ): JsonResponse {
         abort_unless(
             $legalRequest->status === 'draft',
             409,
@@ -163,9 +171,11 @@ class LegalRequestController extends Controller
                 'service_intent',
             ]);
 
-            if (array_key_exists('province_id', $attributes)
-                && !array_key_exists('city_id', $attributes)
-                && (string)$attributes['province_id'] !== (string)$lockedRequest->province_id) {
+            if (
+                array_key_exists('province_id', $attributes)
+                && ! array_key_exists('city_id', $attributes)
+                && (string) $attributes['province_id'] !== (string) $lockedRequest->province_id
+            ) {
                 $attributes['city_id'] = null;
             }
 
@@ -182,7 +192,7 @@ class LegalRequestController extends Controller
                             'relation_note',
                             'is_client',
                         ]),
-                        'is_client' => (bool)($party['is_client'] ?? false),
+                        'is_client' => (bool) ($party['is_client'] ?? false),
                     ]);
                 }
             }
@@ -201,8 +211,7 @@ class LegalRequestController extends Controller
     public function submit(
         Request $request,
         LegalRequest $legalRequest,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $user = $request->user();
 
         abort_unless(
@@ -222,6 +231,7 @@ class LegalRequestController extends Controller
                 403,
                 'You are not allowed to submit this legal request.',
             );
+
             abort_unless(
                 $lockedRequest->status === 'draft',
                 409,
@@ -235,15 +245,25 @@ class LegalRequestController extends Controller
                     'uuid',
                     Rule::exists('legal_categories', 'id')->where('status', true),
                 ],
-                'province_id' => ['required', 'integer', Rule::exists('provinces', 'id')],
+                'province_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('provinces', 'id'),
+                ],
                 'city_id' => [
                     'required',
                     'integer',
                     Rule::exists('cities', 'id')->where(
-                        fn($query) => $query->where('province_id', $lockedRequest->province_id),
+                        fn ($query) => $query->where(
+                            'province_id',
+                            $lockedRequest->province_id,
+                        ),
                     ),
                 ],
-                'urgency' => ['required', Rule::in(['low', 'normal', 'high', 'urgent'])],
+                'urgency' => [
+                    'required',
+                    Rule::in(['low', 'normal', 'high', 'urgent']),
+                ],
                 'service_intent' => [
                     'required',
                     Rule::in(LegalRequestServiceIntent::draftValues()),
@@ -264,12 +284,50 @@ class LegalRequestController extends Controller
         ]);
     }
 
-    private function ensureOwner(Request $request, LegalRequest $legalRequest): void
-    {
+    public function proposals(
+        Request $request,
+        LegalRequest $legalRequest,
+    ): JsonResponse {
+        $this->ensureOwner($request, $legalRequest);
+
+        $proposals = $legalRequest->proposals()
+            ->with('lawyerProfile')
+            ->where('lawyer_proposals.status', '!=', 'draft')
+            ->latest('lawyer_proposals.submitted_at')
+            ->get()
+            ->map(fn ($proposal) => [
+                'id' => $proposal->id,
+                'public_id' => $proposal->public_id,
+                'summary' => $proposal->summary,
+                'proposed_fee_rial' => $proposal->proposed_fee_rial,
+                'estimated_days' => $proposal->estimated_days,
+                'status' => $proposal->status,
+                'submitted_at' => $proposal->submitted_at,
+                'expires_at' => $proposal->expires_at,
+                'lawyer' => $proposal->lawyerProfile === null
+                    ? null
+                    : [
+                        'public_id' => $proposal->lawyerProfile->public_id,
+                        'full_name' => $proposal->lawyerProfile->full_name,
+                        'average_rating' => $proposal->lawyerProfile->average_rating,
+                        'rating_count' => $proposal->lawyerProfile->rating_count,
+                    ],
+            ]);
+
+        return response()->json([
+            'proposals' => $proposals,
+        ]);
+    }
+
+    private function ensureOwner(
+        Request $request,
+        LegalRequest $legalRequest,
+    ): void {
         $user = $request->user();
 
         abort_unless(
-            $user instanceof User && $legalRequest->client_user_id === $user->id,
+            $user instanceof User
+            && $legalRequest->client_user_id === $user->id,
             403,
             'You are not allowed to view this legal request.',
         );
@@ -279,7 +337,7 @@ class LegalRequestController extends Controller
     {
         $legalRequest->load([
             'parties',
-            'documents' => fn($query) => $query
+            'documents' => fn ($query) => $query
                 ->where('status', '!=', 'archived')
                 ->latest('created_at'),
             'documents.documentType',

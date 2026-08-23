@@ -83,6 +83,11 @@ Route::middleware('auth:sanctum')->controller(LegalRequestController::class)->gr
     Route::get('/legal-requests', 'index');
     Route::get('/legal-requests/draft', 'draft');
     Route::post('/legal-requests', 'store');
+
+    
+    // Client can view submitted proposals for their own legal request.
+    Route::get('/legal-requests/{legalRequest}/proposals', 'proposals');
+    
     Route::get('/legal-requests/{legalRequest}', 'show');
     Route::patch('/legal-requests/{legalRequest}', 'update');
     Route::post('/legal-requests/{legalRequest}/submit', 'submit');
@@ -133,4 +138,11 @@ Route::middleware('auth:sanctum')
 
         // Submit an existing proposal draft.
         Route::post('/lawyer/proposals/{proposal}/submit', 'submit');
+
+        Route::post('/lawyer/proposals/{proposal}/withdraw', 'withdraw');
+
+        // Select a submitted proposal and create a pre-contract engagement.
+Route::post('/lawyer/proposals/{proposal}/select', 'select');
     });
+    
+    
