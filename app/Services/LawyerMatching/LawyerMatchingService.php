@@ -2,21 +2,19 @@
 
 namespace App\Services\LawyerMatching;
 
+use App\Models\LawyerMatchCandidate;
 use App\Models\LawyerMatchRun;
 use App\Models\LawyerProfile;
 use App\Models\LegalRequest;
+use App\Models\LegalRequestDistribution;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class LawyerMatchingService
 {
     public const ALGORITHM_VERSION = 'v1';
-
-    private const MAX_CANDIDATES = 50;
-
-    private const DISTRIBUTION_LIMIT = 5;
-
-    private const DISTRIBUTION_EXPIRY_HOURS = 72;
 
     /**
      * Run and persist lawyer selection matching. Repeated calls return the
@@ -47,7 +45,7 @@ class LawyerMatchingService
 
             if ($existingRun !== null) {
                 return [
-                    'run' => $this->loadRun($existingRun),
+                    'run' => $existingRun,
                     'created' => false,
                 ];
             }
@@ -60,24 +58,12 @@ class LawyerMatchingService
             ]);
 
             foreach ($rankedLawyers as $index => $result) {
-                $candidate = $run->candidates()->create([
+                $run->candidates()->create([
                     'lawyer_profile_id' => $result['lawyer']->id,
                     'score' => $result['score'],
                     'rank_position' => $index + 1,
                     'explanation' => $result['explanation'],
                 ]);
-
-                if ($index < self::DISTRIBUTION_LIMIT) {
-                    $lockedRequest->distributions()->firstOrCreate(
-                        ['lawyer_profile_id' => $result['lawyer']->id],
-                        [
-                            'match_candidate_id' => $candidate->id,
-                            'status' => 'sent',
-                            'sent_at' => now(),
-                            'expires_at' => now()->addHours(self::DISTRIBUTION_EXPIRY_HOURS),
-                        ],
-                    );
-                }
             }
 
             $run->forceFill([
@@ -87,7 +73,7 @@ class LawyerMatchingService
             ])->save();
 
             return [
-                'run' => $this->loadRun($run),
+                'run' => $run,
                 'created' => true,
             ];
         });
@@ -114,17 +100,114 @@ class LawyerMatchingService
         return $this->rankedLawyers($legalRequest, requireOpenConsultationSlot: true);
     }
 
-    public function loadRun(LawyerMatchRun $run): LawyerMatchRun
+    /**
+     * Send the request to up to five lawyers explicitly selected by the client.
+     *
+     * @param  array<int, string>  $lawyerPublicIds
+     * @return Collection<int, LegalRequestDistribution>
+     */
+    public function sendRequests(
+        LegalRequest $legalRequest,
+        array $lawyerPublicIds,
+    ): Collection
     {
-        return $run->load([
-            'candidates' => fn ($query) => $query
+        return DB::transaction(function () use ($legalRequest, $lawyerPublicIds): Collection {
+            $lockedRequest = LegalRequest::query()
+                ->whereKey($legalRequest->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                $lockedRequest->status === 'submitted'
+                    && $lockedRequest->service_intent === 'lawyer_selection',
+                409,
+                'Lawyer requests are only available for submitted lawyer-selection requests.',
+            );
+
+            $run = $lockedRequest->matchRuns()
+                ->where('algorithm_version', self::ALGORITHM_VERSION)
+                ->where('status', 'completed')
+                ->latest('created_at')
+                ->first();
+
+            if ($run === null) {
+                abort(409, 'Run lawyer matching before selecting lawyers.');
+            }
+
+            $candidates = $run->candidates()
+                ->whereHas(
+                    'lawyerProfile',
+                    fn ($query) => $query->whereIn('public_id', $lawyerPublicIds),
+                )
+                ->with('lawyerProfile:id,public_id')
+                ->get()
+                ->keyBy(fn ($candidate) => $candidate->lawyerProfile->public_id);
+
+            if ($candidates->count() !== count($lawyerPublicIds)) {
+                throw ValidationException::withMessages([
+                    'lawyer_public_ids' => [
+                        'Every selected lawyer must belong to the latest matching result.',
+                    ],
+                ]);
+            }
+
+            $selectedProfileIds = $candidates
+                ->pluck('lawyer_profile_id')
+                ->values();
+            $existingProfileIds = $lockedRequest->distributions()
+                ->pluck('lawyer_profile_id');
+
+            if ($existingProfileIds->merge($selectedProfileIds)->unique()->count() > 5) {
+                throw ValidationException::withMessages([
+                    'lawyer_public_ids' => [
+                        'A legal request can be sent to at most five lawyers.',
+                    ],
+                ]);
+            }
+
+            foreach ($lawyerPublicIds as $publicId) {
+                $candidate = $candidates->get($publicId);
+
+                if (! $candidate instanceof LawyerMatchCandidate) {
+                    throw ValidationException::withMessages([
+                        'lawyer_public_ids' => [
+                            'Every selected lawyer must belong to the latest matching result.',
+                        ],
+                    ]);
+                }
+
+                $lockedRequest->distributions()->firstOrCreate(
+                    ['lawyer_profile_id' => $candidate->lawyer_profile_id],
+                    [
+                        'match_candidate_id' => $candidate->id,
+                        'status' => 'sent',
+                        'sent_at' => now(),
+                    ],
+                );
+            }
+
+            return $lockedRequest->distributions()
                 ->with([
                     'lawyerProfile.lawyerSpecialties.specialty:id,code,name,status',
                     'lawyerProfile.serviceAreas.province:id,name',
                     'lawyerProfile.serviceAreas.city:id,province_id,name',
                 ])
-                ->orderBy('rank_position'),
-        ]);
+                ->orderBy('sent_at')
+                ->get();
+        });
+    }
+
+    /** @return LengthAwarePaginator<int, LawyerMatchCandidate> */
+    public function paginateCandidates(LawyerMatchRun $run): LengthAwarePaginator
+    {
+        return $run->candidates()
+            ->with([
+                'lawyerProfile.lawyerSpecialties.specialty:id,code,name,status',
+                'lawyerProfile.serviceAreas.province:id,name',
+                'lawyerProfile.serviceAreas.city:id,province_id,name',
+            ])
+            ->orderBy('rank_position')
+            ->paginate(20);
     }
 
     /**
@@ -200,7 +283,6 @@ class LawyerMatchingService
                     ?: $first['lawyer']->full_name <=> $second['lawyer']->full_name
                     ?: $first['lawyer']->id <=> $second['lawyer']->id;
             })
-            ->take(self::MAX_CANDIDATES)
             ->values();
     }
 
