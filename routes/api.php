@@ -99,6 +99,7 @@ Route::middleware('auth:sanctum')
     ->group(function () {
         Route::post('/legal-requests/{legalRequest}/matching', 'store');
         Route::get('/legal-requests/{legalRequest}/matching', 'show');
+        Route::post('/legal-requests/{legalRequest}/lawyer-requests', 'sendRequests');
         Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
     });
 

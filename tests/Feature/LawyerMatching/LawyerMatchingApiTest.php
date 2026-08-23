@@ -134,7 +134,7 @@ test('a client can run idempotent matching for a submitted lawyer selection requ
 
     $this->assertDatabaseCount('lawyer_match_runs', 1);
     $this->assertDatabaseCount('lawyer_match_candidates', 2);
-    $this->assertDatabaseCount('legal_request_distributions', 2);
+    $this->assertDatabaseCount('legal_request_distributions', 0);
     $this->assertDatabaseCount('legal_matters', 0);
 
     $this->postJson("/api/legal-requests/{$fixture['legal_request']->id}/matching")
@@ -142,7 +142,7 @@ test('a client can run idempotent matching for a submitted lawyer selection requ
         ->assertJsonPath('message', 'The existing matching result was returned.');
 
     $this->assertDatabaseCount('lawyer_match_runs', 1);
-    $this->assertDatabaseCount('legal_request_distributions', 2);
+    $this->assertDatabaseCount('legal_request_distributions', 0);
 });
 
 test('matching excludes ineligible lawyers and returns an empty successful result when needed', function () {
@@ -174,6 +174,59 @@ test('matching excludes ineligible lawyers and returns an empty successful resul
         ->assertJsonCount(0, 'data.candidates');
 
     $this->assertDatabaseCount('legal_request_distributions', 0);
+});
+
+test('matching is paginated and the client can send requests to at most five lawyers', function () {
+    $fixture = lawyerMatchingFixture();
+    $lawyers = collect();
+
+    foreach (range(1, 21) as $number) {
+        $lawyers->push(matchingLawyer(
+            $fixture['specialty'],
+            $fixture['province'],
+            $fixture['city'],
+            ['full_name' => "Matching Lawyer {$number}"],
+            $number,
+        ));
+    }
+
+    Sanctum::actingAs($fixture['client']);
+
+    $this->postJson("/api/legal-requests/{$fixture['legal_request']->id}/matching")
+        ->assertCreated()
+        ->assertJsonPath('data.candidates_count', 21)
+        ->assertJsonCount(20, 'data.candidates')
+        ->assertJsonPath('meta.pagination.current_page', 1)
+        ->assertJsonPath('meta.pagination.per_page', 20)
+        ->assertJsonPath('meta.pagination.total', 21)
+        ->assertJsonPath('meta.selection.remaining_count', 5);
+
+    $this->getJson("/api/legal-requests/{$fixture['legal_request']->id}/matching?page=2")
+        ->assertOk()
+        ->assertJsonCount(1, 'data.candidates')
+        ->assertJsonPath('meta.pagination.current_page', 2);
+
+    $this->assertDatabaseCount('lawyer_match_candidates', 21);
+    $this->assertDatabaseCount('legal_request_distributions', 0);
+
+    $selectedLawyers = $lawyers->take(5)->pluck('public_id')->all();
+    $this->postJson("/api/legal-requests/{$fixture['legal_request']->id}/lawyer-requests", [
+        'lawyer_public_ids' => $selectedLawyers,
+    ])
+        ->assertOk()
+        ->assertJsonCount(5, 'data')
+        ->assertJsonPath('meta.selected_count', 5)
+        ->assertJsonPath('meta.remaining_count', 0);
+
+    $this->assertDatabaseCount('legal_request_distributions', 5);
+
+    $this->postJson("/api/legal-requests/{$fixture['legal_request']->id}/lawyer-requests", [
+        'lawyer_public_ids' => [$lawyers->last()->public_id],
+    ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('lawyer_public_ids');
+
+    $this->assertDatabaseCount('legal_request_distributions', 5);
 });
 
 test('a consultation request receives matching lawyers with open slots without persisted matching', function () {
