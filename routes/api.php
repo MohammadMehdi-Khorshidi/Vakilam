@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\LawyerSpecialtyController;
 use App\Http\Controllers\Api\LocationReferenceController;
 use App\Http\Controllers\Api\LawyerProposalController;
 use App\Http\Controllers\Api\SpecialtyReferenceController;
+use App\Http\Controllers\Api\LawyerAvailabilityController;
+use App\Http\Controllers\Api\ConsultationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -84,6 +86,11 @@ Route::middleware('auth:sanctum')->controller(LegalRequestController::class)->gr
     Route::get('/legal-requests', 'index');
     Route::get('/legal-requests/draft', 'draft');
     Route::post('/legal-requests', 'store');
+
+    
+    // Client can view submitted proposals for their own legal request.
+    Route::get('/legal-requests/{legalRequest}/proposals', 'proposals');
+    
     Route::get('/legal-requests/{legalRequest}', 'show');
     Route::patch('/legal-requests/{legalRequest}', 'update');
     Route::post('/legal-requests/{legalRequest}/submit', 'submit');
@@ -142,4 +149,25 @@ Route::middleware('auth:sanctum')
 
         // Submit an existing proposal draft.
         Route::post('/lawyer/proposals/{proposal}/submit', 'submit');
-    });
+
+        Route::post('/lawyer/proposals/{proposal}/withdraw', 'withdraw');
+
+        // Select a submitted proposal and create a pre-contract engagement.
+        Route::post('/lawyer/proposals/{proposal}/select', 'select');
+
+ });
+
+Route::middleware('auth:sanctum')->prefix('lawyer/availabilities')->group(function () {
+    Route::post('/', [LawyerAvailabilityController::class, 'store']);
+});
+
+Route::middleware('auth:sanctum')->get(
+    '/legal-requests/{legalRequest}/consultation-lawyers/{publicId}/slots',
+    [LawyerAvailabilityController::class, 'consultationSlots'],
+);
+
+Route::middleware('auth:sanctum')->post(
+    '/legal-requests/{legalRequest}/consultation-slots/{slot}/reserve',
+    [ConsultationController::class, 'reserve'],
+);
+    

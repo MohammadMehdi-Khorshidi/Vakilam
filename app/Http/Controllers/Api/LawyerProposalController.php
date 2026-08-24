@@ -3,10 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Proposals\SelectLawyerProposalRequest;
 use App\Http\Requests\Proposals\StoreLawyerProposalRequest;
 use App\Http\Requests\Proposals\SubmitLawyerProposalRequest;
 use App\Http\Requests\Proposals\UpdateLawyerProposalRequest;
+use App\Http\Requests\Proposals\WithdrawLawyerProposalRequest;
+use App\Models\AuditLog;
+use App\Models\Engagement;
 use App\Models\LawyerProposal;
+use App\Models\LegalRequest;
 use App\Models\LegalRequestDistribution;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -181,9 +186,12 @@ class LawyerProposalController extends Controller
             /*
              * Finalize the proposal submission.
              */
+            $submittedAt = now();
+
             $lockedProposal->forceFill([
                 'status' => 'submitted',
-                'submitted_at' => now(),
+                'submitted_at' => $submittedAt,
+                'expires_at' => $submittedAt->copy()->addHours(72),
             ])->save();
 
             /*
@@ -199,5 +207,205 @@ class LawyerProposalController extends Controller
             'message' => 'Proposal submitted successfully.',
             'proposal' => $proposal,
         ]);
+    }
+
+    /**
+     * Withdraw a previously submitted proposal.
+     *
+     * Only the lawyer who owns the proposal may withdraw it.
+     * Only submitted proposals can move to the withdrawn state.
+     *
+     * Withdrawal does not create an Engagement or LegalMatter.
+     */
+    public function withdraw(
+        WithdrawLawyerProposalRequest $request,
+        LawyerProposal $proposal,
+    ): JsonResponse {
+        $proposal = DB::transaction(function () use ($proposal): LawyerProposal {
+            $lockedProposal = LawyerProposal::query()
+                ->whereKey($proposal->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                $lockedProposal->status === 'submitted',
+                409,
+                'Only submitted proposals can be withdrawn.',
+            );
+
+            $lockedProposal->forceFill([
+                'status' => 'withdrawn',
+            ])->save();
+
+            return $lockedProposal;
+        });
+
+        return response()->json([
+            'message' => 'Proposal withdrawn successfully.',
+            'proposal' => $proposal,
+        ]);
+    }
+
+    /**
+     * Select a submitted lawyer proposal.
+     *
+     * Selection creates the pre-contract Engagement atomically.
+     * It does not create a LegalMatter.
+     */
+    public function select(
+        SelectLawyerProposalRequest $request,
+        LawyerProposal $proposal,
+    ): JsonResponse {
+        /** @var User $client */
+        $client = $request->user();
+
+        $result = DB::transaction(function () use ($request, $proposal, $client): array {
+            $lockedProposal = LawyerProposal::query()
+                ->with('distribution')
+                ->whereKey($proposal->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $distribution = $lockedProposal->distribution;
+
+            abort_unless(
+                $distribution !== null,
+                409,
+                'Proposal distribution is not available.',
+            );
+
+            $legalRequest = LegalRequest::query()
+                ->whereKey($distribution->legal_request_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                $legalRequest->client_user_id === $client->id,
+                403,
+                'You are not allowed to select this proposal.',
+            );
+
+            /*
+             * Make retries idempotent when this proposal
+             * has already been selected successfully.
+             */
+            if ($lockedProposal->status === 'selected') {
+                $existingEngagement = Engagement::query()
+                    ->where('proposal_id', $lockedProposal->id)
+                    ->first();
+
+                abort_unless(
+                    $existingEngagement !== null,
+                    409,
+                    'Selected proposal has no engagement.',
+                );
+
+                /*
+                 * Distribution is required only for server-side validation
+                 * and should not be exposed in the API response.
+                 */
+                $lockedProposal->unsetRelation('distribution');
+
+                return [
+                    'proposal' => $lockedProposal,
+                    'engagement' => $existingEngagement,
+                    'created' => false,
+                ];
+            }
+
+            abort_unless(
+                $lockedProposal->status === 'submitted',
+                409,
+                'Only submitted proposals can be selected.',
+            );
+
+            abort_unless(
+                $lockedProposal->expires_at !== null
+                && $lockedProposal->expires_at->isFuture(),
+                409,
+                'This proposal has expired.',
+            );
+
+            abort_unless(
+                $legalRequest->status === 'submitted'
+                && $legalRequest->service_intent === 'lawyer_selection',
+                409,
+                'This legal request is not available for lawyer selection.',
+            );
+
+            /*
+             * Prevent two simultaneous active/pre-contract engagements
+             * for the same legal request.
+             */
+            $existingEngagement = Engagement::query()
+                ->where('legal_request_id', $legalRequest->id)
+                ->whereIn('status', [
+                    'pending_contract',
+                    'active',
+                    'paused',
+                ])
+                ->first();
+
+            abort_if(
+                $existingEngagement !== null,
+                409,
+                'A lawyer has already been selected for this legal request.',
+            );
+
+            /*
+             * Mark this proposal as the selected proposal.
+             */
+            $lockedProposal->forceFill([
+                'status' => 'selected',
+            ])->save();
+
+            /*
+             * Create the pre-contract engagement.
+             * LegalMatter is intentionally not created here.
+             */
+            $engagement = Engagement::query()->create([
+                'legal_request_id' => $legalRequest->id,
+                'proposal_id' => $lockedProposal->id,
+                'client_user_id' => $client->id,
+                'lawyer_profile_id' => $lockedProposal->lawyer_profile_id,
+                'status' => 'pending_contract',
+            ]);
+
+            /*
+             * Record the final lawyer selection for auditing.
+             */
+            AuditLog::query()->create([
+                'actor_user_id' => $client->id,
+                'action' => 'lawyer_proposal.selected',
+                'target_type' => LawyerProposal::class,
+                'target_id' => $lockedProposal->id,
+                'ip_address' => $request->ip(),
+                'metadata' => [
+                    'legal_request_id' => $legalRequest->id,
+                    'engagement_id' => $engagement->id,
+                    'lawyer_profile_id' => $lockedProposal->lawyer_profile_id,
+                ],
+            ]);
+
+            /*
+             * Distribution is required only for server-side validation
+             * and should not be exposed in the API response.
+             */
+            $lockedProposal->unsetRelation('distribution');
+
+            return [
+                'proposal' => $lockedProposal,
+                'engagement' => $engagement,
+                'created' => true,
+            ];
+        });
+
+        return response()->json([
+            'message' => $result['created']
+                ? 'Lawyer proposal selected successfully.'
+                : 'Lawyer proposal was already selected.',
+            'proposal' => $result['proposal'],
+            'engagement' => $result['engagement'],
+        ], $result['created'] ? 201 : 200);
     }
 }
