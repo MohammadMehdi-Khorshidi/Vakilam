@@ -16,6 +16,8 @@ use App\Http\Controllers\Api\LawyerSpecialtyController;
 use App\Http\Controllers\Api\LocationReferenceController;
 use App\Http\Controllers\Api\LawyerProposalController;
 use App\Http\Controllers\Api\SpecialtyReferenceController;
+use App\Http\Controllers\Api\LawyerAvailabilityController;
+use App\Http\Controllers\Api\ConsultationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -142,7 +144,21 @@ Route::middleware('auth:sanctum')
         Route::post('/lawyer/proposals/{proposal}/withdraw', 'withdraw');
 
         // Select a submitted proposal and create a pre-contract engagement.
-Route::post('/lawyer/proposals/{proposal}/select', 'select');
-    });
-    
+        Route::post('/lawyer/proposals/{proposal}/select', 'select');
+
+ });
+
+Route::middleware('auth:sanctum')->prefix('lawyer/availabilities')->group(function () {
+    Route::post('/', [LawyerAvailabilityController::class, 'store']);
+});
+
+Route::middleware('auth:sanctum')->get(
+    '/legal-requests/{legalRequest}/consultation-lawyers/{publicId}/slots',
+    [LawyerAvailabilityController::class, 'consultationSlots'],
+);
+
+Route::middleware('auth:sanctum')->post(
+    '/legal-requests/{legalRequest}/consultation-slots/{slot}/reserve',
+    [ConsultationController::class, 'reserve'],
+);
     

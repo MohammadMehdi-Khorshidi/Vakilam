@@ -120,4 +120,10 @@ class LawyerProfile extends Model
     {
         return $this->hasMany(Settlement::class);
     }
+
+    /** Published consultation availability slots for this lawyer. */
+    public function availabilities()
+    {
+        return $this->hasMany(LawyerAvailability::class);
+    }
 }
