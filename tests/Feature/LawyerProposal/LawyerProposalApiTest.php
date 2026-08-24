@@ -1628,6 +1628,29 @@ test('a client can select an active submitted proposal and create one pending co
         'expires_at' => now()->addHours(72),
     ]);
 
+    /*
+     * Another lawyer has an open direct collaboration request.
+     * Selecting the proposal above must close this competing request.
+     */
+    $directLawyerUser = User::factory()->create([
+        'status' => 'active',
+    ]);
+
+    $directLawyerProfile = LawyerProfile::query()->create([
+        'user_id' => $directLawyerUser->id,
+        'full_name' => 'Direct Request Lawyer',
+        'verification_status' => 'approved',
+        'is_available' => true,
+    ]);
+
+    $directDistribution = LegalRequestDistribution::query()->create([
+        'legal_request_id' => $legalRequest->id,
+        'lawyer_profile_id' => $directLawyerProfile->id,
+        'status' => 'pending',
+        'sent_at' => now(),
+        'expires_at' => now()->addHours(72),
+    ]);
+
     Sanctum::actingAs($client);
 
     $this->postJson(
@@ -1651,6 +1674,11 @@ test('a client can select an active submitted proposal and create one pending co
         'client_user_id' => $client->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'status' => 'pending_contract',
+    ]);
+
+    $this->assertDatabaseHas('legal_request_distributions', [
+        'id' => $directDistribution->id,
+        'status' => 'cancelled',
     ]);
 
     $this->assertDatabaseHas('audit_logs', [
@@ -1946,4 +1974,77 @@ test('a withdrawn proposal cannot be selected', function () {
     )->assertStatus(409);
 
     $this->assertDatabaseCount('engagements', 0);
+});
+
+test('a lawyer cannot create a proposal for a pending direct collaboration request', function () {
+    $client = User::factory()->create();
+
+    $category = LegalCategory::query()->create([
+        'code' => 'proposal-pending-direct-request-test',
+        'name' => 'Family',
+        'status' => true,
+    ]);
+
+    $province = Province::query()->create([
+        'name' => 'Tehran',
+    ]);
+
+    $city = City::query()->create([
+        'province_id' => $province->id,
+        'name' => 'Tehran',
+    ]);
+
+    $legalRequest = LegalRequest::query()->create([
+        'client_user_id' => $client->id,
+        'description' => 'Submitted direct lawyer-selection request.',
+        'legal_category_id' => $category->id,
+        'province_id' => $province->id,
+        'city_id' => $city->id,
+        'urgency' => 'normal',
+        'service_intent' => 'lawyer_selection',
+        'status' => 'submitted',
+        'submitted_at' => now(),
+    ]);
+
+    $lawyerUser = User::factory()->create([
+        'status' => 'active',
+    ]);
+
+    $lawyerProfile = LawyerProfile::query()->create([
+        'user_id' => $lawyerUser->id,
+        'full_name' => 'Direct Request Lawyer',
+        'verification_status' => 'approved',
+        'is_available' => true,
+    ]);
+
+    $distribution = LegalRequestDistribution::query()->create([
+        'legal_request_id' => $legalRequest->id,
+        'lawyer_profile_id' => $lawyerProfile->id,
+        'status' => 'pending',
+        'sent_at' => now(),
+        'expires_at' => now()->addHours(72),
+    ]);
+
+    Sanctum::actingAs($lawyerUser);
+
+    $this->postJson(
+        "/api/lawyer/distributions/{$distribution->id}/proposal",
+        [
+            'summary' => 'This must not become a proposal.',
+            'proposed_fee_rial' => 50_000_000,
+            'estimated_days' => 30,
+        ],
+    )
+        ->assertStatus(409)
+        ->assertJsonPath(
+            'message',
+            'A proposal cannot be created for this distribution.',
+        );
+
+    $this->assertDatabaseCount('lawyer_proposals', 0);
+
+    $this->assertDatabaseHas('legal_request_distributions', [
+        'id' => $distribution->id,
+        'status' => 'pending',
+    ]);
 });

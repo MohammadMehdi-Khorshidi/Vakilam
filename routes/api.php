@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\LawyerProposalController;
 use App\Http\Controllers\Api\SpecialtyReferenceController;
 use App\Http\Controllers\Api\LawyerAvailabilityController;
 use App\Http\Controllers\Api\ConsultationController;
+use App\Http\Controllers\Api\LawyerSelectionController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -169,5 +170,17 @@ Route::middleware('auth:sanctum')->get(
 Route::middleware('auth:sanctum')->post(
     '/legal-requests/{legalRequest}/consultation-slots/{slot}/reserve',
     [ConsultationController::class, 'reserve'],
+);
+
+Route::middleware('auth:sanctum')
+    ->post(
+        '/legal-requests/{legalRequest}/lawyer-selection/{lawyerProfile}',
+        [LawyerSelectionController::class, 'store'],
+);
+
+Route::middleware('auth:sanctum')
+    ->post(
+        '/lawyer/distributions/{distribution}/respond',
+        [LawyerSelectionController::class, 'respond'],
 );
     
