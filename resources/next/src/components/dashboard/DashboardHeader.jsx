@@ -30,14 +30,14 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
 
     const getRole = () => {
         if (
-            pathname?.startsWith('/dashboard/lawyer') ||
+            pathname?.startsWith('/lawyer') ||
             pathname?.startsWith('/lawyer')
         ) {
             return 'lawyer';
         }
 
         if (
-            pathname?.startsWith('/dashboard/admin') ||
+            pathname?.startsWith('/admin') ||
             pathname?.startsWith('/admin')
         ) {
             return 'admin';
@@ -54,21 +54,21 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
             key: 'client',
             label: 'موکل',
             description: 'داشبورد موکل',
-            href: '/dashboard/client',
+            href: '/client',
             icon: UserRound,
         },
         {
             key: 'lawyer',
             label: 'وکیل',
             description: 'داشبورد وکیل',
-            href: '/dashboard/lawyer',
+            href: '/lawyer',
             icon: Scale,
         },
         {
             key: 'admin',
             label: 'مدیر سامانه',
             description: 'داشبورد مدیریت',
-            href: '/dashboard/admin',
+            href: '/admin',
             icon: ShieldCheck,
         },
     ];
@@ -76,7 +76,7 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
     return (
         <header
             dir="rtl"
-            className={`${vazir.className} sticky top-0 z-40 h-[80px] w-full border-b border-[#e7ebe9] bg-white`}
+            className={`${vazir.className} fixed left-0 right-0 top-20 z-40 h-[80px] border-b border-[#e7ebe9] bg-white lg:right-[280px]`}
         >
             <div className="flex h-full w-full items-center justify-between px-4 sm:px-6 lg:px-8">
                 {/* ================= Right Side ================= */}
@@ -190,18 +190,18 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
                     {/* User */}
                     <button
                         type="button"
-                        className="flex h-[42px] items-center gap-2 rounded-xl bg-[#c9a96e] px-2 text-[#0d302a] transition-all duration-300 hover:-translate-y-1 hover:bg-[#d8bb82] hover:shadow-lg"
+                        className="z-50 flex h-[42px] items-center gap-2 rounded-xl bg-[#c9a96e] px-2 text-[#0d302a] transition-all duration-300 hover:-translate-y-1 hover:bg-[#d8bb82] hover:shadow-lg"
                     >
                         <div className="flex h-[32px] w-[32px] items-center justify-center rounded-lg bg-[#edf2ef] text-[12px] font-bold text-[#123f37]">
                             ف
                         </div>
 
-                        <div className="hidden min-w-[65px] text-right sm:block">
+                        <div className="z-50 hidden min-w-[65px] text-right sm:block">
                             <p className="text-[8px] font-medium text-[#123f37]">
                                 {currentRole}
                             </p>
 
-                            <p className="mt-0.5 text-[10px] font-bold text-[#123f37]">
+                            <p className="z-50 mt-0.5 text-[10px] font-bold text-[#123f37]">
                                 فرزام نفعی
                             </p>
                         </div>
