@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\FinalLawyerSelectionController;
 use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\ClientCaseController;
 use App\Http\Controllers\Api\LegalRequestController;
@@ -107,7 +108,15 @@ Route::middleware('auth:sanctum')
     ->group(function () {
         Route::post('/legal-requests/{legalRequest}/matching', 'store');
         Route::get('/legal-requests/{legalRequest}/matching', 'show');
+        Route::post('/legal-requests/{legalRequest}/lawyer-requests', 'sendRequests');
         Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
+    });
+
+Route::middleware('auth:sanctum')
+    ->controller(FinalLawyerSelectionController::class)
+    ->group(function () {
+        Route::post('/legal-requests/{legalRequest}/lawyer-selection', 'store');
+        Route::get('/legal-requests/{legalRequest}/lawyer-selection', 'show');
     });
 
 Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(function () {

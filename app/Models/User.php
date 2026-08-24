@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -233,6 +235,35 @@ class User extends Authenticatable implements PasskeyUser
     public function organizedMeetings()
     {
         return $this->hasMany(Meeting::class, 'organizer_user_id');
+    }
+
+    public function policyAcceptances(): HasMany
+    {
+        return $this->hasMany(UserPolicyAcceptance::class, 'user_id');
+    }
+
+    public function acceptedPolicies(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Policy::class,
+            'user_policy_acceptances',
+            'user_id',
+            'policy_id'
+        )->withPivot(['accepted_at', 'ip_address', 'user_agent'])
+            ->withTimestamps(false);
+    }
+
+// Helper مفید
+    public function hasAcceptedPolicy(string $type): bool
+    {
+        $current = Policy::currentOfType($type);
+        if (!$current) {
+            return false;
+        }
+
+        return $this->policyAcceptances()
+            ->where('policy_id', $current->id)
+            ->exists();
     }
 
     /**
