@@ -34,7 +34,7 @@ const Hero = () => {
                         >
                             <button
                                 type="button"
-                                onClick={() => router.push('/dashboard/client')}
+                                onClick={() => router.push('/client')}
                                 className="w-full rounded-lg border border-[#c5a35a] bg-white px-7 py-3.5 text-sm font-bold text-[#123f37] transition-all duration-300 ease-out hover:scale-[1.04] hover:border-[#c5a35a] hover:bg-[#faf6ed] hover:text-[#123f37] hover:shadow-md active:scale-[0.98] sm:w-auto"
                             >
                                 موضوع حقوقی‌ام را توضیح می‌دهم
