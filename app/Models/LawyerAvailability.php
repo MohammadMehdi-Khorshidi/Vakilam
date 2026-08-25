@@ -14,10 +14,10 @@ class LawyerAvailability extends Model
         'starts_at',
         'ends_at',
         'status',
+        'reserved_until',
         'consultation_id',
         'meeting_id',
         'note',
-        'reserved_until',
     ];
 
     protected function casts(): array
