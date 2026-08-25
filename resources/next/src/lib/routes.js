@@ -3,7 +3,7 @@ export const clientNav = [
     { href: '/client/actions', label: 'مرکز اقدامات' },
     { href: '/client/inbox', label: 'صندوق هوشمند' },
     { href: '/client/assistant', label: 'دستیار حقوقی' },
-    { href: '/client/new-case/start', label: 'شرح مسئله جدید' },
+    { href: '/client/legal-request/start', label: 'شرح مسئله جدید' },
     { href: '/client/case', label: 'پرونده‌های من' },
     { href: '/client/lawyers', label: 'همه وکلا' },
     { href: '/client/proposals', label: 'پیشنهادها' },

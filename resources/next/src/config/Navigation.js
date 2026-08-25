@@ -48,7 +48,7 @@ export const clientNav = [
         icon: Scale,
     },
     {
-        href: '/client/new-case/start',
+        href: '/client/legal-request/start',
         label: 'شرح مسئله جدید',
         icon: FilePlus2,
     },

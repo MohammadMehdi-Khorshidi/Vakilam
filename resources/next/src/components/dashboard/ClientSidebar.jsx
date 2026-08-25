@@ -48,7 +48,7 @@ const menuItems = [
         icon: Bot,
     },
     {
-        href: '/client/new-case',
+        href: '/client/legal-request',
         label: 'شرح مسئله جدید',
         icon: FilePlus2,
     },
