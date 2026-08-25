@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -57,21 +56,31 @@ return new class extends Migration
         Schema::create('lawyer_proposals', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('public_id')->unique();
-            $table->uuid('distribution_id')->unique();
+            $table->uuid('legal_request_id')->nullable();
+            $table->uuid('distribution_id')->nullable();
             $table->uuid('lawyer_profile_id');
             $table->text('summary')->nullable();
+            $table->text('cover_letter')->nullable();
+            $table->text('experience_highlight')->nullable();
             $table->unsignedBigInteger('proposed_fee_rial')->nullable();
             $table->unsignedSmallInteger('estimated_days')->nullable();
-            $table->string('status', 20)->default('draft'); // draft|submitted|withdrawn|shortlisted|selected|rejected|expired
+            $table->string('status', 20)->default('draft');
+            $table->string('source', 20)->default('matched');
             $table->dateTime('submitted_at', 6)->nullable();
             $table->dateTime('expires_at', 6)->nullable();
             $table->dateTime('created_at', 6)->useCurrent();
             $table->dateTime('updated_at', 6)->useCurrent()->useCurrentOnUpdate();
 
+            $table->unique(['legal_request_id', 'lawyer_profile_id'], 'uq_proposals_request_lawyer');
             $table->index(['lawyer_profile_id', 'status']);
+            $table->index(['legal_request_id', 'status']);
+            $table->index(['source', 'status']);
+
+            $table->foreign('legal_request_id')->references('id')->on('legal_requests')->restrictOnDelete();
             $table->foreign('distribution_id')->references('id')->on('legal_request_distributions')->restrictOnDelete();
             $table->foreign('lawyer_profile_id')->references('id')->on('lawyer_profiles')->restrictOnDelete();
         });
+
     }
 
     public function down(): void
