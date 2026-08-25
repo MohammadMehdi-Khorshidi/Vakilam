@@ -40,7 +40,11 @@ class LawyerProposalController extends Controller
          * Use a database transaction and row lock to prevent concurrent
          * requests from creating duplicate proposals for one distribution.
          */
-        $proposal = DB::transaction(function () use ($request, $distribution, $user): LawyerProposal {
+        $proposal = DB::transaction(function () use (
+            $request,
+            $distribution,
+            $user,
+        ): LawyerProposal {
             $lockedDistribution = LegalRequestDistribution::query()
                 ->with('legalRequest')
                 ->whereKey($distribution->id)
@@ -53,9 +57,15 @@ class LawyerProposalController extends Controller
              */
             abort_unless(
                 $lockedDistribution->legalRequest !== null
-                && $lockedDistribution->legalRequest->status === 'submitted',
+                    && $lockedDistribution->legalRequest->status === 'submitted',
                 409,
                 'Proposal can only be created for a submitted legal request.',
+            );
+
+            abort_unless(
+                $lockedDistribution->status === 'sent',
+                409,
+                'A proposal cannot be created for this distribution.',
             );
 
             /*
@@ -106,7 +116,10 @@ class LawyerProposalController extends Controller
         UpdateLawyerProposalRequest $request,
         LawyerProposal $proposal,
     ): JsonResponse {
-        $proposal = DB::transaction(function () use ($request, $proposal): LawyerProposal {
+        $proposal = DB::transaction(function () use (
+            $request,
+            $proposal,
+        ): LawyerProposal {
             /*
              * Lock the proposal row to prevent concurrent updates
              * from overwriting each other unexpectedly.
@@ -259,7 +272,11 @@ class LawyerProposalController extends Controller
         /** @var User $client */
         $client = $request->user();
 
-        $result = DB::transaction(function () use ($request, $proposal, $client): array {
+        $result = DB::transaction(function () use (
+            $request,
+            $proposal,
+            $client,
+        ): array {
             $lockedProposal = LawyerProposal::query()
                 ->with('distribution')
                 ->whereKey($proposal->id)
@@ -274,6 +291,10 @@ class LawyerProposalController extends Controller
                 'Proposal distribution is not available.',
             );
 
+            /*
+             * The LegalRequest is the common competition boundary between
+             * Proposal selection and direct lawyer selection.
+             */
             $legalRequest = LegalRequest::query()
                 ->whereKey($distribution->legal_request_id)
                 ->lockForUpdate()
@@ -321,21 +342,25 @@ class LawyerProposalController extends Controller
 
             abort_unless(
                 $lockedProposal->expires_at !== null
-                && $lockedProposal->expires_at->isFuture(),
+                    && $lockedProposal->expires_at->isFuture(),
                 409,
                 'This proposal has expired.',
             );
 
             abort_unless(
                 $legalRequest->status === 'submitted'
-                && $legalRequest->service_intent === 'lawyer_selection',
+                    && $legalRequest->service_intent === 'lawyer_selection',
                 409,
                 'This legal request is not available for lawyer selection.',
             );
 
             /*
              * Prevent two simultaneous active/pre-contract engagements
-             * for the same legal request.
+             * for the same LegalRequest.
+             *
+             * This protects both possible winning paths:
+             * - Client selects a Lawyer Proposal.
+             * - Lawyer accepts a direct client request.
              */
             $existingEngagement = Engagement::query()
                 ->where('legal_request_id', $legalRequest->id)
@@ -353,14 +378,15 @@ class LawyerProposalController extends Controller
             );
 
             /*
-             * Mark this proposal as the selected proposal.
+             * Mark this proposal as the winning proposal.
              */
             $lockedProposal->forceFill([
                 'status' => 'selected',
             ])->save();
 
             /*
-             * Create the pre-contract engagement.
+             * Create the shared pre-contract Engagement.
+             *
              * LegalMatter is intentionally not created here.
              */
             $engagement = Engagement::query()->create([
@@ -370,6 +396,19 @@ class LawyerProposalController extends Controller
                 'lawyer_profile_id' => $lockedProposal->lawyer_profile_id,
                 'status' => 'pending_contract',
             ]);
+
+            /*
+             * A selected Proposal wins the lawyer-selection race.
+             *
+             * Any direct collaboration requests that are still waiting
+             * for lawyer response must now be closed.
+             */
+            LegalRequestDistribution::query()
+                ->where('legal_request_id', $legalRequest->id)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'cancelled',
+                ]);
 
             /*
              * Record the final lawyer selection for auditing.
