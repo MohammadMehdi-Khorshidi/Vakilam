@@ -28,27 +28,50 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
     const [roleMenuOpen, setRoleMenuOpen] = useState(false);
     const [notificationsOn, setNotificationsOn] = useState(true);
 
+    // =========================
+    // تشخیص نقش بر اساس URL
+    // =========================
     const getRole = () => {
-        if (
-            pathname?.startsWith('/lawyer') ||
-            pathname?.startsWith('/lawyer')
-        ) {
+        if (pathname?.startsWith('/lawyer')) {
             return 'lawyer';
         }
 
-        if (
-            pathname?.startsWith('/admin') ||
-            pathname?.startsWith('/admin')
-        ) {
+        if (pathname?.startsWith('/admin')) {
             return 'admin';
         }
 
         return 'client';
     };
+
     const role = getRole();
 
     const currentRole = roleLabels?.[role] || 'موکل';
 
+    // =========================
+    // اطلاعات کاربر هر نقش
+    // =========================
+    const userInfo = {
+        client: {
+            name: 'فرزام نفعی',
+            initial: 'ف',
+        },
+
+        lawyer: {
+            name: 'وکیل',
+            initial: 'و',
+        },
+
+        admin: {
+            name: 'ادمین',
+            initial: 'ا',
+        },
+    };
+
+    const currentUser = userInfo[role] || userInfo.client;
+
+    // =========================
+    // نقش‌ها
+    // =========================
     const roles = [
         {
             key: 'client',
@@ -192,17 +215,19 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
                         type="button"
                         className="z-50 flex h-[42px] items-center gap-2 rounded-xl bg-[#c9a96e] px-2 text-[#0d302a] transition-all duration-300 hover:-translate-y-1 hover:bg-[#d8bb82] hover:shadow-lg"
                     >
+                        {/* User Initial */}
                         <div className="flex h-[32px] w-[32px] items-center justify-center rounded-lg bg-[#edf2ef] text-[12px] font-bold text-[#123f37]">
-                            ف
+                            {currentUser.initial}
                         </div>
 
+                        {/* User Info */}
                         <div className="z-50 hidden min-w-[65px] text-right sm:block">
                             <p className="text-[8px] font-medium text-[#123f37]">
                                 {currentRole}
                             </p>
 
                             <p className="z-50 mt-0.5 text-[10px] font-bold text-[#123f37]">
-                                فرزام نفعی
+                                {currentUser.name}
                             </p>
                         </div>
 

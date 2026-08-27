@@ -1,4 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 import { Vazirmatn } from 'next/font/google';
 
@@ -12,8 +13,7 @@ const CaseHeader = ({ caseData }) => {
         <section dir="rtl" className={`${vazirmatn.className} mb-6`}>
             <div className="flex items-end justify-between gap-6">
                 <div>
-
-                    <h1 className="mt-2 font-bold text-2xl tracking-tight text-[#123f37]">
+                    <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#123f37]">
                         {caseData?.title || 'مطالبه وجه چک'}
                     </h1>
 
@@ -27,13 +27,13 @@ const CaseHeader = ({ caseData }) => {
                     </p>
                 </div>
 
-                <button
-                    type="button"
+                <Link
+                    href="/client/actions"
                     className="inline-flex shrink-0 items-center gap-2 rounded-[11px] bg-[#123f37] px-5 py-3 font-bold text-white shadow-[0_7px_18px_rgba(18,63,55,0.15)] transition hover:bg-[#0d302a]"
                 >
                     مشاهده اقدام‌ها
                     <ArrowLeft size={16} />
-                </button>
+                </Link>
             </div>
         </section>
     );

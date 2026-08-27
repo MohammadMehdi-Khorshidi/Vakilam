@@ -1,19 +1,37 @@
+'use client';
+
+import { useState } from 'react';
+
 import LawyerSidebar from '../../../components/dashboard/LawyerSidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 
+const ClientDashboardLayout = ({ children }) => {
+    const [mobileOpen, setMobileOpen] = useState(false);
 
-export default function LawyerLayout({ children }) {
     return (
-        <div dir="rtl" className="min-h-screen bg-[#f6f8f7]">
-            <LawyerSidebar />
+        <div dir="rtl" className="min-h-screen bg-[#f8faf9]">
+            {/* ================= Dashboard Layout ================= */}
+            <div className="flex min-h-screen">
+                {/* ================= Sidebar ================= */}
+                <LawyerSidebar
+                    mobileOpen={mobileOpen}
+                    setMobileOpen={setMobileOpen}
+                />
 
-            <div className="min-h-screen lg:mr-[280px]">
-                <DashboardHeader userName="ایدا" role="وکیل" />
+                {/* ================= Main Area ================= */}
+                <div className="min-w-0 flex-1">
+                    {/* Header */}
+                    <DashboardHeader
+                        mobileOpen={mobileOpen}
+                        setMobileOpen={setMobileOpen}
+                    />
 
-                <main className="min-h-[calc(100vh-76px)] p-4 sm:p-6 lg:p-8">
-                    {children}
-                </main>
+                    {/* Page */}
+                    <main className="min-h-[calc(100vh-80px)]">{children}</main>
+                </div>
             </div>
         </div>
     );
-}
+};
+
+export default ClientDashboardLayout;
