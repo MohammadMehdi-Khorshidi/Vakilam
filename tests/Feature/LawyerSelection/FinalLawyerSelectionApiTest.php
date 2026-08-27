@@ -108,7 +108,14 @@ test('a client can select one submitted proposal as the final lawyer', function 
         'id' => $fixture['second_proposal']->id,
         'status' => 'rejected',
     ]);
-    $this->assertDatabaseCount('engagements', 0);
+    $this->assertDatabaseHas('engagements', [
+        'legal_request_id' => $fixture['legal_request']->id,
+        'proposal_id' => $fixture['first_proposal']->id,
+        'client_user_id' => $fixture['client']->id,
+        'lawyer_profile_id' => $fixture['first_proposal']->lawyer_profile_id,
+        'status' => 'pending_contract',
+    ]);
+    $this->assertDatabaseCount('engagements', 1);
     $this->assertDatabaseCount('legal_matters', 0);
 
     $this->getJson(
@@ -133,6 +140,7 @@ test('a final lawyer cannot be selected twice', function () {
 
     $this->assertDatabaseCount('lawyer_proposals', 2);
     expect($fixture['first_proposal']->fresh()->status)->toBe('selected');
+    $this->assertDatabaseCount('engagements', 1);
 });
 
 test('only the owner can select or view the final lawyer', function () {

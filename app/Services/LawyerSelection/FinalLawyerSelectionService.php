@@ -2,8 +2,10 @@
 
 namespace App\Services\LawyerSelection;
 
+use App\Models\Engagement;
 use App\Models\LawyerProposal;
 use App\Models\LegalRequest;
+use App\Models\LegalRequestDistribution;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -12,8 +14,7 @@ class FinalLawyerSelectionService
     public function select(
         LegalRequest $legalRequest,
         string $proposalPublicId,
-    ): LawyerProposal
-    {
+    ): LawyerProposal {
         return DB::transaction(function () use ($legalRequest, $proposalPublicId): LawyerProposal {
             $lockedRequest = LegalRequest::query()
                 ->whereKey($legalRequest->id)
@@ -86,6 +87,21 @@ class FinalLawyerSelectionService
                 'The selected lawyer is no longer eligible.',
             );
 
+            $existingEngagement = Engagement::query()
+                ->where('legal_request_id', $lockedRequest->id)
+                ->whereIn('status', [
+                    'pending_contract',
+                    'active',
+                    'paused',
+                ])
+                ->exists();
+
+            abort_if(
+                $existingEngagement,
+                409,
+                'A lawyer has already been selected for this legal request.',
+            );
+
             LawyerProposal::query()
                 ->where('id', '!=', $proposal->id)
                 ->whereIn('status', ['draft', 'submitted', 'shortlisted'])
@@ -97,6 +113,21 @@ class FinalLawyerSelectionService
 
             $proposal->forceFill(['status' => 'selected'])->save();
             $lockedRequest->forceFill(['status' => 'matched'])->save();
+
+            Engagement::query()->create([
+                'legal_request_id' => $lockedRequest->id,
+                'proposal_id' => $proposal->id,
+                'client_user_id' => $lockedRequest->client_user_id,
+                'lawyer_profile_id' => $proposal->lawyer_profile_id,
+                'status' => 'pending_contract',
+            ]);
+
+            LegalRequestDistribution::query()
+                ->where('legal_request_id', $lockedRequest->id)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'cancelled',
+                ]);
 
             return $this->loadSelection($proposal);
         });
