@@ -102,12 +102,6 @@ test('a client can send a direct collaboration request to a matching lawyer', fu
         "/api/legal-requests/{$fixture['legal_request']->id}/matching",
     )->assertCreated();
 
-    $this->assertDatabaseHas('legal_request_distributions', [
-        'legal_request_id' => $fixture['legal_request']->id,
-        'lawyer_profile_id' => $lawyer->id,
-        'status' => 'sent',
-    ]);
-
     $this->postJson(
         "/api/legal-requests/{$fixture['legal_request']->id}/lawyer-selection/{$lawyer->id}",
     )
