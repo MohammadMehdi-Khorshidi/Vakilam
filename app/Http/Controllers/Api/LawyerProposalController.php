@@ -91,6 +91,7 @@ class LawyerProposalController extends Controller
              * Status cannot be supplied directly by the API consumer.
              */
             return LawyerProposal::query()->create([
+                'legal_request_id' => $lockedDistribution->legal_request_id,
                 'distribution_id' => $lockedDistribution->id,
                 'lawyer_profile_id' => $lawyerProfile->id,
                 'summary' => $request->validated('summary'),
@@ -384,6 +385,15 @@ class LawyerProposalController extends Controller
                 'status' => 'selected',
             ])->save();
 
+            LawyerProposal::query()
+                ->whereKeyNot($lockedProposal->id)
+                ->whereIn('status', ['draft', 'submitted', 'shortlisted'])
+                ->whereHas(
+                    'distribution',
+                    fn ($query) => $query->where('legal_request_id', $legalRequest->id),
+                )
+                ->update(['status' => 'rejected']);
+
             /*
              * Create the shared pre-contract Engagement.
              *
@@ -405,7 +415,8 @@ class LawyerProposalController extends Controller
              */
             LegalRequestDistribution::query()
                 ->where('legal_request_id', $legalRequest->id)
-                ->where('status', 'pending')
+                ->whereKeyNot($distribution->id)
+                ->whereIn('status', ['sent', 'pending'])
                 ->update([
                     'status' => 'cancelled',
                 ]);

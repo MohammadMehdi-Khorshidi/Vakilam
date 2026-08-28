@@ -124,7 +124,8 @@ class FinalLawyerSelectionService
 
             LegalRequestDistribution::query()
                 ->where('legal_request_id', $lockedRequest->id)
-                ->where('status', 'pending')
+                ->whereKeyNot($distribution->id)
+                ->whereIn('status', ['sent', 'pending'])
                 ->update([
                     'status' => 'cancelled',
                 ]);

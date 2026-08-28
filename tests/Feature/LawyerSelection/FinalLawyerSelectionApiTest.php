@@ -25,6 +25,8 @@ function finalSelectionLawyer(array $attributes = []): LawyerProfile
  * @return array{
  *     client: User,
  *     legal_request: LegalRequest,
+ *     first_distribution: LegalRequestDistribution,
+ *     second_distribution: LegalRequestDistribution,
  *     first_proposal: LawyerProposal,
  *     second_proposal: LawyerProposal
  * }
@@ -75,6 +77,8 @@ function finalSelectionFixture(): array
     return [
         'client' => $client,
         'legal_request' => $legalRequest,
+        'first_distribution' => $firstDistribution,
+        'second_distribution' => $secondDistribution,
         'first_proposal' => $firstProposal,
         'second_proposal' => $secondProposal,
     ];
@@ -107,6 +111,14 @@ test('a client can select one submitted proposal as the final lawyer', function 
     $this->assertDatabaseHas('lawyer_proposals', [
         'id' => $fixture['second_proposal']->id,
         'status' => 'rejected',
+    ]);
+    $this->assertDatabaseHas('legal_request_distributions', [
+        'id' => $fixture['first_distribution']->id,
+        'status' => 'sent',
+    ]);
+    $this->assertDatabaseHas('legal_request_distributions', [
+        'id' => $fixture['second_distribution']->id,
+        'status' => 'cancelled',
     ]);
     $this->assertDatabaseHas('engagements', [
         'legal_request_id' => $fixture['legal_request']->id,
