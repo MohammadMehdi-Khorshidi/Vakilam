@@ -97,6 +97,11 @@ class LawyerProfile extends Model
         return $this->hasMany(LawyerProposal::class);
     }
 
+    public function negotiations()
+    {
+        return $this->hasMany(Negotiation::class);
+    }
+
     /** Consultations assigned to this lawyer. */
     public function consultations()
     {
