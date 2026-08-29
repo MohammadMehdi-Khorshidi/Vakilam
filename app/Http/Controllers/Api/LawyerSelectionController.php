@@ -294,6 +294,10 @@ class LawyerSelectionController extends Controller
                 'status' => 'accepted',
             ])->save();
 
+            $legalRequest->forceFill([
+                'status' => 'matched',
+            ])->save();
+
             /*
              * Direct lawyer acceptance creates the same pre-contract
              * Engagement used by the Proposal-selection flow.
@@ -358,5 +362,4 @@ class LawyerSelectionController extends Controller
             'engagement' => $result['engagement'],
         ], $result['accepted'] ? 201 : 200);
     }
-
 }

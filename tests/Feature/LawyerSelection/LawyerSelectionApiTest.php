@@ -271,6 +271,11 @@ test('first lawyer acceptance creates one engagement and cancels other open requ
         'status' => 'accepted',
     ]);
 
+    $this->assertDatabaseHas('legal_requests', [
+        'id' => $fixture['legal_request']->id,
+        'status' => 'matched',
+    ]);
+
     $this->assertDatabaseHas('legal_request_distributions', [
         'id' => $secondDistribution->id,
         'status' => 'cancelled',
