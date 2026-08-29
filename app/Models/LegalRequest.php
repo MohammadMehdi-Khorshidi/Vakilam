@@ -83,7 +83,7 @@ class LegalRequest extends Model
         return $this->hasMany(LawyerMatchRun::class);
     }
 
-    /** Distribution records created for candidate lawyers. */
+    /** Distribution records created for candidate lawyersAdmin. */
     public function distributions()
     {
         return $this->hasMany(LegalRequestDistribution::class);

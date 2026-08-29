@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::create('permissions', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('code', 60)->unique();           // e.g. lawyers.verify
+            $table->string('code', 60)->unique();           // e.g. lawyersAdmin.verify
             $table->string('name', 100);
-            $table->string('group_code', 40);               // users|lawyers|finance|support|system
+            $table->string('group_code', 40);               // users|lawyersAdmin|payments|support|system
             $table->string('description', 255)->nullable();
             $table->boolean('is_sensitive')->default(false);
             $table->dateTime('created_at', 6)->useCurrent();

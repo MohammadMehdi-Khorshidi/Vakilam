@@ -58,7 +58,7 @@ export const clientNav = [
         icon: FolderOpen,
     },
     {
-        href: '/client/lawyers',
+        href: '/client/lawyersAdmin',
         label: 'همه وکلا',
         icon: Users,
     },
@@ -158,7 +158,7 @@ export const adminNav = [
         icon: Users,
     },
     {
-        href: '/admin/lawyers',
+        href: '/admin/lawyersAdmin',
         label: 'وکلا',
         icon: UserCog,
     },

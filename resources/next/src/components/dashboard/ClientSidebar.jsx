@@ -58,7 +58,7 @@ const menuItems = [
         icon: BriefcaseBusiness,
     },
     {
-        href: '/client/lawyers',
+        href: '/client/lawyersAdmin',
         label: 'همه وکلا',
         icon: UsersRound,
     },

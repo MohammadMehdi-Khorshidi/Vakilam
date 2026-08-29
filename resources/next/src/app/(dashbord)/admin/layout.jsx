@@ -1,19 +1,37 @@
-import AdminSidebar from '../../../components/dashboard/AdminSidebar';
+'use client';
+
+import { useState } from 'react';
+
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import AdminSidebar from '@/components/dashboard/AdminSidebar';
 
+const ClientDashboardLayout = ({ children }) => {
+    const [mobileOpen, setMobileOpen] = useState(false);
 
-export default function AdminLayout({ children }) {
     return (
-        <div dir="rtl" className="min-h-screen bg-[#f6f8f7]">
-            <AdminSidebar/>
+        <div dir="rtl" className="min-h-screen bg-[#f8faf9]">
+            {/* ================= Dashboard Layout ================= */}
+            <div className="flex min-h-screen">
+                {/* ================= Sidebar ================= */}
+                <AdminSidebar
+                    mobileOpen={mobileOpen}
+                    setMobileOpen={setMobileOpen}
+                />
 
-            <div className="min-h-screen lg:mr-[280px]">
-                <DashboardHeader userName="ایدا" role="ادمین" />
+                {/* ================= Main Area ================= */}
+                <div className="min-w-0 flex-1">
+                    {/* Header */}
+                    <DashboardHeader
+                        mobileOpen={mobileOpen}
+                        setMobileOpen={setMobileOpen}
+                    />
 
-                <main className="min-h-[calc(100vh-76px)] p-4 sm:p-6 lg:p-8">
-                    {children}
-                </main>
+                    {/* Page */}
+                    <main className="min-h-[calc(100vh-80px)]">{children}</main>
+                </div>
             </div>
         </div>
     );
-}
+};
+
+export default ClientDashboardLayout;
