@@ -20,6 +20,11 @@ class ClientDashboardController extends Controller
             ->latest('updated_at')
             ->get();
 
+        $submittedRequests = $user->legalRequests()
+            ->whereIn('status', ['submitted', 'matched'])
+            ->latest('updated_at')
+            ->get();
+
         $activeCases = $user->legalMatters()
             ->latest('updated_at')
             ->get();
@@ -27,6 +32,7 @@ class ClientDashboardController extends Controller
         return response()->json(
             ClientDashboardResource::make([
                 'draft_cases' => $draftCases,
+                'submitted_requests' => $submittedRequests,
                 'active_cases' => $activeCases,
             ])
         );
