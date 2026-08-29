@@ -38,18 +38,20 @@ test('a registered active user can request a password reset otp', function () {
         ->assertJsonStructure(['message', 'expires_in', 'resend_after', 'debug_otp']);
 });
 
-test('an unknown or inactive user cannot request a password reset otp', function () {
-    $this->postJson('/api/auth/password/forgot/send-otp', [
+test('password reset request does not reveal whether a phone belongs to an active account', function () {
+    $unknown = $this->postJson('/api/auth/password/forgot/send-otp', [
         'phone' => '09121234567',
-    ])->assertUnprocessable()
-        ->assertJsonValidationErrors('phone');
+    ])->assertOk()
+        ->assertJsonMissingPath('debug_otp');
 
     createPasswordResetUser(['phone' => '09121111111', 'status' => 'suspended']);
 
-    $this->postJson('/api/auth/password/forgot/send-otp', [
+    $inactive = $this->postJson('/api/auth/password/forgot/send-otp', [
         'phone' => '09121111111',
-    ])->assertUnprocessable()
-        ->assertJsonValidationErrors('phone');
+    ])->assertOk()
+        ->assertJsonMissingPath('debug_otp');
+
+    expect($unknown->json('message'))->toBe($inactive->json('message'));
 });
 
 test('an otp cannot be resent before the cooldown ends', function () {

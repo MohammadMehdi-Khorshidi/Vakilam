@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Policy;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -248,4 +249,43 @@ test('lawyer registration returns service unavailable when registry file is miss
         'terms_accepted' => true,
         'verification_token' => $verificationToken,
     ])->assertServiceUnavailable();
+});
+
+test('registration records acceptance of the current terms policy when configured', function () {
+    $policy = Policy::query()->create([
+        'type' => 'terms_of_service',
+        'version' => '1.0',
+        'title' => 'Terms of Service',
+        'content' => 'Approved test terms.',
+        'effective_from' => now()->subDay(),
+        'is_current' => true,
+        'published_at' => now()->subDay(),
+    ]);
+
+    $otpResponse = $this->postJson('/api/auth/register/send-otp', [
+        'phone' => '09124444444',
+    ])->assertOk();
+
+    $verificationToken = $this->postJson('/api/auth/register/verify-otp', [
+        'phone' => '09124444444',
+        'otp' => $otpResponse->json('debug_otp'),
+    ])->assertOk()->json('verification_token');
+
+    $this->postJson('/api/auth/register', [
+        'first_name' => 'Policy',
+        'last_name' => 'Client',
+        'phone' => '09124444444',
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
+        'role' => 'client',
+        'terms_accepted' => true,
+        'verification_token' => $verificationToken,
+    ])->assertCreated();
+
+    $user = User::query()->where('phone', '09124444444')->firstOrFail();
+
+    $this->assertDatabaseHas('user_policy_acceptances', [
+        'user_id' => $user->id,
+        'policy_id' => $policy->id,
+    ]);
 });
