@@ -8,8 +8,6 @@ use App\Http\Requests\Proposals\StoreLawyerProposalRequest;
 use App\Http\Requests\Proposals\SubmitLawyerProposalRequest;
 use App\Http\Requests\Proposals\UpdateLawyerProposalRequest;
 use App\Http\Requests\Proposals\WithdrawLawyerProposalRequest;
-use App\Models\AuditLog;
-use App\Models\Engagement;
 use App\Models\LawyerProposal;
 use App\Models\LegalRequest;
 use App\Models\LegalRequestDistribution;
@@ -36,25 +34,13 @@ class LawyerProposalController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        /*
-         * Use a database transaction and row lock to prevent concurrent
-         * requests from creating duplicate proposals for one distribution.
-         */
-        $proposal = DB::transaction(function () use (
-            $request,
-            $distribution,
-            $user,
-        ): LawyerProposal {
+        $proposal = DB::transaction(function () use ($request, $distribution, $user): LawyerProposal {
             $lockedDistribution = LegalRequestDistribution::query()
-                ->with('legalRequest')
+                ->with(['legalRequest', 'negotiation'])
                 ->whereKey($distribution->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            /*
-             * A proposal may only be created for a LegalRequest
-             * that has already been submitted by the client.
-             */
             abort_unless(
                 $lockedDistribution->legalRequest !== null
                     && $lockedDistribution->legalRequest->status === 'submitted',
@@ -62,47 +48,45 @@ class LawyerProposalController extends Controller
                 'Proposal can only be created for a submitted legal request.',
             );
 
+            $negotiation = $lockedDistribution->negotiation;
+
             abort_unless(
-                $lockedDistribution->status === 'sent',
+                $lockedDistribution->status === 'negotiating'
+                    && $negotiation !== null
+                    && $negotiation->status === \App\Models\Negotiation::STATUS_ACTIVE,
                 409,
-                'A proposal cannot be created for this distribution.',
+                'A final proposal can only be created from an active negotiation.',
             );
 
-            /*
-             * The database also protects this with a unique constraint,
-             * but this explicit check provides a clear API error message.
-             */
             abort_if(
                 LawyerProposal::query()
-                    ->where('distribution_id', $lockedDistribution->id)
+                    ->where('legal_request_id', $lockedDistribution->legal_request_id)
+                    ->where('lawyer_profile_id', $lockedDistribution->lawyer_profile_id)
                     ->exists(),
                 409,
-                'A proposal already exists for this distribution.',
+                'A final proposal already exists for this lawyer and legal request.',
             );
 
-            /*
-             * Lawyer ownership and verification have already been checked
-             * by StoreLawyerProposalRequest::authorize().
-             */
             $lawyerProfile = $user->lawyerProfile;
 
-            /*
-             * Every newly created proposal starts as a draft.
-             * Status cannot be supplied directly by the API consumer.
-             */
             return LawyerProposal::query()->create([
                 'legal_request_id' => $lockedDistribution->legal_request_id,
+                'negotiation_id' => $negotiation->id,
                 'distribution_id' => $lockedDistribution->id,
                 'lawyer_profile_id' => $lawyerProfile->id,
+                'source' => $negotiation->source === \App\Models\Negotiation::SOURCE_LAWYER_INTEREST
+                    ? LawyerProposal::SOURCE_OPEN
+                    : LawyerProposal::SOURCE_MATCHED,
                 'summary' => $request->validated('summary'),
+                'service_scope' => $request->validated('service_scope'),
                 'proposed_fee_rial' => $request->validated('proposed_fee_rial'),
                 'estimated_days' => $request->validated('estimated_days'),
-                'status' => 'draft',
+                'status' => LawyerProposal::STATUS_DRAFT,
             ]);
         });
 
         return response()->json([
-            'message' => 'Proposal draft created successfully.',
+            'message' => 'Final proposal draft created successfully.',
             'proposal' => $proposal,
         ], 201);
     }
@@ -135,9 +119,16 @@ class LawyerProposalController extends Controller
              * may not be edited through this endpoint.
              */
             abort_unless(
-                $lockedProposal->status === 'draft',
+                $lockedProposal->status === LawyerProposal::STATUS_DRAFT,
                 409,
                 'Only draft proposals can be updated.',
+            );
+
+            $lockedProposal->loadMissing('negotiation');
+            abort_unless(
+                $lockedProposal->negotiation?->status === \App\Models\Negotiation::STATUS_ACTIVE,
+                409,
+                'Final proposal drafts can only be edited while negotiation is active.',
             );
 
             /*
@@ -168,57 +159,52 @@ class LawyerProposalController extends Controller
         SubmitLawyerProposalRequest $request,
         LawyerProposal $proposal,
     ): JsonResponse {
-        /*
-         * Lock the proposal row during the state transition so that
-         * concurrent requests cannot submit the same proposal twice.
-         */
         $proposal = DB::transaction(function () use ($proposal): LawyerProposal {
             $lockedProposal = LawyerProposal::query()
-                ->with('distribution.legalRequest')
+                ->with(['legalRequest', 'negotiation'])
                 ->whereKey($proposal->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            /*
-             * Only a draft proposal may move to the submitted state.
-             */
             abort_unless(
-                $lockedProposal->status === 'draft',
+                $lockedProposal->status === LawyerProposal::STATUS_DRAFT,
                 409,
                 'Only draft proposals can be submitted.',
             );
 
-            /*
-             * The underlying LegalRequest must still be submitted.
-             */
             abort_unless(
-                $lockedProposal->distribution?->legalRequest?->status === 'submitted',
+                $lockedProposal->legalRequest?->status === 'submitted'
+                    && $lockedProposal->legalRequest?->service_intent === 'lawyer_selection',
                 409,
                 'Proposal cannot be submitted for this legal request.',
             );
 
-            /*
-             * Finalize the proposal submission.
-             */
+            abort_unless(
+                $lockedProposal->negotiation !== null
+                    && $lockedProposal->negotiation->status === \App\Models\Negotiation::STATUS_ACTIVE,
+                409,
+                'Final proposal submission requires an active negotiation.',
+            );
+
             $submittedAt = now();
 
             $lockedProposal->forceFill([
-                'status' => 'submitted',
+                'status' => LawyerProposal::STATUS_SUBMITTED,
                 'submitted_at' => $submittedAt,
                 'expires_at' => $submittedAt->copy()->addHours(72),
             ])->save();
 
-            /*
-             * These relations were loaded only for server-side validation
-             * and should not be exposed automatically in the API response.
-             */
-            $lockedProposal->unsetRelation('distribution');
+            $lockedProposal->negotiation->forceFill([
+                'status' => \App\Models\Negotiation::STATUS_PROPOSAL_SUBMITTED,
+            ])->save();
+
+            $lockedProposal->unsetRelation('negotiation');
 
             return $lockedProposal;
         });
 
         return response()->json([
-            'message' => 'Proposal submitted successfully.',
+            'message' => 'Final proposal submitted successfully.',
             'proposal' => $proposal,
         ]);
     }
@@ -247,9 +233,23 @@ class LawyerProposalController extends Controller
                 'Only submitted proposals can be withdrawn.',
             );
 
+            $lockedProposal->loadMissing('negotiation');
+
             $lockedProposal->forceFill([
-                'status' => 'withdrawn',
+                'status' => LawyerProposal::STATUS_WITHDRAWN,
             ])->save();
+
+            if ($lockedProposal->negotiation !== null
+                && $lockedProposal->negotiation->status === \App\Models\Negotiation::STATUS_PROPOSAL_SUBMITTED) {
+                $lockedProposal->negotiation->forceFill([
+                    'status' => \App\Models\Negotiation::STATUS_CLOSED,
+                    'closed_at' => now(),
+                ])->save();
+
+                if ($lockedProposal->negotiation->distribution_id !== null) {
+                    $lockedProposal->negotiation->distribution()->update(['status' => 'closed']);
+                }
+            }
 
             return $lockedProposal;
         });
@@ -261,198 +261,23 @@ class LawyerProposalController extends Controller
     }
 
     /**
-     * Select a submitted lawyer proposal.
+     * Select a submitted proposal and create the pre-contract engagement.
      *
-     * Selection creates the pre-contract Engagement atomically.
-     * It does not create a LegalMatter.
+     * This endpoint is the canonical proposal-selection endpoint for the frontend.
      */
     public function select(
         SelectLawyerProposalRequest $request,
         LawyerProposal $proposal,
+        \App\Services\LawyerSelection\ProposalSelectionService $selectionService,
     ): JsonResponse {
         /** @var User $client */
         $client = $request->user();
 
-        $result = DB::transaction(function () use (
-            $request,
+        $result = $selectionService->select(
             $proposal,
             $client,
-        ): array {
-            $lockedProposal = LawyerProposal::query()
-                ->with('distribution')
-                ->whereKey($proposal->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            $distribution = $lockedProposal->distribution;
-
-            abort_unless(
-                $distribution !== null,
-                409,
-                'Proposal distribution is not available.',
-            );
-
-            /*
-             * The LegalRequest is the common competition boundary between
-             * Proposal selection and direct lawyer selection.
-             */
-            $legalRequest = LegalRequest::query()
-                ->whereKey($distribution->legal_request_id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            abort_unless(
-                $legalRequest->client_user_id === $client->id,
-                403,
-                'You are not allowed to select this proposal.',
-            );
-
-            /*
-             * Make retries idempotent when this proposal
-             * has already been selected successfully.
-             */
-            if ($lockedProposal->status === 'selected') {
-                $existingEngagement = Engagement::query()
-                    ->where('proposal_id', $lockedProposal->id)
-                    ->first();
-
-                abort_unless(
-                    $existingEngagement !== null,
-                    409,
-                    'Selected proposal has no engagement.',
-                );
-
-                /*
-                 * Distribution is required only for server-side validation
-                 * and should not be exposed in the API response.
-                 */
-                $lockedProposal->unsetRelation('distribution');
-
-                return [
-                    'proposal' => $lockedProposal,
-                    'engagement' => $existingEngagement,
-                    'created' => false,
-                ];
-            }
-
-            abort_unless(
-                $lockedProposal->status === 'submitted',
-                409,
-                'Only submitted proposals can be selected.',
-            );
-
-            abort_unless(
-                $lockedProposal->expires_at !== null
-                    && $lockedProposal->expires_at->isFuture(),
-                409,
-                'This proposal has expired.',
-            );
-
-            abort_unless(
-                $legalRequest->status === 'submitted'
-                    && $legalRequest->service_intent === 'lawyer_selection',
-                409,
-                'This legal request is not available for lawyer selection.',
-            );
-
-            /*
-             * Prevent two simultaneous active/pre-contract engagements
-             * for the same LegalRequest.
-             *
-             * This protects both possible winning paths:
-             * - Client selects a Lawyer Proposal.
-             * - Lawyer accepts a direct client request.
-             */
-            $existingEngagement = Engagement::query()
-                ->where('legal_request_id', $legalRequest->id)
-                ->whereIn('status', [
-                    'pending_contract',
-                    'active',
-                    'paused',
-                ])
-                ->first();
-
-            abort_if(
-                $existingEngagement !== null,
-                409,
-                'A lawyer has already been selected for this legal request.',
-            );
-
-            /*
-             * Mark this proposal as the winning proposal.
-             */
-            $lockedProposal->forceFill([
-                'status' => 'selected',
-            ])->save();
-
-            $legalRequest->forceFill([
-                'status' => 'matched',
-            ])->save();
-
-            LawyerProposal::query()
-                ->whereKeyNot($lockedProposal->id)
-                ->whereIn('status', ['draft', 'submitted', 'shortlisted'])
-                ->whereHas(
-                    'distribution',
-                    fn ($query) => $query->where('legal_request_id', $legalRequest->id),
-                )
-                ->update(['status' => 'rejected']);
-
-            /*
-             * Create the shared pre-contract Engagement.
-             *
-             * LegalMatter is intentionally not created here.
-             */
-            $engagement = Engagement::query()->create([
-                'legal_request_id' => $legalRequest->id,
-                'proposal_id' => $lockedProposal->id,
-                'client_user_id' => $client->id,
-                'lawyer_profile_id' => $lockedProposal->lawyer_profile_id,
-                'status' => 'pending_contract',
-            ]);
-
-            /*
-             * A selected Proposal wins the lawyer-selection race.
-             *
-             * Any direct collaboration requests that are still waiting
-             * for lawyer response must now be closed.
-             */
-            LegalRequestDistribution::query()
-                ->where('legal_request_id', $legalRequest->id)
-                ->whereKeyNot($distribution->id)
-                ->whereIn('status', ['sent', 'pending'])
-                ->update([
-                    'status' => 'cancelled',
-                ]);
-
-            /*
-             * Record the final lawyer selection for auditing.
-             */
-            AuditLog::query()->create([
-                'actor_user_id' => $client->id,
-                'action' => 'lawyer_proposal.selected',
-                'target_type' => LawyerProposal::class,
-                'target_id' => $lockedProposal->id,
-                'ip_address' => $request->ip(),
-                'metadata' => [
-                    'legal_request_id' => $legalRequest->id,
-                    'engagement_id' => $engagement->id,
-                    'lawyer_profile_id' => $lockedProposal->lawyer_profile_id,
-                ],
-            ]);
-
-            /*
-             * Distribution is required only for server-side validation
-             * and should not be exposed in the API response.
-             */
-            $lockedProposal->unsetRelation('distribution');
-
-            return [
-                'proposal' => $lockedProposal,
-                'engagement' => $engagement,
-                'created' => true,
-            ];
-        });
+            $request->ip(),
+        );
 
         return response()->json([
             'message' => $result['created']
@@ -460,6 +285,33 @@ class LawyerProposalController extends Controller
                 : 'Lawyer proposal was already selected.',
             'proposal' => $result['proposal'],
             'engagement' => $result['engagement'],
+            'deprecated' => true,
         ], $result['created'] ? 201 : 200);
     }
+
+    public function selectForLegalRequest(
+        SelectLawyerProposalRequest $request,
+        LegalRequest $legalRequest,
+        LawyerProposal $proposal,
+        \App\Services\LawyerSelection\ProposalSelectionService $selectionService,
+    ): JsonResponse {
+        abort_unless(
+            $proposal->legal_request_id === $legalRequest->id,
+            404,
+            'Proposal does not belong to this legal request.',
+        );
+
+        /** @var User $client */
+        $client = $request->user();
+        $result = $selectionService->select($proposal, $client, $request->ip());
+
+        return response()->json([
+            'message' => $result['created']
+                ? 'Final lawyer proposal selected successfully.'
+                : 'Final lawyer proposal was already selected.',
+            'proposal' => $result['proposal'],
+            'engagement' => $result['engagement'],
+        ], $result['created'] ? 201 : 200);
+    }
+
 }
