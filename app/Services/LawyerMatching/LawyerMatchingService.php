@@ -112,8 +112,7 @@ class LawyerMatchingService
     public function sendRequests(
         LegalRequest $legalRequest,
         array $lawyerPublicIds,
-    ): Collection
-    {
+    ): Collection {
         return DB::transaction(function () use ($legalRequest, $lawyerPublicIds): Collection {
             $lockedRequest = LegalRequest::query()
                 ->whereKey($legalRequest->id)
@@ -142,7 +141,14 @@ class LawyerMatchingService
             $candidates = $run->candidates()
                 ->whereHas(
                     'lawyerProfile',
-                    fn ($query) => $query->whereIn('public_id', $lawyerPublicIds),
+                    fn ($query) => $query
+                        ->whereIn('public_id', $lawyerPublicIds)
+                        ->where('verification_status', 'approved')
+                        ->where('is_available', true)
+                        ->whereHas(
+                            'user',
+                            fn ($userQuery) => $userQuery->where('status', 'active'),
+                        ),
                 )
                 ->with('lawyerProfile:id,public_id')
                 ->get()
@@ -271,8 +277,7 @@ class LawyerMatchingService
     private function rankedLawyers(
         LegalRequest $legalRequest,
         bool $requireOpenConsultationSlot = false,
-    ): Collection
-    {
+    ): Collection {
         $legalRequest->loadMissing('legalCategory:id,code,status');
 
         abort_unless(
@@ -349,8 +354,7 @@ class LawyerMatchingService
         string $categoryCode,
         int $provinceId,
         int $cityId,
-    ): array
-    {
+    ): array {
         $matchingSpecialty = $lawyer->lawyerSpecialties
             ->filter(fn ($assignment) => $assignment->specialty?->status
                 && $assignment->specialty->code === $categoryCode)
