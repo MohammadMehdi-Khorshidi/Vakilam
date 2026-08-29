@@ -385,6 +385,10 @@ class LawyerProposalController extends Controller
                 'status' => 'selected',
             ])->save();
 
+            $legalRequest->forceFill([
+                'status' => 'matched',
+            ])->save();
+
             LawyerProposal::query()
                 ->whereKeyNot($lockedProposal->id)
                 ->whereIn('status', ['draft', 'submitted', 'shortlisted'])

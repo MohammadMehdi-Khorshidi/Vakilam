@@ -1702,6 +1702,11 @@ test('a client can select an active submitted proposal and create one pending co
         'status' => 'selected',
     ]);
 
+    $this->assertDatabaseHas('legal_requests', [
+        'id' => $legalRequest->id,
+        'status' => 'matched',
+    ]);
+
     $this->assertDatabaseHas('engagements', [
         'legal_request_id' => $legalRequest->id,
         'proposal_id' => $proposal->id,
