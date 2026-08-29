@@ -32,7 +32,7 @@ class StoreLawyerProposalRequest extends FormRequest
         return [
             'summary' => ['nullable', 'string'],
             'proposed_fee_rial' => ['nullable', 'integer', 'min:0'],
-            'estimated_days' => ['nullable', 'integer', 'min:0'],
+            'estimated_days' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

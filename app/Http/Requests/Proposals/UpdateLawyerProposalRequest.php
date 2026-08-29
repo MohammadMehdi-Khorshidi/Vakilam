@@ -49,7 +49,7 @@ class UpdateLawyerProposalRequest extends FormRequest
         return [
             'summary' => ['sometimes', 'nullable', 'string'],
             'proposed_fee_rial' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'estimated_days' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'estimated_days' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ];
     }
 }

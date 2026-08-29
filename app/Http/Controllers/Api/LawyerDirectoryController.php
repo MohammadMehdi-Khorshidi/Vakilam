@@ -21,6 +21,7 @@ class LawyerDirectoryController extends Controller
         $lawyers = LawyerProfile::query()
             ->where('verification_status', 'approved')
             ->where('is_available', true)
+            ->whereHas('user', fn ($query) => $query->where('status', 'active'))
             ->when(
                 $filters['specialty_id'] ?? null,
                 fn ($query, $specialtyId) => $query->whereHas(
@@ -66,6 +67,7 @@ class LawyerDirectoryController extends Controller
             ->where('public_id', $publicId)
             ->where('verification_status', 'approved')
             ->where('is_available', true)
+            ->whereHas('user', fn ($query) => $query->where('status', 'active'))
             ->with([
                 'lawyerSpecialties.specialty:id,code,name,status',
                 'serviceAreas.province:id,name',

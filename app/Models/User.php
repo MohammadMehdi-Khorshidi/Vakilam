@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -41,7 +43,7 @@ use Laravel\Sanctum\HasApiTokens;
  */
 #[Fillable(['name', 'last_name', 'email', 'phone', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements PasskeyUser
+class User extends Authenticatable implements FilamentUser, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasUuids, Notifiable, PasskeyAuthenticatable, SoftDeletes, TwoFactorAuthenticatable;
@@ -79,7 +81,15 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->belongsToMany(Role::class, 'user_roles')
             ->using(UserRole::class)
-            ->withPivot(['id', 'granted_at', 'revoked_at']);
+            ->withPivot(['id', 'granted_at', 'revoked_at'])
+            ->wherePivotNull('revoked_at');
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $panel->getId() === 'admin'
+            && $this->status === 'active'
+            && $this->roles()->where('code', 'admin')->exists();
     }
 
     /** Legal requests created by this user as a client. */
@@ -253,11 +263,11 @@ class User extends Authenticatable implements PasskeyUser
             ->withTimestamps(false);
     }
 
-// Helper مفید
+    // Helper مفید
     public function hasAcceptedPolicy(string $type): bool
     {
         $current = Policy::currentOfType($type);
-        if (!$current) {
+        if (! $current) {
             return false;
         }
 

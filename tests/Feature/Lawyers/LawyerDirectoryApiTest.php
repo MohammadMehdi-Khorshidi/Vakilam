@@ -29,6 +29,8 @@ test('only approved and available lawyers are publicly listed', function () {
         'full_name' => 'وکیل غیرفعال',
         'is_available' => false,
     ]);
+    $suspended = createDirectoryLawyer(['full_name' => 'وکیل تعلیق‌شده']);
+    $suspended->user->forceFill(['status' => 'suspended'])->save();
 
     $response = $this->getJson('/api/lawyers');
 
@@ -37,7 +39,11 @@ test('only approved and available lawyers are publicly listed', function () {
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.public_id', $visible->public_id)
         ->assertJsonMissing(['full_name' => 'وکیل در انتظار'])
-        ->assertJsonMissing(['full_name' => 'وکیل غیرفعال']);
+        ->assertJsonMissing(['full_name' => 'وکیل غیرفعال'])
+        ->assertJsonMissing(['full_name' => 'وکیل تعلیق‌شده']);
+
+    $this->getJson("/api/lawyers/{$suspended->public_id}")
+        ->assertNotFound();
 });
 
 test('lawyers can be filtered by specialty and service city', function () {

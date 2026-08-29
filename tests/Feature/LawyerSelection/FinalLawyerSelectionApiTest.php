@@ -25,6 +25,8 @@ function finalSelectionLawyer(array $attributes = []): LawyerProfile
  * @return array{
  *     client: User,
  *     legal_request: LegalRequest,
+ *     first_distribution: LegalRequestDistribution,
+ *     second_distribution: LegalRequestDistribution,
  *     first_proposal: LawyerProposal,
  *     second_proposal: LawyerProposal
  * }
@@ -75,6 +77,8 @@ function finalSelectionFixture(): array
     return [
         'client' => $client,
         'legal_request' => $legalRequest,
+        'first_distribution' => $firstDistribution,
+        'second_distribution' => $secondDistribution,
         'first_proposal' => $firstProposal,
         'second_proposal' => $secondProposal,
     ];
@@ -108,7 +112,22 @@ test('a client can select one submitted proposal as the final lawyer', function 
         'id' => $fixture['second_proposal']->id,
         'status' => 'rejected',
     ]);
-    $this->assertDatabaseCount('engagements', 0);
+    $this->assertDatabaseHas('legal_request_distributions', [
+        'id' => $fixture['first_distribution']->id,
+        'status' => 'sent',
+    ]);
+    $this->assertDatabaseHas('legal_request_distributions', [
+        'id' => $fixture['second_distribution']->id,
+        'status' => 'cancelled',
+    ]);
+    $this->assertDatabaseHas('engagements', [
+        'legal_request_id' => $fixture['legal_request']->id,
+        'proposal_id' => $fixture['first_proposal']->id,
+        'client_user_id' => $fixture['client']->id,
+        'lawyer_profile_id' => $fixture['first_proposal']->lawyer_profile_id,
+        'status' => 'pending_contract',
+    ]);
+    $this->assertDatabaseCount('engagements', 1);
     $this->assertDatabaseCount('legal_matters', 0);
 
     $this->getJson(
@@ -133,6 +152,7 @@ test('a final lawyer cannot be selected twice', function () {
 
     $this->assertDatabaseCount('lawyer_proposals', 2);
     expect($fixture['first_proposal']->fresh()->status)->toBe('selected');
+    $this->assertDatabaseCount('engagements', 1);
 });
 
 test('only the owner can select or view the final lawyer', function () {

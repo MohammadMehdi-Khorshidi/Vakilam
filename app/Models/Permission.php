@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Permission extends Model
 {
     use HasUuids;
+    public const UPDATED_AT = null;
 
     /** Attributes that may be mass assigned. */
     protected $fillable = [

@@ -1,7 +1,9 @@
 <?php
 
+use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\LawyerProfile;
+use App\Models\LawyerProposal;
 use App\Models\LegalCategory;
 use App\Models\LegalRequest;
 use App\Models\LegalRequestDistribution;
@@ -73,6 +75,7 @@ test('an approved lawyer can create a proposal draft for their distribution', fu
         ->assertJsonPath('proposal.lawyer_profile_id', $lawyerProfile->id);
 
     $this->assertDatabaseHas('lawyer_proposals', [
+        'legal_request_id' => $legalRequest->id,
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'status' => 'draft',
@@ -204,7 +207,7 @@ test('a lawyer can update their own proposal while it is still a draft', functio
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Initial proposal.',
@@ -288,16 +291,31 @@ test('a lawyer can submit their own proposal draft without creating a matter or 
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Ready to submit.',
-        'proposed_fee_rial' => 50_000_000,
-        'estimated_days' => 30,
         'status' => 'draft',
     ]);
 
     Sanctum::actingAs($lawyerUser);
+
+    $this->postJson(
+        "/api/lawyer/proposals/{$proposal->id}/submit"
+    )
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'summary',
+            'proposed_fee_rial',
+            'estimated_days',
+        ]);
+
+    expect($proposal->fresh()->status)->toBe('draft');
+
+    $proposal->forceFill([
+        'summary' => 'Ready to submit.',
+        'proposed_fee_rial' => 50_000_000,
+        'estimated_days' => 30,
+    ])->save();
 
     $this->postJson(
         "/api/lawyer/proposals/{$proposal->id}/submit"
@@ -375,7 +393,7 @@ test('a submitted proposal cannot be updated', function () {
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Submitted proposal.',
@@ -452,7 +470,7 @@ test('a submitted proposal cannot be submitted again', function () {
 
     $submittedAt = now();
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Already submitted proposal.',
@@ -735,7 +753,6 @@ test('an inactive lawyer cannot create a proposal', function () {
     $this->assertDatabaseCount('lawyer_proposals', 0);
 });
 
-
 test('another lawyer cannot update a proposal', function () {
     $client = User::factory()->create();
 
@@ -789,7 +806,7 @@ test('another lawyer cannot update a proposal', function () {
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $ownerProfile->id,
         'summary' => 'Original proposal.',
@@ -809,7 +826,6 @@ test('another lawyer cannot update a proposal', function () {
         'status' => 'draft',
     ]);
 });
-
 
 test('another lawyer cannot submit a proposal', function () {
     $client = User::factory()->create();
@@ -864,7 +880,7 @@ test('another lawyer cannot submit a proposal', function () {
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $ownerProfile->id,
         'summary' => 'Draft proposal.',
@@ -882,7 +898,6 @@ test('another lawyer cannot submit a proposal', function () {
     expect($proposal->status)->toBe('draft');
     expect($proposal->submitted_at)->toBeNull();
 });
-
 
 test('a proposal cannot be submitted when its legal request is no longer submitted', function () {
     $client = User::factory()->create();
@@ -928,7 +943,7 @@ test('a proposal cannot be submitted when its legal request is no longer submitt
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Draft proposal.',
@@ -954,7 +969,6 @@ test('a proposal cannot be submitted when its legal request is no longer submitt
     $this->assertDatabaseCount('engagements', 0);
     $this->assertDatabaseCount('legal_matters', 0);
 });
-
 
 test('proposal monetary and duration values cannot be negative', function () {
     $client = User::factory()->create();
@@ -1068,7 +1082,7 @@ test('a client can view submitted proposals for their own legal request while la
         'sent_at' => now(),
     ]);
 
-    $submittedProposal = \App\Models\LawyerProposal::query()->create([
+    $submittedProposal = LawyerProposal::query()->create([
         'distribution_id' => $submittedDistribution->id,
         'lawyer_profile_id' => $submittedLawyerProfile->id,
         'summary' => 'Visible submitted proposal.',
@@ -1096,7 +1110,7 @@ test('a client can view submitted proposals for their own legal request while la
         'sent_at' => now(),
     ]);
 
-    $draftProposal = \App\Models\LawyerProposal::query()->create([
+    $draftProposal = LawyerProposal::query()->create([
         'distribution_id' => $draftDistribution->id,
         'lawyer_profile_id' => $draftLawyerProfile->id,
         'summary' => 'Hidden draft proposal.',
@@ -1120,7 +1134,6 @@ test('a client can view submitted proposals for their own legal request while la
         collect($response->json('proposals'))->pluck('id')
     )->not->toContain($draftProposal->id);
 });
-
 
 test('a client cannot view proposals for another clients legal request', function () {
     $owner = User::factory()->create();
@@ -1171,7 +1184,7 @@ test('a client cannot view proposals for another clients legal request', functio
         'sent_at' => now(),
     ]);
 
-    \App\Models\LawyerProposal::query()->create([
+    LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Private submitted proposal.',
@@ -1185,7 +1198,6 @@ test('a client cannot view proposals for another clients legal request', functio
         "/api/legal-requests/{$legalRequest->id}/proposals"
     )->assertForbidden();
 });
-
 
 test('proposal viewing requires authentication', function () {
     $client = User::factory()->create();
@@ -1268,7 +1280,7 @@ test('a lawyer can withdraw their own submitted proposal without creating an eng
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Submitted proposal.',
@@ -1292,7 +1304,6 @@ test('a lawyer can withdraw their own submitted proposal without creating an eng
     $this->assertDatabaseCount('engagements', 0);
     $this->assertDatabaseCount('legal_matters', 0);
 });
-
 
 test('another lawyer cannot withdraw a proposal', function () {
     $client = User::factory()->create();
@@ -1347,7 +1358,7 @@ test('another lawyer cannot withdraw a proposal', function () {
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $ownerProfile->id,
         'summary' => 'Submitted proposal.',
@@ -1366,7 +1377,6 @@ test('another lawyer cannot withdraw a proposal', function () {
         'status' => 'submitted',
     ]);
 });
-
 
 test('a draft proposal cannot be withdrawn', function () {
     $client = User::factory()->create();
@@ -1412,7 +1422,7 @@ test('a draft proposal cannot be withdrawn', function () {
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Draft proposal.',
@@ -1430,7 +1440,6 @@ test('a draft proposal cannot be withdrawn', function () {
         'status' => 'draft',
     ]);
 });
-
 
 test('a withdrawn proposal cannot be withdrawn again', function () {
     $client = User::factory()->create();
@@ -1476,7 +1485,7 @@ test('a withdrawn proposal cannot be withdrawn again', function () {
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Already withdrawn proposal.',
@@ -1547,7 +1556,7 @@ test('expired submitted proposals are marked as expired by the scheduler', funct
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Expired proposal.',
@@ -1617,7 +1626,7 @@ test('a client can select an active submitted proposal and create one pending co
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Selectable proposal.',
@@ -1651,6 +1660,31 @@ test('a client can select an active submitted proposal and create one pending co
         'expires_at' => now()->addHours(72),
     ]);
 
+    $competingLawyerUser = User::factory()->create(['status' => 'active']);
+    $competingLawyerProfile = LawyerProfile::query()->create([
+        'user_id' => $competingLawyerUser->id,
+        'full_name' => 'Competing Proposal Lawyer',
+        'verification_status' => 'approved',
+        'is_available' => true,
+    ]);
+    $competingDistribution = LegalRequestDistribution::query()->create([
+        'legal_request_id' => $legalRequest->id,
+        'lawyer_profile_id' => $competingLawyerProfile->id,
+        'status' => 'sent',
+        'sent_at' => now(),
+    ]);
+    $competingProposal = LawyerProposal::query()->create([
+        'legal_request_id' => $legalRequest->id,
+        'distribution_id' => $competingDistribution->id,
+        'lawyer_profile_id' => $competingLawyerProfile->id,
+        'summary' => 'Competing submitted proposal.',
+        'proposed_fee_rial' => 45_000_000,
+        'estimated_days' => 35,
+        'status' => 'submitted',
+        'submitted_at' => now(),
+        'expires_at' => now()->addHours(72),
+    ]);
+
     Sanctum::actingAs($client);
 
     $this->postJson(
@@ -1681,6 +1715,16 @@ test('a client can select an active submitted proposal and create one pending co
         'status' => 'cancelled',
     ]);
 
+    $this->assertDatabaseHas('lawyer_proposals', [
+        'id' => $competingProposal->id,
+        'status' => 'rejected',
+    ]);
+
+    $this->assertDatabaseHas('legal_request_distributions', [
+        'id' => $competingDistribution->id,
+        'status' => 'cancelled',
+    ]);
+
     $this->assertDatabaseHas('audit_logs', [
         'actor_user_id' => $client->id,
         'action' => 'lawyer_proposal.selected',
@@ -1692,7 +1736,6 @@ test('a client can select an active submitted proposal and create one pending co
     // Lawyer selection itself must not form a LegalMatter.
     $this->assertDatabaseCount('legal_matters', 0);
 });
-
 
 test('selecting the same proposal again is idempotent and does not create another engagement', function () {
     $client = User::factory()->create([
@@ -1740,7 +1783,7 @@ test('selecting the same proposal again is idempotent and does not create anothe
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'summary' => 'Selectable proposal.',
@@ -1767,13 +1810,12 @@ test('selecting the same proposal again is idempotent and does not create anothe
     $this->assertDatabaseCount('legal_matters', 0);
 
     expect(
-        \App\Models\AuditLog::query()
+        AuditLog::query()
             ->where('action', 'lawyer_proposal.selected')
             ->where('target_id', $proposal->id)
             ->count()
     )->toBe(1);
 });
-
 
 test('a client cannot select another clients proposal', function () {
     $owner = User::factory()->create([
@@ -1825,7 +1867,7 @@ test('a client cannot select another clients proposal', function () {
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'status' => 'submitted',
@@ -1846,7 +1888,6 @@ test('a client cannot select another clients proposal', function () {
         'status' => 'submitted',
     ]);
 });
-
 
 test('an expired proposal cannot be selected', function () {
     $client = User::factory()->create([
@@ -1894,7 +1935,7 @@ test('an expired proposal cannot be selected', function () {
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'status' => 'submitted',
@@ -1911,7 +1952,6 @@ test('an expired proposal cannot be selected', function () {
     $this->assertDatabaseCount('engagements', 0);
     $this->assertDatabaseCount('legal_matters', 0);
 });
-
 
 test('a withdrawn proposal cannot be selected', function () {
     $client = User::factory()->create([
@@ -1959,7 +1999,7 @@ test('a withdrawn proposal cannot be selected', function () {
         'sent_at' => now(),
     ]);
 
-    $proposal = \App\Models\LawyerProposal::query()->create([
+    $proposal = LawyerProposal::query()->create([
         'distribution_id' => $distribution->id,
         'lawyer_profile_id' => $lawyerProfile->id,
         'status' => 'withdrawn',

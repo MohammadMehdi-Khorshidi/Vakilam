@@ -35,8 +35,10 @@ class Role extends Model
     {
         return $this->belongsToMany(User::class, 'user_roles')
             ->using(UserRole::class)
-            ->withPivot(['id', 'granted_at', 'revoked_at']);
+            ->withPivot(['id', 'granted_at', 'revoked_at'])
+            ->wherePivotNull('revoked_at');
     }
+
     /**
      * Permissions assigned to this role.
      */
@@ -44,5 +46,4 @@ class Role extends Model
     {
         return $this->belongsToMany(Permission::class, 'role_permissions');
     }
-
 }

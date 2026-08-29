@@ -57,8 +57,7 @@ test('a client can reserve an open consultation slot for ten minutes', function 
                 $mock->shouldReceive('consultationRecommendations')
                     ->once()
                     ->withArgs(
-                        fn (LegalRequest $request): bool =>
-                            $request->is($legalRequest)
+                        fn (LegalRequest $request): bool => $request->is($legalRequest)
                     )
                     ->andReturn(collect([
                         [
@@ -73,8 +72,6 @@ test('a client can reserve an open consultation slot for ten minutes', function 
         $response = $this->postJson(
             "/api/legal-requests/{$legalRequest->id}/consultation-slots/{$slot->id}/reserve"
         );
-
-        $response->dump();
 
         $response
             ->assertCreated()
@@ -189,8 +186,6 @@ test('another client cannot reserve an already reserved consultation slot', func
                 ->count()
         )->toBe(1);
 
-        
-
         expect($slot->status)
             ->toBe('reserved')
             ->and($slot->consultation_id)
@@ -267,8 +262,7 @@ test('an expired reservation can be released and reserved by another client', fu
                 $mock->shouldReceive('consultationRecommendations')
                     ->once()
                     ->withArgs(
-                        fn (LegalRequest $request): bool =>
-                            $request->is($secondLegalRequest)
+                        fn (LegalRequest $request): bool => $request->is($secondLegalRequest)
                     )
                     ->andReturn(collect([
                         [
