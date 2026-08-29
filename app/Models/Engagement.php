@@ -26,6 +26,7 @@ class Engagement extends Model
         'client_user_id',
         'lawyer_profile_id',
         'status',
+        'contract_due_at',
         'started_at',
         'ended_at',
     ];
@@ -38,6 +39,7 @@ class Engagement extends Model
     protected function casts(): array
     {
         return [
+            'contract_due_at' => 'datetime',
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
         ];
@@ -65,6 +67,11 @@ class Engagement extends Model
     public function lawyerProfile()
     {
         return $this->belongsTo(LawyerProfile::class);
+    }
+
+    public function confirmations()
+    {
+        return $this->hasMany(EngagementConfirmation::class);
     }
 
     /** Contract associated with this engagement; engagement_id is unique on contracts. */
