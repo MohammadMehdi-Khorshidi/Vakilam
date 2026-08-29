@@ -52,7 +52,7 @@ class LawyerInterestController extends Controller
                     });
                 }
             })
-            ->whereDoesntHave('engagements')
+            ->whereDoesntHave('engagement')
             ->whereDoesntHave('distributions', fn ($q) => $q->where('lawyer_profile_id', $lawyer->id))
             ->with(['legalCategory:id,code,name', 'province:id,name', 'city:id,province_id,name'])
             ->latest('submitted_at');

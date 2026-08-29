@@ -223,7 +223,7 @@ test('client selection of final proposal creates one engagement and cancels comp
         ->assertJsonPath('proposal.status', 'selected')
         ->assertJsonPath('engagement.status', 'pending_contract');
 
-    $engagement = $fixture['legalRequest']->engagements()->firstOrFail();
+    $engagement = $fixture['legalRequest']->engagement()->firstOrFail();
     expect($engagement->contract_due_at->equalTo(now()->addHours(48)))->toBeTrue();
     expect($fixture['negotiation']->fresh()->status)->toBe(Negotiation::STATUS_WON);
     expect($otherNegotiation->fresh()->status)->toBe(Negotiation::STATUS_CANCELLED);

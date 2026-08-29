@@ -171,7 +171,7 @@ test('contract payment success is the only event that forms and activates legal 
     $this->postJson("/api/legal-requests/{$fixture['legalRequest']->id}/proposals/{$proposal->public_id}/select")
         ->assertCreated();
 
-    $engagement = $fixture['legalRequest']->engagements()->firstOrFail();
+    $engagement = $fixture['legalRequest']->engagement()->firstOrFail();
     $this->assertDatabaseCount('legal_matters', 0);
 
     $this->postJson("/api/engagements/{$engagement->public_id}/confirm")
@@ -243,7 +243,7 @@ test('failed payment does not create legal matter', function () {
 
     Sanctum::actingAs($fixture['client']);
     $this->postJson("/api/legal-requests/{$fixture['legalRequest']->id}/proposals/{$proposal->public_id}/select")->assertCreated();
-    $engagement = $fixture['legalRequest']->engagements()->firstOrFail();
+    $engagement = $fixture['legalRequest']->engagement()->firstOrFail();
     $this->postJson("/api/engagements/{$engagement->public_id}/confirm")->assertCreated();
 
     Sanctum::actingAs($fixture['lawyerUser']);

@@ -83,7 +83,13 @@ class PaymentController extends Controller
 
     private function serialize(Payment $payment): array
     {
-        $payment->loadMissing('invoice.contract.engagement.legalMatters');
+        $payment->loadMissing('invoice.contract.engagement.legalMatter');
+
+        $legalMatter = $payment
+            ->invoice
+            ?->contract
+            ?->engagement
+            ?->legalMatter;
 
         return [
             'public_id' => $payment->public_id,
@@ -97,9 +103,9 @@ class PaymentController extends Controller
                 'status' => $payment->invoice->status,
                 'total_rial' => $payment->invoice->total_rial,
             ],
-            'legal_matter' => $payment->invoice?->contract?->engagement?->legalMatters?->first() === null ? null : [
-                'public_id' => $payment->invoice->contract->engagement->legalMatters->first()->public_id,
-                'status' => $payment->invoice->contract->engagement->legalMatters->first()->status,
+            'legal_matter' => $payment->invoice?->contract?->engagement?->legalMatter === null ? null : [
+                'public_id' => $payment->invoice->contract->engagement->legalMatter->public_id,
+                'status' => $payment->invoice->contract->engagement->legalMatter->status,
             ],
         ];
     }

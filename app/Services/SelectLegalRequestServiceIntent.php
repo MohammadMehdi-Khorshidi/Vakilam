@@ -30,8 +30,8 @@ class SelectLegalRequestServiceIntent
                     || $lockedRequest->consultations()->exists()
                     || $lockedRequest->negotiations()->exists()
                     || $lockedRequest->proposals()->exists()
-                    || $lockedRequest->engagements()->exists()
-                    || $lockedRequest->legalMatters()->exists();
+                    || $lockedRequest->engagement()->exists()
+                    || $lockedRequest->legalMatter()->exists();
 
                 abort_if(
                     $flowAlreadyStarted,
