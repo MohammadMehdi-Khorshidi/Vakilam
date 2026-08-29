@@ -106,7 +106,6 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen }) => {
 
     return (
         <>
-            {/* ================= Mobile Overlay ================= */}
             {mobileOpen && (
                 <button
                     type="button"
@@ -116,14 +115,12 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen }) => {
                 />
             )}
 
-            {/* ================= Sidebar ================= */}
             <aside
                 dir="rtl"
                 className={`${vazir.className} fixed right-0 top-[80px] z-40 flex h-[calc(100vh-80px)] w-[270px] flex-col overflow-hidden border-l border-white/[0.06] bg-[radial-gradient(circle_at_20%_0,#c5a35a2e,#0000_24%),linear-gradient(#174b42_0%,#0e332d_55%,#092620_100%)] text-white shadow-[-8px_0_35px_#08231f14] transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:z-30 lg:h-[calc(100vh-80px)] lg:translate-x-0 lg:self-start ${
                     mobileOpen ? 'translate-x-0' : 'translate-x-full'
                 }`}
             >
-                {/* ================= Logo ================= */}
                 <div className="relative flex h-[92px] shrink-0 items-center justify-center border-b border-white/10">
                     <Link
                         href="/"
@@ -150,7 +147,6 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen }) => {
                         />
                     </Link>
 
-                    {/* Mobile Close */}
                     <button
                         type="button"
                         aria-label="بستن منو"
@@ -161,7 +157,6 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen }) => {
                     </button>
                 </div>
 
-                {/* ================= Menu ================= */}
                 <nav className="sidebar-scrollbar flex-1 overflow-y-auto py-5">
                     <ul className="space-y-1">
                         {menuItems.map((item) => {
@@ -186,7 +181,6 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen }) => {
                                                 : 'text-white/75 hover:bg-[#405f4e] hover:text-white'
                                         } `}
                                     >
-                                        {/* خط طلایی سمت راست */}
                                         <span
                                             className={`absolute right-2 top-1/2 h-[32px] w-[3px] -translate-y-1/2 rounded-b-full bg-[#c9a96e] transition-all duration-200 ${
                                                 active
@@ -195,7 +189,6 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen }) => {
                                             } `}
                                         />
 
-                                        {/* Icon Box */}
                                         <span
                                             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 ${
                                                 active
@@ -206,7 +199,6 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen }) => {
                                             <Icon size={19} strokeWidth={1.8} />
                                         </span>
 
-                                        {/* Label */}
                                         <span className="flex-1">
                                             {item.label}
                                         </span>
@@ -217,7 +209,6 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen }) => {
                     </ul>
                 </nav>
 
-                {/* ================= Privacy ================= */}
                 <div className="shrink-0 px-4 pb-3 pt-2">
                     <div className="rounded-2xl border border-[#a5822e]/55 bg-white/[0.035] px-4 py-5 text-center">
                         <p className="text-[14px] font-bold text-[#e4c66f]">
@@ -231,7 +222,6 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen }) => {
                     </div>
                 </div>
 
-                {/* ================= Logout ================= */}
                 <div className="shrink-0 px-4 pb-4">
                     <button
                         type="button"
