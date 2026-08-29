@@ -2,146 +2,76 @@
 
 namespace App\Services\LawyerSelection;
 
-use App\Models\Engagement;
 use App\Models\LawyerProposal;
 use App\Models\LegalRequest;
-use App\Models\LegalRequestDistribution;
-use Illuminate\Support\Facades\DB;
+use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Compatibility wrapper for the legacy LegalRequest final-selection endpoint.
+ *
+ * New frontend integrations should use:
+ * POST /api/legal-requests/{legalRequest}/proposals/{proposal:public_id}/select
+ *
+ * The legacy endpoint delegates to ProposalSelectionService so both routes use
+ * the exact same atomic selection, cancellation and idempotency rules.
+ */
 class FinalLawyerSelectionService
 {
+    public function __construct(
+        private readonly ProposalSelectionService $proposalSelectionService,
+    ) {
+    }
+
+    /** @return array{proposal: LawyerProposal, engagement: \App\Models\Engagement, created: bool} */
     public function select(
         LegalRequest $legalRequest,
         string $proposalPublicId,
-    ): LawyerProposal {
-        return DB::transaction(function () use ($legalRequest, $proposalPublicId): LawyerProposal {
-            $lockedRequest = LegalRequest::query()
-                ->whereKey($legalRequest->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        User $client,
+        ?string $ipAddress = null,
+    ): array {
+        $proposal = LawyerProposal::query()
+            ->where('public_id', $proposalPublicId)
+            ->where(function ($query) use ($legalRequest): void {
+                $query->where('legal_request_id', $legalRequest->id)
+                    ->orWhereHas(
+                        'distribution',
+                        fn ($distributionQuery) => $distributionQuery
+                            ->where('legal_request_id', $legalRequest->id),
+                    );
+            })
+            ->first();
 
-            abort_unless(
-                $lockedRequest->status === 'submitted'
-                    && $lockedRequest->service_intent === 'lawyer_selection',
-                409,
-                'A lawyer can only be selected for a submitted lawyer-selection request.',
-            );
-
-            $alreadySelected = LawyerProposal::query()
-                ->where('status', 'selected')
-                ->whereHas(
-                    'distribution',
-                    fn ($query) => $query->where('legal_request_id', $lockedRequest->id),
-                )
-                ->exists();
-
-            abort_if(
-                $alreadySelected,
-                409,
-                'A lawyer has already been selected for this legal request.',
-            );
-
-            $proposal = LawyerProposal::query()
-                ->with([
-                    'distribution',
-                    'lawyerProfile.user',
-                    'lawyerProfile.lawyerSpecialties.specialty:id,code,name,status',
-                    'lawyerProfile.serviceAreas.province:id,name',
-                    'lawyerProfile.serviceAreas.city:id,province_id,name',
-                ])
-                ->where('public_id', $proposalPublicId)
-                ->whereHas(
-                    'distribution',
-                    fn ($query) => $query->where('legal_request_id', $lockedRequest->id),
-                )
-                ->lockForUpdate()
-                ->first();
-
-            if ($proposal === null || $proposal->status !== 'submitted') {
-                throw ValidationException::withMessages([
-                    'proposal_public_id' => [
-                        'The selected proposal must be a submitted proposal for this legal request.',
-                    ],
-                ]);
-            }
-
-            $distribution = $proposal->distribution;
-            $lawyerProfile = $proposal->lawyerProfile;
-
-            abort_if(
-                $proposal->expires_at?->isPast()
-                    || $distribution === null
-                    || $distribution->status === 'expired'
-                    || $distribution->expires_at?->isPast(),
-                409,
-                'The selected proposal is no longer available.',
-            );
-
-            abort_unless(
-                $lawyerProfile !== null
-                    && $lawyerProfile->id === $distribution->lawyer_profile_id
-                    && $lawyerProfile->verification_status === 'approved'
-                    && $lawyerProfile->user?->status === 'active',
-                409,
-                'The selected lawyer is no longer eligible.',
-            );
-
-            $existingEngagement = Engagement::query()
-                ->where('legal_request_id', $lockedRequest->id)
-                ->whereIn('status', [
-                    'pending_contract',
-                    'active',
-                    'paused',
-                ])
-                ->exists();
-
-            abort_if(
-                $existingEngagement,
-                409,
-                'A lawyer has already been selected for this legal request.',
-            );
-
-            LawyerProposal::query()
-                ->where('id', '!=', $proposal->id)
-                ->whereIn('status', ['draft', 'submitted', 'shortlisted'])
-                ->whereHas(
-                    'distribution',
-                    fn ($query) => $query->where('legal_request_id', $lockedRequest->id),
-                )
-                ->update(['status' => 'rejected']);
-
-            $proposal->forceFill(['status' => 'selected'])->save();
-            $lockedRequest->forceFill(['status' => 'matched'])->save();
-
-            Engagement::query()->create([
-                'legal_request_id' => $lockedRequest->id,
-                'proposal_id' => $proposal->id,
-                'client_user_id' => $lockedRequest->client_user_id,
-                'lawyer_profile_id' => $proposal->lawyer_profile_id,
-                'status' => 'pending_contract',
+        if ($proposal === null || ! in_array($proposal->status, [
+            LawyerProposal::STATUS_SUBMITTED,
+            LawyerProposal::STATUS_SELECTED,
+        ], true)) {
+            throw ValidationException::withMessages([
+                'proposal_public_id' => [
+                    'The selected proposal must be a submitted final proposal for this legal request.',
+                ],
             ]);
+        }
 
-            LegalRequestDistribution::query()
-                ->where('legal_request_id', $lockedRequest->id)
-                ->whereKeyNot($distribution->id)
-                ->whereIn('status', ['sent', 'pending'])
-                ->update([
-                    'status' => 'cancelled',
-                ]);
-
-            return $this->loadSelection($proposal);
-        });
+        return $this->proposalSelectionService->select(
+            $proposal,
+            $client,
+            $ipAddress,
+        );
     }
 
     public function current(LegalRequest $legalRequest): ?LawyerProposal
     {
         $proposal = LawyerProposal::query()
-            ->where('status', 'selected')
-            ->whereHas(
-                'distribution',
-                fn ($query) => $query->where('legal_request_id', $legalRequest->id),
-            )
+            ->where('status', LawyerProposal::STATUS_SELECTED)
+            ->where(function ($query) use ($legalRequest): void {
+                $query->where('legal_request_id', $legalRequest->id)
+                    ->orWhereHas(
+                        'distribution',
+                        fn ($distributionQuery) => $distributionQuery
+                            ->where('legal_request_id', $legalRequest->id),
+                    );
+            })
             ->first();
 
         return $proposal === null ? null : $this->loadSelection($proposal);
@@ -150,6 +80,7 @@ class FinalLawyerSelectionService
     private function loadSelection(LawyerProposal $proposal): LawyerProposal
     {
         return $proposal->load([
+            'negotiation:id,public_id,status',
             'lawyerProfile.lawyerSpecialties.specialty:id,code,name,status',
             'lawyerProfile.serviceAreas.province:id,name',
             'lawyerProfile.serviceAreas.city:id,province_id,name',
