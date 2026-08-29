@@ -212,24 +212,3 @@ test('only the owner can submit a draft legal request and it cannot be submitted
     $this->postJson("/api/legal-requests/{$legalRequest->id}/submit")
         ->assertStatus(409);
 });
-
-test('creating a matter from the same legal request does not create duplicates', function () {
-    $client = legalRequestTestUser();
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'title' => 'Duplicate Matter Test',
-        'description' => 'Testing duplicate matter prevention.',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $service = app(\App\Services\LegalMatters\LegalMatterFormationService::class);
-
-    $firstMatter = $service->createFromLegalRequest($legalRequest);
-    $secondMatter = $service->createFromLegalRequest($legalRequest);
-
-    expect($firstMatter->id)->toBe($secondMatter->id);
-
-    $this->assertDatabaseCount('legal_matters', 1);
-});

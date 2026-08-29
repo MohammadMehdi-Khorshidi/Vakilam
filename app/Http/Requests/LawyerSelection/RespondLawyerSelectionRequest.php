@@ -10,8 +10,7 @@ use Illuminate\Validation\Rule;
 class RespondLawyerSelectionRequest extends FormRequest
 {
     /**
-     * Determine whether the authenticated lawyer owns
-     * the direct collaboration request.
+     * Determine whether the authenticated lawyer owns the client invitation.
      */
     public function authorize(): bool
     {
@@ -34,7 +33,7 @@ class RespondLawyerSelectionRequest extends FormRequest
     }
 
     /**
-     * A lawyer may either accept or reject the direct request.
+     * A lawyer may accept the invitation and open negotiation, or reject it.
      */
     public function rules(): array
     {

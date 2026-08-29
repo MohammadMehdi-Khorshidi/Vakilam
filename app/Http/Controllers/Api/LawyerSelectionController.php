@@ -4,181 +4,96 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawyerSelection\RespondLawyerSelectionRequest;
-use App\Http\Requests\LawyerSelection\SendLawyerSelectionRequest;
 use App\Models\AuditLog;
-use App\Models\Engagement;
-use App\Models\LawyerMatchCandidate;
-use App\Models\LawyerProfile;
-use App\Models\LawyerProposal;
 use App\Models\LegalRequest;
 use App\Models\LegalRequestDistribution;
+use App\Models\NegotiationThread;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class LawyerSelectionController extends Controller
 {
-    private const MAX_OPEN_REQUESTS = 5;
+    public function lawyerInvitations(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $profile = $user instanceof User ? $user->lawyerProfile : null;
+        abort_unless(
+            $user instanceof User
+                && $user->status === 'active'
+                && $profile !== null
+                && $profile->verification_status === 'approved',
+            403,
+            'Only approved lawyers can view invitations.',
+        );
 
-    private const REQUEST_EXPIRY_HOURS = 72;
+        $invitations = $profile->distributions()
+            ->with([
+                'legalRequest.legalCategory',
+                'legalRequest.province',
+                'legalRequest.city',
+                'negotiationThread',
+            ])
+            ->latest('sent_at')
+            ->paginate(20);
 
-    /**
-     * Send a direct collaboration request from the client
-     * to one matched lawyer.
-     */
-    public function store(
-        SendLawyerSelectionRequest $request,
-        LegalRequest $legalRequest,
-        LawyerProfile $lawyerProfile,
-    ): JsonResponse {
-        $distribution = DB::transaction(function () use (
-            $legalRequest,
-            $lawyerProfile,
-        ): LegalRequestDistribution {
-            $lockedRequest = LegalRequest::query()
-                ->whereKey($legalRequest->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        $invitations->through(fn (LegalRequestDistribution $distribution): array => [
+            'distribution_id' => $distribution->id,
+            'status' => $distribution->status,
+            'sent_at' => $distribution->sent_at?->toISOString(),
+            'expires_at' => $distribution->expires_at?->toISOString(),
+            'negotiation_public_id' => $distribution->negotiationThread?->public_id,
+            'legal_request' => [
+                'public_id' => $distribution->legalRequest?->public_id,
+                'title' => $distribution->legalRequest?->title,
+                'description' => $distribution->legalRequest?->description,
+                'urgency' => $distribution->legalRequest?->urgency,
+                'category' => $distribution->legalRequest?->legalCategory?->name,
+                'province' => $distribution->legalRequest?->province?->name,
+                'city' => $distribution->legalRequest?->city?->name,
+            ],
+        ]);
 
-            abort_unless(
-                $lockedRequest->status === 'submitted'
-                    && $lockedRequest->service_intent === 'lawyer_selection',
-                409,
-                'This legal request is not available for lawyer selection.',
-            );
-
-            /*
-             * Close stale direct collaboration requests before checking
-             * idempotency or the client's five-open-request limit.
-             */
-            LegalRequestDistribution::query()
-                ->where('legal_request_id', $lockedRequest->id)
-                ->where('status', 'pending')
-                ->whereNotNull('expires_at')
-                ->where('expires_at', '<=', now())
-                ->update([
-                    'status' => 'expired',
-                ]);
-
-            /*
-             * The client may only send a direct collaboration request
-             * to a lawyer returned by a completed matching run
-             * for this LegalRequest.
-             */
-            $candidate = LawyerMatchCandidate::query()
-                ->where('lawyer_profile_id', $lawyerProfile->id)
-                ->whereHas(
-                    'matchRun',
-                    fn ($query) => $query
-                        ->where('legal_request_id', $lockedRequest->id)
-                        ->where('status', 'completed'),
-                )
-                ->first();
-
-            abort_unless(
-                $candidate !== null,
-                409,
-                'This lawyer is not a matching candidate for this legal request.',
-            );
-
-            /*
-             * A LegalRequest + Lawyer pair has only one Distribution.
-             * Matching may already have created it with status "sent".
-             */
-            $existingDistribution = LegalRequestDistribution::query()
-                ->where('legal_request_id', $lockedRequest->id)
-                ->where('lawyer_profile_id', $lawyerProfile->id)
-                ->lockForUpdate()
-                ->first();
-
-            /*
-             * Repeating the same direct request while it is still pending
-             * is idempotent and does not create a second Distribution.
-             */
-            if ($existingDistribution?->status === 'pending') {
-                return $existingDistribution;
-            }
-
-            /*
-             * The same lawyer must not simultaneously have:
-             *
-             * - an active Proposal, and
-             * - a direct collaboration request
-             *
-             * for the same LegalRequest.
-             */
-            $hasActiveProposal = LawyerProposal::query()
-                ->where('lawyer_profile_id', $lawyerProfile->id)
-                ->whereHas(
-                    'distribution',
-                    fn ($query) => $query
-                        ->where('legal_request_id', $lockedRequest->id),
-                )
-                ->whereIn('status', ['submitted', 'shortlisted'])
-                ->exists();
-
-            abort_if(
-                $hasActiveProposal,
-                409,
-                'This lawyer already has an active proposal for this legal request.',
-            );
-
-            /*
-             * A client may have at most five open direct collaboration
-             * requests for the same LegalRequest at any one time.
-             */
-            $openRequestsCount = LegalRequestDistribution::query()
-                ->where('legal_request_id', $lockedRequest->id)
-                ->where('status', 'pending')
-                ->count();
-
-            abort_if(
-                $openRequestsCount >= self::MAX_OPEN_REQUESTS,
-                409,
-                'A maximum of five lawyer requests may be open at the same time.',
-            );
-
-            /*
-             * Matching may already have distributed the case to this lawyer
-             * for the Proposal flow. Reuse that Distribution instead of
-             * creating another record.
-             *
-             * The 72-hour direct-request window starts now.
-             */
-            if ($existingDistribution !== null) {
-                $existingDistribution->forceFill([
-                    'match_candidate_id' => $candidate->id,
-                    'status' => 'pending',
-                    'sent_at' => now(),
-                    'viewed_at' => null,
-                    'expires_at' => now()->addHours(self::REQUEST_EXPIRY_HOURS),
-                ])->save();
-
-                return $existingDistribution->fresh();
-            }
-
-            /*
-             * This branch is available if a matching candidate exists
-             * without a previously persisted Distribution.
-             */
-            return LegalRequestDistribution::query()->create([
-                'legal_request_id' => $lockedRequest->id,
-                'lawyer_profile_id' => $lawyerProfile->id,
-                'match_candidate_id' => $candidate->id,
-                'status' => 'pending',
-                'sent_at' => now(),
-                'expires_at' => now()->addHours(self::REQUEST_EXPIRY_HOURS),
-            ]);
-        });
-
-        return response()->json([
-            'message' => 'Lawyer collaboration request sent successfully.',
-            'distribution' => $distribution,
-        ], 201);
+        return response()->json($invitations);
     }
 
-    /**
-     * Accept or reject a direct collaboration request.
-     */
+    public function clientInvitations(
+        Request $request,
+        LegalRequest $legalRequest,
+    ): JsonResponse {
+        $user = $request->user();
+        abort_unless(
+            $user instanceof User
+                && $user->status === 'active'
+                && $legalRequest->client_user_id === $user->id,
+            403,
+            'You are not allowed to view these lawyer invitations.',
+        );
+
+        return response()->json([
+            'data' => $legalRequest->distributions()
+                ->with(['lawyerProfile', 'negotiationThread'])
+                ->orderBy('sent_at')
+                ->get()
+                ->map(fn (LegalRequestDistribution $distribution): array => [
+                    'distribution_id' => $distribution->id,
+                    'status' => $distribution->status,
+                    'sent_at' => $distribution->sent_at?->toISOString(),
+                    'responded_at' => $distribution->responded_at?->toISOString(),
+                    'expires_at' => $distribution->expires_at?->toISOString(),
+                    'closed_at' => $distribution->closed_at?->toISOString(),
+                    'negotiation_public_id' => $distribution->negotiationThread?->public_id,
+                    'lawyer' => [
+                        'public_id' => $distribution->lawyerProfile?->public_id,
+                        'full_name' => $distribution->lawyerProfile?->full_name,
+                        'average_rating' => $distribution->lawyerProfile?->average_rating,
+                    ],
+                ]),
+        ]);
+    }
+
+    /** Accepting an invitation opens a negotiation and never an Engagement. */
     public function respond(
         RespondLawyerSelectionRequest $request,
         LegalRequestDistribution $distribution,
@@ -189,40 +104,33 @@ class LawyerSelectionController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            /*
-             * Only an active direct collaboration request
-             * may be accepted or rejected.
-             */
-            abort_unless(
-                $lockedDistribution->status === 'pending',
-                409,
-                'This lawyer request is no longer pending.',
-            );
-
-            /*
-             * Direct collaboration requests are valid for 72 hours
-             * from the time the client sends them.
-             */
-            if (
-                $lockedDistribution->expires_at === null
-                || ! $lockedDistribution->expires_at->isFuture()
-            ) {
-                $lockedDistribution->forceFill([
-                    'status' => 'expired',
-                ])->save();
-
+            if ($lockedDistribution->status === LegalRequestDistribution::STATUS_ACCEPTED) {
                 return [
                     'distribution' => $lockedDistribution,
-                    'engagement' => null,
-                    'accepted' => false,
-                    'expired' => true,
+                    'negotiation' => $lockedDistribution->negotiationThread()->firstOrFail(),
+                    'created' => false,
                 ];
             }
 
-            /*
-             * Lock the LegalRequest as the common competition boundary
-             * between Direct Selection and Proposal selection.
-             */
+            abort_unless(
+                $lockedDistribution->status === LegalRequestDistribution::STATUS_SENT,
+                409,
+                'This lawyer invitation is no longer awaiting a response.',
+            );
+
+            if (
+                $lockedDistribution->expires_at !== null
+                && ! $lockedDistribution->expires_at->isFuture()
+            ) {
+                $lockedDistribution->forceFill([
+                    'status' => LegalRequestDistribution::STATUS_EXPIRED,
+                    'responded_at' => now(),
+                    'closed_at' => now(),
+                ])->save();
+
+                abort(409, 'This lawyer invitation has expired.');
+            }
+
             $legalRequest = LegalRequest::query()
                 ->whereKey($lockedDistribution->legal_request_id)
                 ->lockForUpdate()
@@ -232,131 +140,79 @@ class LawyerSelectionController extends Controller
                 $legalRequest->status === 'submitted'
                     && $legalRequest->service_intent === 'lawyer_selection',
                 409,
-                'This legal request is not available for lawyer selection.',
+                'This legal request is not available for negotiation.',
             );
 
-            $action = $request->validated('action');
-
-            /*
-             * Rejecting closes only this lawyer's direct request.
-             * This frees one of the client's five open-request slots.
-             */
-            if ($action === 'reject') {
+            if ($request->validated('action') === 'reject') {
                 $lockedDistribution->forceFill([
-                    'status' => 'rejected',
+                    'status' => LegalRequestDistribution::STATUS_REJECTED,
+                    'responded_at' => now(),
+                    'closed_at' => now(),
                 ])->save();
 
-                AuditLog::query()->create([
-                    'actor_user_id' => $request->user()->id,
-                    'action' => 'lawyer_selection.rejected',
-                    'target_type' => LegalRequestDistribution::class,
-                    'target_id' => $lockedDistribution->id,
-                    'ip_address' => $request->ip(),
-                    'metadata' => [
-                        'legal_request_id' => $legalRequest->id,
-                        'lawyer_profile_id' => $lockedDistribution->lawyer_profile_id,
-                    ],
-                ]);
+                $this->audit($request, $lockedDistribution, 'lawyer_invitation.rejected');
 
                 return [
                     'distribution' => $lockedDistribution,
-                    'engagement' => null,
-                    'accepted' => false,
-                    'expired' => false,
+                    'negotiation' => null,
+                    'created' => false,
                 ];
             }
 
-            /*
-             * First valid mutual acceptance wins.
-             *
-             * If an Engagement has already been created by either:
-             * - another direct lawyer acceptance, or
-             * - a selected Lawyer Proposal,
-             *
-             * this request cannot win anymore.
-             */
-            $existingEngagement = Engagement::query()
-                ->where('legal_request_id', $legalRequest->id)
-                ->whereIn('status', [
-                    'pending_contract',
-                    'active',
-                    'paused',
-                ])
-                ->first();
-
-            abort_if(
-                $existingEngagement !== null,
-                409,
-                'A lawyer has already been selected for this legal request.',
-            );
-
             $lockedDistribution->forceFill([
-                'status' => 'accepted',
+                'status' => LegalRequestDistribution::STATUS_ACCEPTED,
+                'responded_at' => now(),
             ])->save();
 
-            /*
-             * Direct lawyer acceptance creates the same pre-contract
-             * Engagement used by the Proposal-selection flow.
-             *
-             * proposal_id remains null because this Engagement
-             * came from direct client selection.
-             */
-            $engagement = Engagement::query()->create([
-                'legal_request_id' => $legalRequest->id,
-                'proposal_id' => null,
-                'client_user_id' => $legalRequest->client_user_id,
-                'lawyer_profile_id' => $lockedDistribution->lawyer_profile_id,
-                'status' => 'pending_contract',
+            $negotiation = NegotiationThread::query()->create([
+                'distribution_id' => $lockedDistribution->id,
+                'status' => NegotiationThread::STATUS_OPEN,
+                'started_at' => now(),
             ]);
 
-            /*
-             * The winning lawyer closes all remaining open
-             * direct collaboration requests for this LegalRequest.
-             */
-            LegalRequestDistribution::query()
-                ->where('legal_request_id', $legalRequest->id)
-                ->whereKeyNot($lockedDistribution->id)
-                ->where('status', 'pending')
-                ->update([
-                    'status' => 'cancelled',
-                ]);
-
-            AuditLog::query()->create([
-                'actor_user_id' => $request->user()->id,
-                'action' => 'lawyer_selection.accepted',
-                'target_type' => LegalRequestDistribution::class,
-                'target_id' => $lockedDistribution->id,
-                'ip_address' => $request->ip(),
-                'metadata' => [
-                    'legal_request_id' => $legalRequest->id,
-                    'engagement_id' => $engagement->id,
-                    'lawyer_profile_id' => $lockedDistribution->lawyer_profile_id,
-                ],
-            ]);
+            $this->audit(
+                $request,
+                $lockedDistribution,
+                'lawyer_invitation.accepted',
+                ['negotiation_thread_id' => $negotiation->id],
+            );
 
             return [
                 'distribution' => $lockedDistribution,
-                'engagement' => $engagement,
-                'accepted' => true,
-                'expired' => false,
+                'negotiation' => $negotiation,
+                'created' => true,
             ];
         });
 
-        if ($result['expired']) {
-            return response()->json([
-                'message' => 'This lawyer request has expired.',
-                'distribution' => $result['distribution'],
-                'engagement' => null,
-            ], 409);
-        }
-
         return response()->json([
-            'message' => $result['accepted']
-                ? 'Lawyer collaboration request accepted successfully.'
-                : 'Lawyer collaboration request rejected successfully.',
+            'message' => $result['negotiation'] === null
+                ? 'Lawyer invitation rejected.'
+                : ($result['created']
+                    ? 'Lawyer invitation accepted and negotiation opened.'
+                    : 'The existing negotiation was returned.'),
             'distribution' => $result['distribution'],
-            'engagement' => $result['engagement'],
-        ], $result['accepted'] ? 201 : 200);
+            'negotiation' => $result['negotiation'],
+        ], $result['created'] ? 201 : 200);
     }
 
+    /** @param array<string, mixed> $metadata */
+    private function audit(
+        RespondLawyerSelectionRequest $request,
+        LegalRequestDistribution $distribution,
+        string $action,
+        array $metadata = [],
+    ): void {
+        AuditLog::query()->create([
+            'actor_user_id' => $request->user()->id,
+            'action' => $action,
+            'target_type' => LegalRequestDistribution::class,
+            'target_id' => $distribution->id,
+            'ip_address' => $request->ip(),
+            'metadata' => [
+                'legal_request_id' => $distribution->legal_request_id,
+                'lawyer_profile_id' => $distribution->lawyer_profile_id,
+                ...$metadata,
+            ],
+        ]);
+    }
 }

@@ -20,6 +20,7 @@ class LegalMatterResource extends JsonResource
             'public_id' => $this->public_id,
             'title' => $this->title,
             'status' => $this->status,
+            'origin_type' => $this->origin_type,
             'opened_at' => $this->opened_at?->toISOString(),
             'closed_at' => $this->closed_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),

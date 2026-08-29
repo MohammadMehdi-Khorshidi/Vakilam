@@ -16,6 +16,8 @@ class LawyerMatchingService
 {
     public const ALGORITHM_VERSION = 'v1';
 
+    public const INVITATION_EXPIRY_HOURS = 72;
+
     /**
      * Run and persist lawyer selection matching. Repeated calls return the
      * latest completed v1 run so an accidental retry does not duplicate work.
@@ -182,6 +184,7 @@ class LawyerMatchingService
                         'match_candidate_id' => $candidate->id,
                         'status' => 'sent',
                         'sent_at' => now(),
+                        'expires_at' => now()->addHours(self::INVITATION_EXPIRY_HOURS),
                     ],
                 );
             }

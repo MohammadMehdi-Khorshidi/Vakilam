@@ -9,6 +9,10 @@ class LegalMatter extends Model
 {
     use HasUuids;
 
+    public const ORIGIN_LAWYER_SELECTION = 'lawyer_selection';
+    public const ORIGIN_AI_ASSISTANT = 'ai_assistant';
+    public const ORIGIN_CONSULTATION = 'consultation';
+
     /**
      * Generate UUIDs for both the internal primary key and the public identifier.
      *
@@ -22,6 +26,9 @@ class LegalMatter extends Model
     /** Attributes that may be mass assigned. */
     protected $fillable = [
         'source_legal_request_id',
+        'origin_type',
+        'originable_type',
+        'originable_id',
         'engagement_id',
         'client_user_id',
         'title',
@@ -53,6 +60,12 @@ class LegalMatter extends Model
     public function engagement()
     {
         return $this->belongsTo(Engagement::class);
+    }
+
+    /** Business object whose successful payment formed this matter. */
+    public function originable()
+    {
+        return $this->morphTo();
     }
 
     /** Client user who owns this matter. */

@@ -4,7 +4,6 @@ use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\DocumentController;
-use App\Http\Controllers\Api\FinalLawyerSelectionController;
 use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\ClientCaseController;
 use App\Http\Controllers\Api\LegalRequestController;
@@ -15,11 +14,13 @@ use App\Http\Controllers\Api\LawyerMatchingController;
 use App\Http\Controllers\Api\LawyerServiceAreaController;
 use App\Http\Controllers\Api\LawyerSpecialtyController;
 use App\Http\Controllers\Api\LocationReferenceController;
-use App\Http\Controllers\Api\LawyerProposalController;
 use App\Http\Controllers\Api\SpecialtyReferenceController;
 use App\Http\Controllers\Api\LawyerAvailabilityController;
 use App\Http\Controllers\Api\ConsultationController;
 use App\Http\Controllers\Api\LawyerSelectionController;
+use App\Http\Controllers\Api\NegotiationController;
+use App\Http\Controllers\Api\ContractWorkflowController;
+use App\Http\Controllers\Api\PaymentWorkflowController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -113,13 +114,6 @@ Route::middleware('auth:sanctum')
         Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
     });
 
-Route::middleware('auth:sanctum')
-    ->controller(FinalLawyerSelectionController::class)
-    ->group(function () {
-        Route::post('/legal-requests/{legalRequest}/lawyer-selection', 'store');
-        Route::get('/legal-requests/{legalRequest}/lawyer-selection', 'show');
-    });
-
 Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(function () {
     Route::prefix('legal-requests/{legalRequest}/documents')->group(function () {
         Route::get('/', 'index');
@@ -140,23 +134,31 @@ Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(
 });
     
 Route::middleware('auth:sanctum')
-    ->controller(LawyerProposalController::class)
+    ->controller(NegotiationController::class)
     ->group(function () {
-        // Create a new proposal draft for a lawyer distribution.
-        Route::post('/lawyer/distributions/{distribution}/proposal', 'store');
+        Route::get('/legal-requests/{legalRequest}/negotiations', 'index');
+        Route::get('/negotiations/{negotiation}', 'show');
+        Route::get('/negotiations/{negotiation}/messages', 'messages');
+        Route::post('/negotiations/{negotiation}/messages', 'storeMessage');
+        Route::post('/negotiations/{negotiation}/proposals', 'storeProposal');
+        Route::post('/negotiations/{negotiation}/proposals/{proposal}/reject', 'rejectProposal');
+        Route::post('/negotiations/{negotiation}/proposals/{proposal}/accept', 'acceptProposal');
+        Route::post('/negotiations/{negotiation}/cancel', 'cancel');
+    });
 
-        // Update an existing proposal draft.
-        Route::patch('/lawyer/proposals/{proposal}', 'update');
+Route::middleware('auth:sanctum')
+    ->controller(ContractWorkflowController::class)
+    ->group(function () {
+        Route::post('/engagements/{engagement}/contract', 'store');
+        Route::get('/engagements/{engagement}/contract', 'show');
+        Route::post('/contracts/{contract}/sign', 'sign');
+    });
 
-        // Submit an existing proposal draft.
-        Route::post('/lawyer/proposals/{proposal}/submit', 'submit');
+Route::middleware('auth:sanctum')
+    ->post('/invoices/{invoice}/payments', [PaymentWorkflowController::class, 'store']);
 
-        Route::post('/lawyer/proposals/{proposal}/withdraw', 'withdraw');
-
-        // Select a submitted proposal and create a pre-contract engagement.
-        Route::post('/lawyer/proposals/{proposal}/select', 'select');
-
- });
+Route::post('/payments/webhook', [PaymentWorkflowController::class, 'webhook'])
+    ->middleware('throttle:30,1');
 
 Route::middleware('auth:sanctum')->prefix('lawyer/availabilities')->group(function () {
     Route::post('/', [LawyerAvailabilityController::class, 'store']);
@@ -173,10 +175,13 @@ Route::middleware('auth:sanctum')->post(
 );
 
 Route::middleware('auth:sanctum')
-    ->post(
-        '/legal-requests/{legalRequest}/lawyer-selection/{lawyerProfile}',
-        [LawyerSelectionController::class, 'store'],
-);
+    ->get('/lawyer/invitations', [LawyerSelectionController::class, 'lawyerInvitations']);
+
+Route::middleware('auth:sanctum')
+    ->get(
+        '/legal-requests/{legalRequest}/lawyer-requests',
+        [LawyerSelectionController::class, 'clientInvitations'],
+    );
 
 Route::middleware('auth:sanctum')
     ->post(

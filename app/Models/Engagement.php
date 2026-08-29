@@ -79,6 +79,11 @@ class Engagement extends Model
         return $this->hasMany(LegalMatter::class);
     }
 
+    public function originLegalMatter()
+    {
+        return $this->morphOne(LegalMatter::class, 'originable');
+    }
+
     /** Reviews submitted for this engagement. */
     public function reviews()
     {
