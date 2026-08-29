@@ -289,3 +289,61 @@ test('registration records acceptance of the current terms policy when configure
         'policy_id' => $policy->id,
     ]);
 });
+
+test('registration does not record unpublished or future terms policies', function () {
+    $unpublishedPolicy = Policy::query()->create([
+        'type' => 'terms_of_service',
+        'version' => 'draft',
+        'title' => 'Draft Terms',
+        'content' => 'Unpublished terms.',
+        'effective_from' => now()->subDay(),
+        'is_current' => true,
+        'published_at' => null,
+    ]);
+
+    $futurePolicy = Policy::query()->create([
+        'type' => 'terms_of_service',
+        'version' => 'future',
+        'title' => 'Future Terms',
+        'content' => 'Future terms.',
+        'effective_from' => now()->addDay(),
+        'is_current' => true,
+        'published_at' => now(),
+    ]);
+
+    $otpResponse = $this->postJson('/api/auth/register/send-otp', [
+        'phone' => '09125555555',
+    ])->assertOk();
+
+    $verificationToken = $this->postJson('/api/auth/register/verify-otp', [
+        'phone' => '09125555555',
+        'otp' => $otpResponse->json('debug_otp'),
+    ])->assertOk()->json('verification_token');
+
+    $this->postJson('/api/auth/register', [
+        'first_name' => 'Policy',
+        'last_name' => 'Validation',
+        'phone' => '09125555555',
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
+        'role' => 'client',
+        'terms_accepted' => true,
+        'verification_token' => $verificationToken,
+    ])->assertCreated();
+
+    $user = User::query()
+        ->where('phone', '09125555555')
+        ->firstOrFail();
+
+    $this->assertDatabaseMissing('user_policy_acceptances', [
+        'user_id' => $user->id,
+        'policy_id' => $unpublishedPolicy->id,
+    ]);
+
+    $this->assertDatabaseMissing('user_policy_acceptances', [
+        'user_id' => $user->id,
+        'policy_id' => $futurePolicy->id,
+    ]);
+
+    $this->assertDatabaseCount('user_policy_acceptances', 0);
+});
