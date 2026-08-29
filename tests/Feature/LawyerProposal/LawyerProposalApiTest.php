@@ -1,37 +1,31 @@
 <?php
 
-use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\LawyerProfile;
 use App\Models\LawyerProposal;
 use App\Models\LegalCategory;
 use App\Models\LegalRequest;
 use App\Models\LegalRequestDistribution;
+use App\Models\Negotiation;
 use App\Models\Province;
 use App\Models\User;
+use Carbon\Carbon;
 use Laravel\Sanctum\Sanctum;
 
-test('an approved lawyer can create a proposal draft for their distribution', function () {
+function finalProposalFixture(string $source = Negotiation::SOURCE_CLIENT_INVITE): array
+{
     $client = User::factory()->create();
-
     $category = LegalCategory::query()->create([
-        'code' => 'family-proposal-test',
+        'code' => 'proposal-flow-'.str()->random(8),
         'name' => 'Family',
         'status' => true,
     ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
+    $province = Province::query()->create(['name' => 'Tehran '.str()->random(4)]);
+    $city = City::query()->create(['province_id' => $province->id, 'name' => 'Tehran']);
     $legalRequest = LegalRequest::query()->create([
         'client_user_id' => $client->id,
-        'description' => 'A submitted legal request for proposal testing.',
+        'title' => 'Submitted lawyer request',
+        'description' => 'Negotiation proposal flow.',
         'legal_category_id' => $category->id,
         'province_id' => $province->id,
         'city_id' => $city->id,
@@ -41,989 +35,333 @@ test('an approved lawyer can create a proposal draft for their distribution', fu
         'submitted_at' => now(),
     ]);
 
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
+    $lawyerUser = User::factory()->create();
+    $lawyer = LawyerProfile::query()->create([
         'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
+        'full_name' => 'Negotiating Lawyer',
         'verification_status' => 'approved',
         'is_available' => true,
     ]);
 
     $distribution = LegalRequestDistribution::query()->create([
         'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
+        'lawyer_profile_id' => $lawyer->id,
+        'source' => $source,
+        'status' => 'negotiating',
         'sent_at' => now(),
+        'responded_at' => now(),
+        'expires_at' => now()->addHours(72),
     ]);
 
-    Sanctum::actingAs($lawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/distributions/{$distribution->id}/proposal",
-        [
-            'summary' => 'I can handle this legal matter.',
-            'proposed_fee_rial' => 50_000_000,
-            'estimated_days' => 30,
-        ],
-    )
-        ->assertCreated()
-        ->assertJsonPath('proposal.status', 'draft')
-        ->assertJsonPath('proposal.distribution_id', $distribution->id)
-        ->assertJsonPath('proposal.lawyer_profile_id', $lawyerProfile->id);
-
-    $this->assertDatabaseHas('lawyer_proposals', [
+    $negotiation = Negotiation::query()->create([
         'legal_request_id' => $legalRequest->id,
+        'lawyer_profile_id' => $lawyer->id,
         'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'draft',
+        'source' => $source,
+        'status' => Negotiation::STATUS_ACTIVE,
+        'opened_at' => now(),
     ]);
 
-    $this->assertDatabaseCount('legal_matters', 0);
-});
+    return compact('client', 'legalRequest', 'lawyerUser', 'lawyer', 'distribution', 'negotiation');
+}
 
-test('a lawyer cannot create a proposal for another lawyers distribution', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'family-proposal-ownership-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'A submitted legal request for proposal authorization testing.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $ownerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $ownerProfile = LawyerProfile::query()->create([
-        'user_id' => $ownerUser->id,
-        'full_name' => $ownerUser->name.' '.$ownerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $otherLawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    LawyerProfile::query()->create([
-        'user_id' => $otherLawyerUser->id,
-        'full_name' => $otherLawyerUser->name.' '.$otherLawyerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $ownerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    Sanctum::actingAs($otherLawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/distributions/{$distribution->id}/proposal",
-        [
-            'summary' => 'Unauthorized proposal.',
-            'proposed_fee_rial' => 50_000_000,
-            'estimated_days' => 30,
-        ],
-    )
-        ->assertForbidden();
-
-    $this->assertDatabaseCount('lawyer_proposals', 0);
-    $this->assertDatabaseCount('legal_matters', 0);
-});
-
-test('a lawyer can update their own proposal while it is still a draft', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'family-proposal-update-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'A submitted legal request for proposal update testing.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
+function createSubmittedFinalProposal(array $fixture): LawyerProposal
+{
     $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Initial proposal.',
-        'proposed_fee_rial' => 40_000_000,
-        'estimated_days' => 20,
-        'status' => 'draft',
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
-
-    $this->patchJson(
-        "/api/lawyer/proposals/{$proposal->id}",
-        [
-            'summary' => 'Updated proposal.',
-            'proposed_fee_rial' => 55_000_000,
-            'estimated_days' => 25,
-        ],
-    )
-        ->assertOk()
-        ->assertJsonPath('proposal.status', 'draft')
-        ->assertJsonPath('proposal.summary', 'Updated proposal.')
-        ->assertJsonPath('proposal.proposed_fee_rial', 55_000_000)
-        ->assertJsonPath('proposal.estimated_days', 25);
-
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'status' => 'draft',
-        'summary' => 'Updated proposal.',
-        'proposed_fee_rial' => 55_000_000,
-        'estimated_days' => 25,
-    ]);
-
-    $this->assertDatabaseCount('legal_matters', 0);
-});
-
-test('a lawyer can submit their own proposal draft without creating a matter or engagement', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'family-proposal-submit-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'A submitted legal request for proposal submission testing.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'draft',
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/submit"
-    )
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors([
-            'summary',
-            'proposed_fee_rial',
-            'estimated_days',
-        ]);
-
-    expect($proposal->fresh()->status)->toBe('draft');
-
-    $proposal->forceFill([
-        'summary' => 'Ready to submit.',
+        'legal_request_id' => $fixture['legalRequest']->id,
+        'negotiation_id' => $fixture['negotiation']->id,
+        'distribution_id' => $fixture['distribution']->id,
+        'lawyer_profile_id' => $fixture['lawyer']->id,
+        'source' => $fixture['negotiation']->source === Negotiation::SOURCE_LAWYER_INTEREST ? 'open' : 'matched',
+        'summary' => 'Final negotiated terms.',
+        'service_scope' => 'Representation through the agreed phase.',
         'proposed_fee_rial' => 50_000_000,
         'estimated_days' => 30,
+        'status' => LawyerProposal::STATUS_SUBMITTED,
+        'submitted_at' => now(),
+        'expires_at' => now()->addHours(72),
+    ]);
+
+    $fixture['negotiation']->forceFill(['status' => Negotiation::STATUS_PROPOSAL_SUBMITTED])->save();
+
+    return $proposal;
+}
+
+test('lawyer creates a final proposal draft only from an active negotiation', function () {
+    $fixture = finalProposalFixture();
+    Sanctum::actingAs($fixture['lawyerUser']);
+
+    $this->postJson("/api/negotiations/{$fixture['negotiation']->public_id}/proposal", [
+        'summary' => 'Final offer',
+        'service_scope' => 'Court representation',
+        'proposed_fee_rial' => 50_000_000,
+        'estimated_days' => 30,
+    ])
+        ->assertCreated()
+        ->assertJsonPath('proposal.status', 'draft')
+        ->assertJsonPath('proposal.negotiation_id', $fixture['negotiation']->id)
+        ->assertJsonPath('proposal.legal_request_id', $fixture['legalRequest']->id);
+
+    $this->assertDatabaseCount('engagements', 0);
+});
+
+test('legacy distribution proposal endpoint also requires an active negotiation', function () {
+    $fixture = finalProposalFixture();
+    $fixture['negotiation']->delete();
+    Sanctum::actingAs($fixture['lawyerUser']);
+
+    $this->postJson("/api/lawyer/distributions/{$fixture['distribution']->id}/proposal", [
+        'service_scope' => 'Representation',
+        'proposed_fee_rial' => 50_000_000,
+        'estimated_days' => 30,
+    ])->assertStatus(409);
+
+    $this->assertDatabaseCount('lawyer_proposals', 0);
+});
+
+test('final proposal submission requires scope fee duration and starts independent 72 hour validity', function () {
+    Carbon::setTestNow('2026-08-29 11:00:00');
+    $fixture = finalProposalFixture();
+    $proposal = LawyerProposal::query()->create([
+        'legal_request_id' => $fixture['legalRequest']->id,
+        'negotiation_id' => $fixture['negotiation']->id,
+        'distribution_id' => $fixture['distribution']->id,
+        'lawyer_profile_id' => $fixture['lawyer']->id,
+        'status' => 'draft',
+        'source' => 'matched',
+    ]);
+
+    Sanctum::actingAs($fixture['lawyerUser']);
+    $this->postJson("/api/lawyer/proposals/{$proposal->public_id}/submit")
+        ->assertStatus(422);
+
+    $proposal->forceFill([
+        'summary' => 'Final explanation',
+        'service_scope' => 'Representation',
+        'proposed_fee_rial' => 80_000_000,
+        'estimated_days' => 45,
     ])->save();
 
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/submit"
-    )
+    $this->postJson("/api/lawyer/proposals/{$proposal->public_id}/submit")
         ->assertOk()
         ->assertJsonPath('proposal.status', 'submitted');
 
     $proposal->refresh();
-
-    expect($proposal->submitted_at)->not->toBeNull();
-
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'status' => 'submitted',
-    ]);
-
-    $this->assertDatabaseCount('engagements', 0);
-    $this->assertDatabaseCount('legal_matters', 0);
-
-    $proposal->refresh();
-
-    $this->assertNotNull($proposal->submitted_at);
-    $this->assertTrue(
-        $proposal->expires_at->equalTo(
-            $proposal->submitted_at->copy()->addHours(72)
-        )
-    );
+    expect($proposal->submitted_at->equalTo(now()))->toBeTrue();
+    expect($proposal->expires_at->equalTo(now()->addHours(72)))->toBeTrue();
+    expect($fixture['negotiation']->fresh()->status)->toBe(Negotiation::STATUS_PROPOSAL_SUBMITTED);
 });
 
-test('a submitted proposal cannot be updated', function () {
-    $client = User::factory()->create();
+test('client sees submitted final proposals but not drafts', function () {
+    $fixture = finalProposalFixture();
+    $submitted = createSubmittedFinalProposal($fixture);
 
-    $category = LegalCategory::query()->create([
-        'code' => 'family-proposal-locked-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'A submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Submitted proposal.',
-        'proposed_fee_rial' => 50_000_000,
-        'estimated_days' => 30,
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
-
-    $this->patchJson(
-        "/api/lawyer/proposals/{$proposal->id}",
-        [
-            'summary' => 'This change must not be accepted.',
-        ],
-    )
-        ->assertStatus(409);
-
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'summary' => 'Submitted proposal.',
-        'status' => 'submitted',
-    ]);
-});
-
-test('a submitted proposal cannot be submitted again', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'family-proposal-resubmit-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'A submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $submittedAt = now();
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Already submitted proposal.',
-        'proposed_fee_rial' => 50_000_000,
-        'estimated_days' => 30,
-        'status' => 'submitted',
-        'submitted_at' => $submittedAt,
-    ]);
-
-    $proposal->refresh();
-    $originalSubmittedAt = $proposal->submitted_at?->copy();
-
-    Sanctum::actingAs($lawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/submit"
-    )
-        ->assertStatus(409);
-
-    $proposal->refresh();
-
-    expect($proposal->status)->toBe('submitted');
-    expect($proposal->submitted_at?->equalTo($originalSubmittedAt))->toBeTrue();
-
-    $this->assertDatabaseCount('engagements', 0);
-    $this->assertDatabaseCount('legal_matters', 0);
-});
-
-test('a second proposal cannot be created for the same distribution', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'family-proposal-duplicate-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'A submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/distributions/{$distribution->id}/proposal",
-        [
-            'summary' => 'First proposal.',
-            'proposed_fee_rial' => 50_000_000,
-            'estimated_days' => 30,
-        ],
-    )->assertCreated();
-
-    $this->postJson(
-        "/api/lawyer/distributions/{$distribution->id}/proposal",
-        [
-            'summary' => 'Second proposal.',
-            'proposed_fee_rial' => 60_000_000,
-            'estimated_days' => 40,
-        ],
-    )->assertStatus(409);
-
-    $this->assertDatabaseCount('lawyer_proposals', 1);
-    $this->assertDatabaseCount('legal_matters', 0);
-});
-
-test('a proposal cannot be created for a draft legal request', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'family-proposal-draft-request-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'A draft legal request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
+    $second = finalProposalFixture();
+    // Move a draft from another lawyer onto the same legal request for visibility testing.
+    $second['distribution']->forceFill(['legal_request_id' => $fixture['legalRequest']->id])->save();
+    $second['negotiation']->forceFill(['legal_request_id' => $fixture['legalRequest']->id])->save();
+    LawyerProposal::query()->create([
+        'legal_request_id' => $fixture['legalRequest']->id,
+        'negotiation_id' => $second['negotiation']->id,
+        'distribution_id' => $second['distribution']->id,
+        'lawyer_profile_id' => $second['lawyer']->id,
         'status' => 'draft',
+        'source' => 'matched',
     ]);
 
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
+    Sanctum::actingAs($fixture['client']);
+    $this->getJson("/api/legal-requests/{$fixture['legalRequest']->id}/proposals")
+        ->assertOk()
+        ->assertJsonCount(1, 'proposals')
+        ->assertJsonPath('proposals.0.public_id', $submitted->public_id);
+});
 
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
+test('client selection of final proposal creates one engagement and cancels competitors', function () {
+    Carbon::setTestNow('2026-08-29 12:00:00');
+    $fixture = finalProposalFixture();
+    $winner = createSubmittedFinalProposal($fixture);
+
+    $otherUser = User::factory()->create();
+    $otherLawyer = LawyerProfile::query()->create([
+        'user_id' => $otherUser->id,
+        'full_name' => 'Competitor',
         'verification_status' => 'approved',
         'is_available' => true,
     ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
+    $otherDistribution = LegalRequestDistribution::query()->create([
+        'legal_request_id' => $fixture['legalRequest']->id,
+        'lawyer_profile_id' => $otherLawyer->id,
+        'source' => 'client_invite',
+        'status' => 'negotiating',
         'sent_at' => now(),
     ]);
+    $otherNegotiation = Negotiation::query()->create([
+        'legal_request_id' => $fixture['legalRequest']->id,
+        'lawyer_profile_id' => $otherLawyer->id,
+        'distribution_id' => $otherDistribution->id,
+        'source' => 'client_invite',
+        'status' => Negotiation::STATUS_PROPOSAL_SUBMITTED,
+        'opened_at' => now(),
+    ]);
+    $loser = LawyerProposal::query()->create([
+        'legal_request_id' => $fixture['legalRequest']->id,
+        'negotiation_id' => $otherNegotiation->id,
+        'distribution_id' => $otherDistribution->id,
+        'lawyer_profile_id' => $otherLawyer->id,
+        'service_scope' => 'Other scope',
+        'proposed_fee_rial' => 60_000_000,
+        'estimated_days' => 35,
+        'status' => 'submitted',
+        'source' => 'matched',
+        'submitted_at' => now(),
+        'expires_at' => now()->addHours(72),
+    ]);
 
-    Sanctum::actingAs($lawyerUser);
+    Sanctum::actingAs($fixture['client']);
+    $this->postJson("/api/legal-requests/{$fixture['legalRequest']->id}/proposals/{$winner->public_id}/select")
+        ->assertCreated()
+        ->assertJsonPath('proposal.status', 'selected')
+        ->assertJsonPath('engagement.status', 'pending_contract');
 
-    $this->postJson(
-        "/api/lawyer/distributions/{$distribution->id}/proposal",
-        [
-            'summary' => 'This proposal must not be created.',
-            'proposed_fee_rial' => 50_000_000,
-            'estimated_days' => 30,
-        ],
-    )
-        ->assertStatus(409);
-
-    $this->assertDatabaseCount('lawyer_proposals', 0);
+    $engagement = $fixture['legalRequest']->engagements()->firstOrFail();
+    expect($engagement->contract_due_at->equalTo(now()->addHours(48)))->toBeTrue();
+    expect($fixture['negotiation']->fresh()->status)->toBe(Negotiation::STATUS_WON);
+    expect($otherNegotiation->fresh()->status)->toBe(Negotiation::STATUS_CANCELLED);
+    expect($loser->fresh()->status)->toBe(LawyerProposal::STATUS_CANCELLED);
+    expect($otherDistribution->fresh()->status)->toBe('cancelled');
+    $this->assertDatabaseCount('engagements', 1);
     $this->assertDatabaseCount('legal_matters', 0);
 });
 
-test('an unapproved lawyer cannot create a proposal', function () {
-    $client = User::factory()->create();
+test('expired final proposal cannot be selected', function () {
+    $fixture = finalProposalFixture();
+    $proposal = createSubmittedFinalProposal($fixture);
+    $proposal->forceFill(['expires_at' => now()->subMinute()])->save();
 
-    $category = LegalCategory::query()->create([
-        'code' => 'family-proposal-unapproved-test',
-        'name' => 'Family',
-        'status' => true,
+    Sanctum::actingAs($fixture['client']);
+    $this->postJson("/api/legal-requests/{$fixture['legalRequest']->id}/proposals/{$proposal->public_id}/select")
+        ->assertStatus(409);
+
+    $this->assertDatabaseCount('engagements', 0);
+});
+
+test('open interest negotiation produces an open source final proposal', function () {
+    $fixture = finalProposalFixture(Negotiation::SOURCE_LAWYER_INTEREST);
+    Sanctum::actingAs($fixture['lawyerUser']);
+
+    $this->postJson("/api/negotiations/{$fixture['negotiation']->public_id}/proposal", [
+        'service_scope' => 'Representation',
+        'proposed_fee_rial' => 40_000_000,
+        'estimated_days' => 25,
+    ])->assertCreated()->assertJsonPath('proposal.source', 'open');
+});
+
+test('another lawyer cannot create update submit or withdraw another lawyers final proposal', function () {
+    $fixture = finalProposalFixture();
+    $other = finalProposalFixture();
+
+    Sanctum::actingAs($other['lawyerUser']);
+
+    $this->postJson("/api/negotiations/{$fixture['negotiation']->public_id}/proposal", [
+        'summary' => 'Unauthorized proposal',
+        'service_scope' => 'Representation',
+        'proposed_fee_rial' => 10_000_000,
+        'estimated_days' => 10,
+    ])->assertForbidden();
+
+    $proposal = LawyerProposal::query()->create([
+        'legal_request_id' => $fixture['legalRequest']->id,
+        'negotiation_id' => $fixture['negotiation']->id,
+        'distribution_id' => $fixture['distribution']->id,
+        'lawyer_profile_id' => $fixture['lawyer']->id,
+        'source' => LawyerProposal::SOURCE_MATCHED,
+        'summary' => 'Final terms',
+        'service_scope' => 'Representation',
+        'proposed_fee_rial' => 50_000_000,
+        'estimated_days' => 30,
+        'status' => LawyerProposal::STATUS_DRAFT,
     ]);
 
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
+    $this->patchJson("/api/lawyer/proposals/{$proposal->public_id}", [
+        'summary' => 'Unauthorized update',
+    ])->assertForbidden();
 
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'A submitted legal request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
-        'verification_status' => 'pending',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/distributions/{$distribution->id}/proposal",
-        [
-            'summary' => 'This proposal must not be created.',
-            'proposed_fee_rial' => 50_000_000,
-            'estimated_days' => 30,
-        ],
-    )
+    $this->postJson("/api/lawyer/proposals/{$proposal->public_id}/submit")
         ->assertForbidden();
 
-    $this->assertDatabaseCount('lawyer_proposals', 0);
-    $this->assertDatabaseCount('legal_matters', 0);
-});
-
-test('an inactive lawyer cannot create a proposal', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-inactive-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
+    $proposal->forceFill([
+        'status' => LawyerProposal::STATUS_SUBMITTED,
         'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'suspended',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/distributions/{$distribution->id}/proposal"
-    )->assertForbidden();
-
-    $this->assertDatabaseCount('lawyer_proposals', 0);
-});
-
-test('another lawyer cannot update a proposal', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-update-owner-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $ownerUser = User::factory()->create(['status' => 'active']);
-
-    $ownerProfile = LawyerProfile::query()->create([
-        'user_id' => $ownerUser->id,
-        'full_name' => $ownerUser->name.' '.$ownerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $otherUser = User::factory()->create(['status' => 'active']);
-
-    LawyerProfile::query()->create([
-        'user_id' => $otherUser->id,
-        'full_name' => $otherUser->name.' '.$otherUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $ownerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $ownerProfile->id,
-        'summary' => 'Original proposal.',
-        'status' => 'draft',
-    ]);
-
-    Sanctum::actingAs($otherUser);
-
-    $this->patchJson(
-        "/api/lawyer/proposals/{$proposal->id}",
-        ['summary' => 'Unauthorized change.'],
-    )->assertForbidden();
-
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'summary' => 'Original proposal.',
-        'status' => 'draft',
-    ]);
-});
-
-test('another lawyer cannot submit a proposal', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-submit-owner-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $ownerUser = User::factory()->create(['status' => 'active']);
-
-    $ownerProfile = LawyerProfile::query()->create([
-        'user_id' => $ownerUser->id,
-        'full_name' => $ownerUser->name.' '.$ownerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $otherUser = User::factory()->create(['status' => 'active']);
-
-    LawyerProfile::query()->create([
-        'user_id' => $otherUser->id,
-        'full_name' => $otherUser->name.' '.$otherUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $ownerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $ownerProfile->id,
-        'summary' => 'Draft proposal.',
-        'status' => 'draft',
-    ]);
-
-    Sanctum::actingAs($otherUser);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/submit"
-    )->assertForbidden();
-
-    $proposal->refresh();
-
-    expect($proposal->status)->toBe('draft');
-    expect($proposal->submitted_at)->toBeNull();
-});
-
-test('a proposal cannot be submitted when its legal request is no longer submitted', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-request-state-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create(['status' => 'active']);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Draft proposal.',
-        'status' => 'draft',
-    ]);
-
-    $legalRequest->forceFill([
-        'status' => 'cancelled',
-        'cancelled_at' => now(),
+        'expires_at' => now()->addHours(72),
     ])->save();
 
-    Sanctum::actingAs($lawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/submit"
-    )->assertStatus(409);
-
-    $proposal->refresh();
-
-    expect($proposal->status)->toBe('draft');
-    expect($proposal->submitted_at)->toBeNull();
-
-    $this->assertDatabaseCount('engagements', 0);
-    $this->assertDatabaseCount('legal_matters', 0);
+    $this->postJson("/api/lawyer/proposals/{$proposal->public_id}/withdraw")
+        ->assertForbidden();
 });
 
-test('proposal monetary and duration values cannot be negative', function () {
-    $client = User::factory()->create();
+test('an unapproved lawyer cannot create a final proposal', function () {
+    $fixture = finalProposalFixture();
 
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-validation-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
+    $fixture['lawyer']->forceFill([
+        'verification_status' => 'pending',
+    ])->save();
 
-    $province = Province::query()->create(['name' => 'Tehran']);
+    Sanctum::actingAs($fixture['lawyerUser']);
 
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
+    $this->postJson("/api/negotiations/{$fixture['negotiation']->public_id}/proposal", [
+        'summary' => 'Final offer',
+        'service_scope' => 'Representation',
+        'proposed_fee_rial' => 50_000_000,
+        'estimated_days' => 30,
+    ])->assertForbidden();
 
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
+    $this->assertDatabaseCount('lawyer_proposals', 0);
+});
 
-    $lawyerUser = User::factory()->create(['status' => 'active']);
+test('an inactive lawyer cannot create a final proposal', function () {
+    $fixture = finalProposalFixture();
 
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => $lawyerUser->name.' '.$lawyerUser->last_name,
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
+    $fixture['lawyerUser']->forceFill([
+        'status' => 'suspended',
+    ])->save();
 
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
+    Sanctum::actingAs($fixture['lawyerUser']);
 
-    Sanctum::actingAs($lawyerUser);
+    $this->postJson("/api/negotiations/{$fixture['negotiation']->public_id}/proposal", [
+        'summary' => 'Final offer',
+        'service_scope' => 'Representation',
+        'proposed_fee_rial' => 50_000_000,
+        'estimated_days' => 30,
+    ])->assertForbidden();
 
-    $this->postJson(
-        "/api/lawyer/distributions/{$distribution->id}/proposal",
-        [
-            'proposed_fee_rial' => -1,
-            'estimated_days' => -1,
-        ],
-    )
-        ->assertUnprocessable()
+    $this->assertDatabaseCount('lawyer_proposals', 0);
+});
+
+test('a submitted final proposal cannot be updated or submitted again', function () {
+    $fixture = finalProposalFixture();
+    $proposal = createSubmittedFinalProposal($fixture);
+
+    Sanctum::actingAs($fixture['lawyerUser']);
+
+    $this->patchJson("/api/lawyer/proposals/{$proposal->public_id}", [
+        'summary' => 'Changed after submission',
+    ])->assertStatus(409);
+
+    $this->postJson("/api/lawyer/proposals/{$proposal->public_id}/submit")
+        ->assertStatus(409);
+});
+
+test('final proposal values cannot be negative or have zero duration', function () {
+    $fixture = finalProposalFixture();
+
+    Sanctum::actingAs($fixture['lawyerUser']);
+
+    $this->postJson("/api/negotiations/{$fixture['negotiation']->public_id}/proposal", [
+        'service_scope' => 'Representation',
+        'proposed_fee_rial' => -1,
+        'estimated_days' => 0,
+    ])
+        ->assertStatus(422)
         ->assertJsonValidationErrors([
             'proposed_fee_rial',
             'estimated_days',
@@ -1032,1064 +370,99 @@ test('proposal monetary and duration values cannot be negative', function () {
     $this->assertDatabaseCount('lawyer_proposals', 0);
 });
 
-test('a client can view submitted proposals for their own legal request while lawyer drafts stay hidden', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-client-view-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $submittedLawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $submittedLawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $submittedLawyerUser->id,
-        'full_name' => 'Submitted Proposal Lawyer',
-        'verification_status' => 'approved',
-        'average_rating' => 4.5,
-        'rating_count' => 12,
-        'is_available' => true,
-    ]);
-
-    $submittedDistribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $submittedLawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $submittedProposal = LawyerProposal::query()->create([
-        'distribution_id' => $submittedDistribution->id,
-        'lawyer_profile_id' => $submittedLawyerProfile->id,
-        'summary' => 'Visible submitted proposal.',
-        'proposed_fee_rial' => 50_000_000,
-        'estimated_days' => 30,
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $draftLawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $draftLawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $draftLawyerUser->id,
-        'full_name' => 'Draft Proposal Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $draftDistribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $draftLawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $draftProposal = LawyerProposal::query()->create([
-        'distribution_id' => $draftDistribution->id,
-        'lawyer_profile_id' => $draftLawyerProfile->id,
-        'summary' => 'Hidden draft proposal.',
-        'status' => 'draft',
-    ]);
-
-    Sanctum::actingAs($client);
-
-    $response = $this->getJson(
-        "/api/legal-requests/{$legalRequest->id}/proposals"
-    )
-        ->assertOk()
-        ->assertJsonCount(1, 'proposals')
-        ->assertJsonPath('proposals.0.id', $submittedProposal->id)
-        ->assertJsonPath('proposals.0.status', 'submitted')
-        ->assertJsonPath('proposals.0.summary', 'Visible submitted proposal.')
-        ->assertJsonPath('proposals.0.lawyer.public_id', $submittedLawyerProfile->public_id)
-        ->assertJsonPath('proposals.0.lawyer.full_name', 'Submitted Proposal Lawyer');
-
-    expect(
-        collect($response->json('proposals'))->pluck('id')
-    )->not->toContain($draftProposal->id);
-});
-
-test('a client cannot view proposals for another clients legal request', function () {
-    $owner = User::factory()->create();
+test('another client cannot select a final proposal', function () {
+    $fixture = finalProposalFixture();
+    $proposal = createSubmittedFinalProposal($fixture);
     $otherClient = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-client-ownership-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $owner->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Proposal Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Private submitted proposal.',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
 
     Sanctum::actingAs($otherClient);
 
-    $this->getJson(
-        "/api/legal-requests/{$legalRequest->id}/proposals"
+    $this->postJson(
+        "/api/legal-requests/{$fixture['legalRequest']->id}/proposals/{$proposal->public_id}/select"
     )->assertForbidden();
+
+    $this->assertDatabaseCount('engagements', 0);
 });
 
-test('proposal viewing requires authentication', function () {
-    $client = User::factory()->create();
+test('selecting the same final proposal again is idempotent', function () {
+    $fixture = finalProposalFixture();
+    $proposal = createSubmittedFinalProposal($fixture);
 
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-view-auth-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $this->getJson(
-        "/api/legal-requests/{$legalRequest->id}/proposals"
-    )->assertUnauthorized();
-});
-
-test('a lawyer can withdraw their own submitted proposal without creating an engagement or matter', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-withdraw-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Withdraw Proposal Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Submitted proposal.',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
+    Sanctum::actingAs($fixture['client']);
 
     $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/withdraw"
+        "/api/legal-requests/{$fixture['legalRequest']->id}/proposals/{$proposal->public_id}/select"
+    )->assertCreated();
+
+    $this->postJson(
+        "/api/legal-requests/{$fixture['legalRequest']->id}/proposals/{$proposal->public_id}/select"
     )
         ->assertOk()
-        ->assertJsonPath('proposal.status', 'withdrawn');
+        ->assertJsonPath('proposal.status', LawyerProposal::STATUS_SELECTED);
 
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'status' => 'withdrawn',
-    ]);
-
-    $this->assertDatabaseCount('engagements', 0);
-    $this->assertDatabaseCount('legal_matters', 0);
+    $this->assertDatabaseCount('engagements', 1);
 });
 
-test('another lawyer cannot withdraw a proposal', function () {
-    $client = User::factory()->create();
+test('withdrawn and cancelled final proposals cannot be selected', function () {
+    $withdrawnFixture = finalProposalFixture();
+    $withdrawnProposal = createSubmittedFinalProposal($withdrawnFixture);
 
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-withdraw-owner-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
+    $withdrawnProposal->forceFill([
+        'status' => LawyerProposal::STATUS_WITHDRAWN,
+    ])->save();
 
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $ownerUser = User::factory()->create(['status' => 'active']);
-
-    $ownerProfile = LawyerProfile::query()->create([
-        'user_id' => $ownerUser->id,
-        'full_name' => 'Proposal Owner',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $otherUser = User::factory()->create(['status' => 'active']);
-
-    LawyerProfile::query()->create([
-        'user_id' => $otherUser->id,
-        'full_name' => 'Other Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $ownerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $ownerProfile->id,
-        'summary' => 'Submitted proposal.',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    Sanctum::actingAs($otherUser);
+    Sanctum::actingAs($withdrawnFixture['client']);
 
     $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/withdraw"
-    )->assertForbidden();
-
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'status' => 'submitted',
-    ]);
-});
-
-test('a draft proposal cannot be withdrawn', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-withdraw-draft-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create(['status' => 'active']);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Draft Proposal Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Draft proposal.',
-        'status' => 'draft',
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/withdraw"
+        "/api/legal-requests/{$withdrawnFixture['legalRequest']->id}/proposals/{$withdrawnProposal->public_id}/select"
     )->assertStatus(409);
 
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'status' => 'draft',
-    ]);
-});
+    $cancelledFixture = finalProposalFixture();
+    $cancelledProposal = createSubmittedFinalProposal($cancelledFixture);
 
-test('a withdrawn proposal cannot be withdrawn again', function () {
-    $client = User::factory()->create();
+    $cancelledProposal->forceFill([
+        'status' => LawyerProposal::STATUS_CANCELLED,
+    ])->save();
 
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-rewithdraw-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create(['status' => 'active']);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Withdrawn Proposal Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Already withdrawn proposal.',
-        'status' => 'withdrawn',
-        'submitted_at' => now(),
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
+    Sanctum::actingAs($cancelledFixture['client']);
 
     $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/withdraw"
+        "/api/legal-requests/{$cancelledFixture['legalRequest']->id}/proposals/{$cancelledProposal->public_id}/select"
     )->assertStatus(409);
 
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'status' => 'withdrawn',
-    ]);
-
     $this->assertDatabaseCount('engagements', 0);
-    $this->assertDatabaseCount('legal_matters', 0);
 });
 
-test('expired submitted proposals are marked as expired by the scheduler', function () {
-    $client = User::factory()->create();
+test('expired submitted final proposals are expired by the scheduler and close their negotiation', function () {
+    Carbon::setTestNow('2026-08-29 15:00:00');
 
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-expiry-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
+    $fixture = finalProposalFixture();
+    $proposal = createSubmittedFinalProposal($fixture);
 
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
+    $proposal->forceFill([
+        'expires_at' => now()->subMinute(),
+    ])->save();
 
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
+    expect($fixture['negotiation']->fresh()->status)
+        ->toBe(Negotiation::STATUS_PROPOSAL_SUBMITTED);
 
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Expiry Test Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Expired proposal.',
-        'status' => 'submitted',
-        'submitted_at' => now()->subHours(73),
-        'expires_at' => now()->subHour(),
-    ]);
+    expect($fixture['distribution']->fresh()->status)
+        ->toBe('negotiating');
 
     $this->artisan('schedule:run')
         ->assertExitCode(0);
 
-    $proposal->refresh();
+    expect($proposal->fresh()->status)
+        ->toBe(LawyerProposal::STATUS_EXPIRED);
 
-    expect($proposal->status)->toBe('expired');
+    expect($fixture['negotiation']->fresh()->status)
+        ->toBe(Negotiation::STATUS_CLOSED);
 
-    $this->assertDatabaseCount('engagements', 0);
-    $this->assertDatabaseCount('legal_matters', 0);
-});
+    expect($fixture['negotiation']->fresh()->closed_at)
+        ->not->toBeNull();
 
-test('a client can select an active submitted proposal and create one pending contract engagement', function () {
-    $client = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-select-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted lawyer-selection request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Selected Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Selectable proposal.',
-        'proposed_fee_rial' => 50_000_000,
-        'estimated_days' => 30,
-        'status' => 'submitted',
-        'submitted_at' => now(),
-        'expires_at' => now()->addHours(72),
-    ]);
-
-    /*
-     * Another lawyer has an open direct collaboration request.
-     * Selecting the proposal above must close this competing request.
-     */
-    $directLawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $directLawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $directLawyerUser->id,
-        'full_name' => 'Direct Request Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $directDistribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $directLawyerProfile->id,
-        'status' => 'pending',
-        'sent_at' => now(),
-        'expires_at' => now()->addHours(72),
-    ]);
-
-    $competingLawyerUser = User::factory()->create(['status' => 'active']);
-    $competingLawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $competingLawyerUser->id,
-        'full_name' => 'Competing Proposal Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-    $competingDistribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $competingLawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-    $competingProposal = LawyerProposal::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'distribution_id' => $competingDistribution->id,
-        'lawyer_profile_id' => $competingLawyerProfile->id,
-        'summary' => 'Competing submitted proposal.',
-        'proposed_fee_rial' => 45_000_000,
-        'estimated_days' => 35,
-        'status' => 'submitted',
-        'submitted_at' => now(),
-        'expires_at' => now()->addHours(72),
-    ]);
-
-    Sanctum::actingAs($client);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/select"
-    )
-        ->assertCreated()
-        ->assertJsonPath('proposal.status', 'selected')
-        ->assertJsonPath('engagement.status', 'pending_contract')
-        ->assertJsonPath('engagement.proposal_id', $proposal->id)
-        ->assertJsonPath('engagement.client_user_id', $client->id)
-        ->assertJsonPath('engagement.lawyer_profile_id', $lawyerProfile->id);
-
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'status' => 'selected',
-    ]);
-
-    $this->assertDatabaseHas('legal_requests', [
-        'id' => $legalRequest->id,
-        'status' => 'matched',
-    ]);
-
-    $this->assertDatabaseHas('engagements', [
-        'legal_request_id' => $legalRequest->id,
-        'proposal_id' => $proposal->id,
-        'client_user_id' => $client->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'pending_contract',
-    ]);
-
-    $this->assertDatabaseHas('legal_request_distributions', [
-        'id' => $directDistribution->id,
-        'status' => 'cancelled',
-    ]);
-
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $competingProposal->id,
-        'status' => 'rejected',
-    ]);
-
-    $this->assertDatabaseHas('legal_request_distributions', [
-        'id' => $competingDistribution->id,
-        'status' => 'cancelled',
-    ]);
-
-    $this->assertDatabaseHas('audit_logs', [
-        'actor_user_id' => $client->id,
-        'action' => 'lawyer_proposal.selected',
-        'target_id' => $proposal->id,
-    ]);
-
-    $this->assertDatabaseCount('engagements', 1);
-
-    // Lawyer selection itself must not form a LegalMatter.
-    $this->assertDatabaseCount('legal_matters', 0);
-});
-
-test('selecting the same proposal again is idempotent and does not create another engagement', function () {
-    $client = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-select-idempotent-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create(['status' => 'active']);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Idempotent Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'summary' => 'Selectable proposal.',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-        'expires_at' => now()->addHours(72),
-    ]);
-
-    Sanctum::actingAs($client);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/select"
-    )->assertCreated();
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/select"
-    )
-        ->assertOk()
-        ->assertJsonPath('proposal.status', 'selected')
-        ->assertJsonPath('engagement.status', 'pending_contract');
-
-    $this->assertDatabaseCount('engagements', 1);
-
-    $this->assertDatabaseCount('legal_matters', 0);
-
-    expect(
-        AuditLog::query()
-            ->where('action', 'lawyer_proposal.selected')
-            ->where('target_id', $proposal->id)
-            ->count()
-    )->toBe(1);
-});
-
-test('a client cannot select another clients proposal', function () {
-    $owner = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $otherClient = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-select-owner-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $owner->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create(['status' => 'active']);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Protected Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'submitted',
-        'submitted_at' => now(),
-        'expires_at' => now()->addHours(72),
-    ]);
-
-    Sanctum::actingAs($otherClient);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/select"
-    )->assertForbidden();
+    expect($fixture['distribution']->fresh()->status)
+        ->toBe('expired');
 
     $this->assertDatabaseCount('engagements', 0);
-
-    $this->assertDatabaseHas('lawyer_proposals', [
-        'id' => $proposal->id,
-        'status' => 'submitted',
-    ]);
-});
-
-test('an expired proposal cannot be selected', function () {
-    $client = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-select-expired-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create(['status' => 'active']);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Expired Proposal Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'submitted',
-        'submitted_at' => now()->subHours(73),
-        'expires_at' => now()->subHour(),
-    ]);
-
-    Sanctum::actingAs($client);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/select"
-    )->assertStatus(409);
-
-    $this->assertDatabaseCount('engagements', 0);
-    $this->assertDatabaseCount('legal_matters', 0);
-});
-
-test('a withdrawn proposal cannot be selected', function () {
-    $client = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-select-withdrawn-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create(['name' => 'Tehran']);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create(['status' => 'active']);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Withdrawn Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'sent',
-        'sent_at' => now(),
-    ]);
-
-    $proposal = LawyerProposal::query()->create([
-        'distribution_id' => $distribution->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'withdrawn',
-        'submitted_at' => now(),
-        'expires_at' => now()->addHours(72),
-    ]);
-
-    Sanctum::actingAs($client);
-
-    $this->postJson(
-        "/api/lawyer/proposals/{$proposal->id}/select"
-    )->assertStatus(409);
-
-    $this->assertDatabaseCount('engagements', 0);
-});
-
-test('a lawyer cannot create a proposal for a pending direct collaboration request', function () {
-    $client = User::factory()->create();
-
-    $category = LegalCategory::query()->create([
-        'code' => 'proposal-pending-direct-request-test',
-        'name' => 'Family',
-        'status' => true,
-    ]);
-
-    $province = Province::query()->create([
-        'name' => 'Tehran',
-    ]);
-
-    $city = City::query()->create([
-        'province_id' => $province->id,
-        'name' => 'Tehran',
-    ]);
-
-    $legalRequest = LegalRequest::query()->create([
-        'client_user_id' => $client->id,
-        'description' => 'Submitted direct lawyer-selection request.',
-        'legal_category_id' => $category->id,
-        'province_id' => $province->id,
-        'city_id' => $city->id,
-        'urgency' => 'normal',
-        'service_intent' => 'lawyer_selection',
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
-
-    $lawyerUser = User::factory()->create([
-        'status' => 'active',
-    ]);
-
-    $lawyerProfile = LawyerProfile::query()->create([
-        'user_id' => $lawyerUser->id,
-        'full_name' => 'Direct Request Lawyer',
-        'verification_status' => 'approved',
-        'is_available' => true,
-    ]);
-
-    $distribution = LegalRequestDistribution::query()->create([
-        'legal_request_id' => $legalRequest->id,
-        'lawyer_profile_id' => $lawyerProfile->id,
-        'status' => 'pending',
-        'sent_at' => now(),
-        'expires_at' => now()->addHours(72),
-    ]);
-
-    Sanctum::actingAs($lawyerUser);
-
-    $this->postJson(
-        "/api/lawyer/distributions/{$distribution->id}/proposal",
-        [
-            'summary' => 'This must not become a proposal.',
-            'proposed_fee_rial' => 50_000_000,
-            'estimated_days' => 30,
-        ],
-    )
-        ->assertStatus(409)
-        ->assertJsonPath(
-            'message',
-            'A proposal cannot be created for this distribution.',
-        );
-
-    $this->assertDatabaseCount('lawyer_proposals', 0);
-
-    $this->assertDatabaseHas('legal_request_distributions', [
-        'id' => $distribution->id,
-        'status' => 'pending',
-    ]);
 });
