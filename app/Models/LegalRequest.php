@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
 class LegalRequest extends Model
 {
@@ -89,17 +89,16 @@ class LegalRequest extends Model
         return $this->hasMany(LegalRequestDistribution::class);
     }
 
-    /** Lawyer proposals submitted through this request's distributions. */
+    /** Final lawyer proposals directly linked to this request. */
     public function proposals()
     {
-        return $this->hasManyThrough(
-            LawyerProposal::class,
-            LegalRequestDistribution::class,
-            'legal_request_id',
-            'distribution_id',
-            'id',
-            'id',
-        );
+        return $this->hasMany(LawyerProposal::class);
+    }
+
+    /** Negotiations opened for this request. */
+    public function negotiations()
+    {
+        return $this->hasMany(Negotiation::class);
     }
 
     /** Consultations opened from this request. */
@@ -108,16 +107,16 @@ class LegalRequest extends Model
         return $this->hasMany(Consultation::class);
     }
 
-    /** Engagements created from this request. */
-    public function engagements()
+    /** The single engagement created from this request. */
+    public function engagement()
     {
-        return $this->hasMany(Engagement::class);
+        return $this->hasOne(Engagement::class);
     }
 
-    /** Legal matters whose source is this request. */
-    public function legalMatters()
+    /** The single legal matter whose source is this request. */
+    public function legalMatter()
     {
-        return $this->hasMany(LegalMatter::class, 'source_legal_request_id');
+        return $this->hasOne(LegalMatter::class, 'source_legal_request_id');
     }
 
     /** AI interactions linked to this request. */
@@ -131,5 +130,4 @@ class LegalRequest extends Model
     {
         return $this->hasMany(Document::class);
     }
-
 }

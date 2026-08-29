@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\LawyerMatchRun;
 use App\Models\LegalRequest;
 use App\Models\Role;
 use App\Models\User;
@@ -121,4 +122,32 @@ test('a service intent can only be selected for an owned submitted request', fun
     ])->assertStatus(409);
 
     expect($legalRequest->fresh()->service_intent)->toBe('undecided');
+});
+
+test('service intent cannot change after matching has started', function () {
+    $client = serviceIntentTestClient();
+    $legalRequest = LegalRequest::query()->create([
+        'client_user_id' => $client->id,
+        'description' => 'Submitted request with an active matching flow.',
+        'service_intent' => 'lawyer_selection',
+        'status' => 'submitted',
+        'submitted_at' => now(),
+    ]);
+
+    LawyerMatchRun::query()->create([
+        'legal_request_id' => $legalRequest->id,
+        'algorithm_version' => 'v1',
+        'status' => 'completed',
+        'candidates_count' => 0,
+        'completed_at' => now(),
+    ]);
+
+    Sanctum::actingAs($client);
+
+    $this->postJson("/api/legal-requests/{$legalRequest->id}/service-intent", [
+        'service_intent' => 'consultation',
+    ])->assertStatus(409)
+        ->assertJsonPath('message', 'Service intent cannot be changed after a service flow has started.');
+
+    expect($legalRequest->fresh()->service_intent)->toBe('lawyer_selection');
 });

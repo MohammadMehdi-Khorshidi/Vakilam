@@ -25,6 +25,20 @@ class SelectLegalRequestServiceIntent
             );
 
             if ($lockedRequest->service_intent !== $serviceIntent->value) {
+                $flowAlreadyStarted = $lockedRequest->matchRuns()->exists()
+                    || $lockedRequest->distributions()->exists()
+                    || $lockedRequest->consultations()->exists()
+                    || $lockedRequest->negotiations()->exists()
+                    || $lockedRequest->proposals()->exists()
+                    || $lockedRequest->engagement()->exists()
+                    || $lockedRequest->legalMatter()->exists();
+
+                abort_if(
+                    $flowAlreadyStarted,
+                    409,
+                    'Service intent cannot be changed after a service flow has started.',
+                );
+
                 $lockedRequest->forceFill([
                     'service_intent' => $serviceIntent->value,
                 ])->save();

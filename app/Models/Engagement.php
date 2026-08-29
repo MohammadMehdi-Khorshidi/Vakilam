@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
 class Engagement extends Model
 {
@@ -26,6 +26,7 @@ class Engagement extends Model
         'client_user_id',
         'lawyer_profile_id',
         'status',
+        'contract_due_at',
         'started_at',
         'ended_at',
     ];
@@ -38,6 +39,7 @@ class Engagement extends Model
     protected function casts(): array
     {
         return [
+            'contract_due_at' => 'datetime',
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
         ];
@@ -67,6 +69,11 @@ class Engagement extends Model
         return $this->belongsTo(LawyerProfile::class);
     }
 
+    public function confirmations()
+    {
+        return $this->hasMany(EngagementConfirmation::class);
+    }
+
     /** Contract associated with this engagement; engagement_id is unique on contracts. */
     public function contract()
     {
@@ -74,9 +81,9 @@ class Engagement extends Model
     }
 
     /** Legal matters that reference this engagement. */
-    public function legalMatters()
+    public function legalMatter()
     {
-        return $this->hasMany(LegalMatter::class);
+        return $this->hasOne(LegalMatter::class);
     }
 
     /** Reviews submitted for this engagement. */

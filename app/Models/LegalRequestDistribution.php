@@ -16,9 +16,11 @@ class LegalRequestDistribution extends Model
         'legal_request_id',
         'lawyer_profile_id',
         'match_candidate_id',
+        'source',
         'status',
         'sent_at',
         'viewed_at',
+        'responded_at',
         'expires_at',
     ];
 
@@ -30,6 +32,7 @@ class LegalRequestDistribution extends Model
         return [
             'sent_at'    => 'datetime',
             'viewed_at'  => 'datetime',
+            'responded_at' => 'datetime',
             'expires_at' => 'datetime',
         ];
     }
@@ -47,6 +50,11 @@ class LegalRequestDistribution extends Model
     public function matchCandidate()
     {
         return $this->belongsTo(LawyerMatchCandidate::class);
+    }
+
+    public function negotiation()
+    {
+        return $this->hasOne(Negotiation::class, 'distribution_id');
     }
 
     public function proposal()

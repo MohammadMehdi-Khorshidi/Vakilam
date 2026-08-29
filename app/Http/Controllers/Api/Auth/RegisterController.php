@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AuthenticatedUserResource;
 use App\Models\ClientProfile;
 use App\Models\LawyerProfile;
+use App\Models\Policy;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRole;
+use App\Models\UserPolicyAcceptance;
 use App\Exceptions\LawyerRegistryUnavailableException;
 use App\Services\Lawyers\LawyerRegistryVerificationException;
 use App\Services\Lawyers\LawyerRegistryVerifier;
@@ -195,7 +198,7 @@ class RegisterController extends Controller
             }
         }
 
-        $user = DB::transaction(function () use ($data, $registryMatch): User {
+        $user = DB::transaction(function () use ($data, $registryMatch, $request): User {
             $user = User::query()->create([
                 'name' => $data['first_name'],
                 'last_name' => $data['last_name'],
@@ -250,25 +253,35 @@ class RegisterController extends Controller
                 ]);
             }
 
+            $currentTerms = Policy::currentOfType('terms_of_service');
+
+            if ($currentTerms !== null) {
+                UserPolicyAcceptance::query()->firstOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'policy_id' => $currentTerms->id,
+                    ],
+                    [
+                        'accepted_at' => now(),
+                        'ip_address' => $request->ip(),
+                        'user_agent' => mb_substr((string) $request->userAgent(), 0, 255),
+                    ],
+                );
+            }
+
             return $user;
         });
 
         Cache::forget($this->verificationCacheKey($data['verification_token']));
 
         $token = $user->createToken('registration')->plainTextToken;
+        $user->load(['roles:id,code,name', 'clientProfile', 'lawyerProfile']);
 
         return response()->json([
             'message' => 'Registered successfully.',
             'token_type' => 'Bearer',
             'access_token' => $token,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'last_name' => $user->last_name,
-                'phone' => $user->phone,
-                'role' => $data['role'],
-                'status' => $user->status,
-            ],
+            'user' => AuthenticatedUserResource::make($user)->resolve(),
         ], 201);
     }
 

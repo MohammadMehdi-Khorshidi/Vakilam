@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Policy extends Model
 {
-    use HasUuids, HasFactory;
+    use HasFactory, HasUuids;
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
@@ -28,10 +29,10 @@ class Policy extends Model
 
     protected $casts = [
         'effective_from' => 'datetime',
-        'is_current'     => 'boolean',
-        'published_at'   => 'datetime',
-        'created_at'     => 'datetime',
-        'updated_at'     => 'datetime',
+        'is_current' => 'boolean',
+        'published_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     // Relationships
@@ -69,6 +70,11 @@ class Policy extends Model
     // Helpers
     public static function currentOfType(string $type): ?self
     {
-        return static::ofType($type)->current()->first();
+        return static::ofType($type)
+            ->current()
+            ->published()
+            ->effective()
+            ->latest('effective_from')
+            ->first();
     }
 }
