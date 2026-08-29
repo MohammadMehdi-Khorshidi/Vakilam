@@ -259,3 +259,59 @@ test('an expired direct invitation frees one of the five open invitation slots',
         "/api/legal-requests/{$fixture['legalRequest']->id}/lawyer-selection/{$lawyers->last()->public_id}"
     )->assertCreated();
 });
+
+test('a closed negotiation cannot be reopened by reinviting the same lawyer', function () {
+    $fixture = negotiationSelectionFixture();
+
+    $lawyer = negotiationSelectionLawyer(
+        $fixture['specialty'],
+        $fixture['province'],
+        $fixture['city'],
+    );
+
+    Sanctum::actingAs($fixture['client']);
+
+    $this->postJson(
+        "/api/legal-requests/{$fixture['legalRequest']->id}/matching",
+    )->assertCreated();
+
+    $this->postJson(
+        "/api/legal-requests/{$fixture['legalRequest']->id}/lawyer-selection/{$lawyer->public_id}",
+    )->assertCreated();
+
+    $distribution = $fixture['legalRequest']
+        ->distributions()
+        ->where('lawyer_profile_id', $lawyer->id)
+        ->firstOrFail();
+
+    Sanctum::actingAs($lawyer->user);
+
+    $this->postJson(
+        "/api/lawyer/distributions/{$distribution->id}/respond",
+        ['action' => 'accept'],
+    )->assertCreated();
+
+    $negotiation = $distribution->negotiation()->firstOrFail();
+
+    Sanctum::actingAs($fixture['client']);
+
+    $this->postJson(
+        "/api/negotiations/{$negotiation->public_id}/close",
+    )->assertOk();
+
+    $this->postJson(
+        "/api/legal-requests/{$fixture['legalRequest']->id}/lawyer-selection/{$lawyer->public_id}",
+    )->assertStatus(409);
+
+    $this->assertDatabaseHas('legal_request_distributions', [
+        'id' => $distribution->id,
+        'status' => 'closed',
+    ]);
+
+    $this->assertDatabaseHas('negotiations', [
+        'id' => $negotiation->id,
+        'status' => 'closed',
+    ]);
+
+    $this->assertDatabaseCount('negotiations', 1);
+});

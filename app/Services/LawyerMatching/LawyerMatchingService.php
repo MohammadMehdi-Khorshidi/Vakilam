@@ -7,6 +7,7 @@ use App\Models\LawyerMatchRun;
 use App\Models\LawyerProfile;
 use App\Models\LegalRequest;
 use App\Models\LegalRequestDistribution;
+use App\Models\Negotiation;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -209,6 +210,18 @@ class LawyerMatchingService
                             && in_array($distribution->status, ['interest_pending', 'negotiating'], true),
                         409,
                         'This lawyer already has an active interest in the legal request.',
+                    );
+
+                    abort_if(
+                        $distribution->negotiation()
+                            ->whereIn('status', [
+                                Negotiation::STATUS_CLOSED,
+                                Negotiation::STATUS_CANCELLED,
+                                Negotiation::STATUS_WON,
+                            ])
+                            ->exists(),
+                        409,
+                        'A closed negotiation with this lawyer cannot be reopened.',
                     );
 
                     if ($distribution->source === 'client_invite'
