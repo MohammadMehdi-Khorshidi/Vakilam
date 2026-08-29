@@ -105,7 +105,7 @@ test('eligible uninvited lawyer can express interest and client can open negotia
         ->assertOk()
         ->assertJsonPath('data.0.public_id', $fixture['legalRequest']->public_id);
 
-    $this->postJson("/api/lawyer/legal-requests/{$fixture['legalRequest']->id}/interest")
+    $this->postJson("/api/lawyer/legal-requests/{$fixture['legalRequest']->public_id}/interest")
         ->assertCreated()
         ->assertJsonPath('interest.source', 'lawyer_interest')
         ->assertJsonPath('interest.status', 'interest_pending');

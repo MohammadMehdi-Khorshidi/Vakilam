@@ -3,30 +3,30 @@
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\RegisterController;
-use App\Http\Resources\AuthenticatedUserResource;
+use App\Http\Controllers\Api\ClientCaseController;
+use App\Http\Controllers\Api\ClientDashboardController;
+use App\Http\Controllers\Api\ConsultationController;
+use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EngagementController;
 use App\Http\Controllers\Api\FinalLawyerSelectionController;
-use App\Http\Controllers\Api\ClientDashboardController;
-use App\Http\Controllers\Api\ClientCaseController;
-use App\Http\Controllers\Api\LegalRequestController;
-use App\Http\Controllers\Api\LegalRequestServiceIntentController;
+use App\Http\Controllers\Api\LawyerAvailabilityController;
 use App\Http\Controllers\Api\LawyerDirectoryController;
-use App\Http\Controllers\Api\LawyerProfileController;
+use App\Http\Controllers\Api\LawyerInterestController;
 use App\Http\Controllers\Api\LawyerMatchingController;
+use App\Http\Controllers\Api\LawyerProfileController;
+use App\Http\Controllers\Api\LawyerProposalController;
+use App\Http\Controllers\Api\LawyerSelectionController;
 use App\Http\Controllers\Api\LawyerServiceAreaController;
 use App\Http\Controllers\Api\LawyerSpecialtyController;
-use App\Http\Controllers\Api\LocationReferenceController;
-use App\Http\Controllers\Api\LawyerProposalController;
-use App\Http\Controllers\Api\SpecialtyReferenceController;
-use App\Http\Controllers\Api\LawyerAvailabilityController;
-use App\Http\Controllers\Api\ConsultationController;
-use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\NegotiationController;
-use App\Http\Controllers\Api\LawyerInterestController;
-use App\Http\Controllers\Api\ContractController;
-use App\Http\Controllers\Api\LawyerSelectionController;
 use App\Http\Controllers\Api\LawyerWorkspaceController;
+use App\Http\Controllers\Api\LegalRequestController;
+use App\Http\Controllers\Api\LegalRequestServiceIntentController;
+use App\Http\Controllers\Api\LocationReferenceController;
+use App\Http\Controllers\Api\NegotiationController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\SpecialtyReferenceController;
+use App\Http\Resources\AuthenticatedUserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -97,10 +97,9 @@ Route::middleware(['auth:sanctum', 'active'])->controller(LegalRequestController
     Route::get('/legal-requests/draft', 'draft');
     Route::post('/legal-requests', 'store');
 
-    
     // Client can view submitted proposals for their own legal request.
     Route::get('/legal-requests/{legalRequest}/proposals', 'proposals');
-    
+
     Route::get('/legal-requests/{legalRequest}', 'show');
     Route::patch('/legal-requests/{legalRequest}', 'update');
     Route::post('/legal-requests/{legalRequest}/submit', 'submit');
@@ -147,26 +146,25 @@ Route::middleware(['auth:sanctum', 'active'])->controller(DocumentController::cl
         Route::delete('/', 'destroy');
     });
 });
-    
+
 Route::middleware(['auth:sanctum', 'active'])
-    ->controller(LawyerProposalController::class)
-    ->group(function () {
-        // Create a new proposal draft for a lawyer distribution.
-        Route::post('/lawyer/distributions/{distribution}/proposal', 'store');
+        ->controller(LawyerProposalController::class)
+        ->group(function () {
+            // Create a new proposal draft for a lawyer distribution.
+            Route::post('/lawyer/distributions/{distribution}/proposal', 'store');
 
-        // Update an existing proposal draft.
-        Route::patch('/lawyer/proposals/{proposal:public_id}', 'update');
+            // Update an existing proposal draft.
+            Route::patch('/lawyer/proposals/{proposal:public_id}', 'update');
 
-        // Submit an existing proposal draft.
-        Route::post('/lawyer/proposals/{proposal:public_id}/submit', 'submit');
+            // Submit an existing proposal draft.
+            Route::post('/lawyer/proposals/{proposal:public_id}/submit', 'submit');
 
-        Route::post('/lawyer/proposals/{proposal:public_id}/withdraw', 'withdraw');
+            Route::post('/lawyer/proposals/{proposal:public_id}/withdraw', 'withdraw');
 
-        // Select a submitted proposal and create a pre-contract engagement.
-        Route::post('/lawyer/proposals/{proposal:public_id}/select', 'select');
+            // Select a submitted proposal and create a pre-contract engagement.
+            Route::post('/lawyer/proposals/{proposal:public_id}/select', 'select');
 
- });
-
+        });
 
 Route::middleware(['auth:sanctum', 'active'])
     ->controller(LawyerWorkspaceController::class)
@@ -183,12 +181,11 @@ Route::middleware(['auth:sanctum', 'active'])
         Route::get('/legal-requests/{legalRequest}/engagement', 'showForLegalRequest');
     });
 
-
 Route::middleware(['auth:sanctum', 'active'])
     ->controller(LawyerInterestController::class)
     ->group(function () {
         Route::get('/lawyer/open-opportunities', 'openOpportunities');
-        Route::post('/lawyer/legal-requests/{legalRequest}/interest', 'store');
+        Route::post('/lawyer/legal-requests/{legalRequest:public_id}/interest', 'store');
         Route::get('/legal-requests/{legalRequest}/lawyer-interests', 'indexForClient');
         Route::post('/legal-requests/{legalRequest}/lawyer-interests/{distribution}/respond', 'respond');
     });
@@ -251,12 +248,11 @@ Route::middleware(['auth:sanctum', 'active'])
     ->post(
         '/legal-requests/{legalRequest}/lawyer-selection/{lawyerProfile:public_id}',
         [LawyerSelectionController::class, 'store'],
-)
-->withoutScopedBindings();
+    )
+    ->withoutScopedBindings();
 
 Route::middleware(['auth:sanctum', 'active'])
     ->post(
         '/lawyer/distributions/{distribution}/respond',
         [LawyerSelectionController::class, 'respond'],
-);
-    
+    );

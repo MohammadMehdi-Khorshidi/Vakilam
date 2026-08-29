@@ -49,7 +49,7 @@ Accept خروجی `negotiation.public_id` می‌دهد و `engagement` براب
 ## فرصت عمومی / Interest وکیل
 
 - `GET /lawyer/open-opportunities` — LegalRequestهای submitted و واجد شرایط؛ بدون اسناد و اطلاعات حساس
-- `POST /lawyer/legal-requests/{legalRequest}/interest` — اعلام علاقه وکیل دعوت‌نشده
+- `POST /lawyer/legal-requests/{legal_request_public_id}/interest` — اعلام علاقه وکیل دعوت‌نشده
 - `GET /legal-requests/{legalRequest}/lawyer-interests` — برای موکل
 - `POST /legal-requests/{legalRequest}/lawyer-interests/{distribution_id}/respond`
 
