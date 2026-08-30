@@ -8,6 +8,7 @@ function formatFileSize(bytes) {
     }
 
     const units = ['بایت', 'کیلوبایت', 'مگابایت'];
+
     const unitIndex = Math.min(
         Math.floor(Math.log(bytes) / Math.log(1024)),
         units.length - 1,
@@ -16,30 +17,32 @@ function formatFileSize(bytes) {
     const value = bytes / 1024 ** unitIndex;
 
     return `${new Intl.NumberFormat('fa-IR', {
-        maximumFractionDigits: 1,
-    }).format(value)} ${units[unitIndex]}`;
+    maximumFractionDigits: 1,
+}).format(value)} ${units[unitIndex]}`;
 }
 
-function getFileIcon(type) {
+function DocumentFileIcon({ type }) {
     if (type?.startsWith('image/')) {
-        return FileImage;
+        return <FileImage size={22} />;
     }
 
     if (type === 'application/pdf') {
-        return FileText;
+        return <FileText size={22} />;
     }
 
-    return File;
+    return <File size={22} />;
 }
 
-export default function DocumentCard({ document, onPreview, onDelete }) {
-    const FileIcon = getFileIcon(document.type);
-
+export default function DocumentCard({
+    document,
+    onPreview,
+    onDelete,
+}) {
     return (
         <article className="flex flex-col justify-between gap-4 rounded-xl border border-[#e3eae7] bg-white p-5 transition hover:border-[#bfd0ca] sm:flex-row sm:items-center">
             <div className="flex min-w-0 items-start gap-4">
                 <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#edf6f2] text-[#0b5648]">
-                    <FileIcon size={22} />
+                    <DocumentFileIcon type={document.type} />
                 </div>
 
                 <div className="min-w-0">
@@ -49,19 +52,21 @@ export default function DocumentCard({ document, onPreview, onDelete }) {
 
                     <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#879590]">
                         <span>{document.id}</span>
+
                         <span>·</span>
+
                         <span>{formatFileSize(document.size)}</span>
+
                         <span>·</span>
 
                         <time dateTime={document.uploadedAt}>
-                            {new Date(document.uploadedAt).toLocaleString(
-                                'fa-IR',
-                                {
-                                    calendar: 'persian',
-                                    dateStyle: 'medium',
-                                    timeStyle: 'short',
-                                },
-                            )}
+                            {new Date(
+                                document.uploadedAt,
+                            ).toLocaleString('fa-IR', {
+                                calendar: 'persian',
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                            })}
                         </time>
                     </div>
 

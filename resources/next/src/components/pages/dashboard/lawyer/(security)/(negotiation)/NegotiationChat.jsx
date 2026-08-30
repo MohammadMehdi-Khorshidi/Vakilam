@@ -8,15 +8,11 @@ import NegotiationMessage from './NegotiationMessage';
 export default function NegotiationChat({ caseCode, initialMessages }) {
     const storageKey = `vakilam-negotiation-${caseCode}`;
 
-    const [messages, setMessages] = useState(initialMessages);
+    const [messages, setMessages] = useState(() => {
+        if (typeof window === 'undefined') {
+            return initialMessages;
+        }
 
-    const [text, setText] = useState('');
-
-    const [isLoaded, setIsLoaded] = useState(false);
-
-    const endRef = useRef(null);
-
-    useEffect(() => {
         try {
             const storedMessages = window.localStorage.getItem(storageKey);
 
@@ -24,23 +20,27 @@ export default function NegotiationChat({ caseCode, initialMessages }) {
                 const parsedMessages = JSON.parse(storedMessages);
 
                 if (Array.isArray(parsedMessages)) {
-                    setMessages(parsedMessages);
+                    return parsedMessages;
                 }
             }
         } catch {
-            setMessages(initialMessages);
-        } finally {
-            setIsLoaded(true);
+            // اگر localStorage یا JSON مشکل داشت،
+            // از پیام‌های اولیه استفاده می‌کنیم.
         }
-    }, [initialMessages, storageKey]);
+
+        return initialMessages;
+    });
+
+    const [text, setText] = useState('');
+
+    const endRef = useRef(null);
 
     useEffect(() => {
-        if (!isLoaded) {
-            return;
-        }
-
-        window.localStorage.setItem(storageKey, JSON.stringify(messages));
-    }, [isLoaded, messages, storageKey]);
+        window.localStorage.setItem(
+            storageKey,
+            JSON.stringify(messages),
+        );
+    }, [messages, storageKey]);
 
     useEffect(() => {
         endRef.current?.scrollIntoView({
@@ -59,11 +59,8 @@ export default function NegotiationChat({ caseCode, initialMessages }) {
             ...currentMessages,
             {
                 id: `NEG-MSG-${Date.now()}`,
-
                 sender: 'lawyer',
-
                 text: cleanedText,
-
                 sentAt: new Date().toISOString(),
             },
         ]);
@@ -92,7 +89,10 @@ export default function NegotiationChat({ caseCode, initialMessages }) {
 
             <div className="my-5 flex max-h-[400px] flex-1 flex-col gap-3 overflow-y-auto">
                 {messages.map((message) => (
-                    <NegotiationMessage key={message.id} message={message} />
+                    <NegotiationMessage
+                        key={message.id}
+                        message={message}
+                    />
                 ))}
 
                 <div ref={endRef} />

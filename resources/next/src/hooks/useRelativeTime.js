@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -37,7 +38,7 @@ const timeUnits = [
     },
 ];
 
-function calculateRelativeTime(date) {
+function calculateRelativeTime(date, currentTime) {
     if (!date) {
         return 'زمان نامشخص';
     }
@@ -48,24 +49,28 @@ function calculateRelativeTime(date) {
         return 'زمان نامعتبر';
     }
 
-    const differenceInSeconds = Math.round((targetTime - Date.now()) / 1000);
+    const differenceInSeconds = Math.round(
+        (targetTime - currentTime) / 1000,
+    );
 
     const selectedUnit =
         timeUnits.find(
             ({ seconds }) => Math.abs(differenceInSeconds) >= seconds,
         ) ?? timeUnits[timeUnits.length - 1];
 
-    const value = Math.round(differenceInSeconds / selectedUnit.seconds);
+    const value = Math.round(
+        differenceInSeconds / selectedUnit.seconds,
+    );
 
     return relativeTimeFormatter.format(value, selectedUnit.unit);
 }
 
 export default function useRelativeTime(date) {
-    const [currentTime, setCurrentTime] = useState(Date.now());
+    const [currentTime, setCurrentTime] = useState(() => new Date());
 
     useEffect(() => {
         const intervalId = window.setInterval(() => {
-            setCurrentTime(Date.now());
+            setCurrentTime(new Date());
         }, 60_000);
 
         return () => {
@@ -73,5 +78,8 @@ export default function useRelativeTime(date) {
         };
     }, []);
 
-    return useMemo(() => calculateRelativeTime(date), [date, currentTime]);
-}
+    return useMemo(
+        () => calculateRelativeTime(date, currentTime.getTime()),
+        [date, currentTime],
+    );
+};

@@ -22,23 +22,15 @@ function formatPersianTime(date) {
 }
 
 export default function LiveDateTime() {
-    const [currentDate, setCurrentDate] = useState(null);
+    const [currentDate, setCurrentDate] = useState(() => new Date());
 
     useEffect(() => {
-        setCurrentDate(new Date());
-
         const interval = setInterval(() => {
             setCurrentDate(new Date());
         }, 1000);
 
         return () => clearInterval(interval);
     }, []);
-
-    if (!currentDate) {
-        return (
-            <div className="h-[50px] w-[250px] animate-pulse rounded-xl bg-[#e8eeea]" />
-        );
-    }
 
     return (
         <div className="flex flex-wrap items-center gap-3">
@@ -63,3 +55,4 @@ export default function LiveDateTime() {
         </div>
     );
 }
+;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 function formatExactDate(date) {
     return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
@@ -45,18 +45,28 @@ function getRelativeTime(date, now) {
     return `${days.toLocaleString('fa-IR')} روز پیش`;
 }
 
+function subscribeToClock(callback) {
+    const interval = window.setInterval(callback, 60 * 1000);
+
+    return () => {
+        window.clearInterval(interval);
+    };
+}
+
+function getClientTime() {
+    return Date.now();
+}
+
+function getServerTime() {
+    return 0;
+}
+
 export default function LiveLastActivity({ dateString }) {
-    const [now, setNow] = useState(null);
-
-    useEffect(() => {
-        setNow(new Date());
-
-        const interval = setInterval(() => {
-            setNow(new Date());
-        }, 60 * 1000);
-
-        return () => clearInterval(interval);
-    }, []);
+    const nowTimestamp = useSyncExternalStore(
+        subscribeToClock,
+        getClientTime,
+        getServerTime,
+    );
 
     const activityDate = new Date(dateString);
 
@@ -64,11 +74,7 @@ export default function LiveLastActivity({ dateString }) {
         return <span>زمان نامشخص</span>;
     }
 
-    if (!now) {
-        return (
-            <span className="inline-block h-5 w-20 animate-pulse rounded bg-[#e7ece9]" />
-        );
-    }
+    const now = new Date(nowTimestamp);
 
     return (
         <span

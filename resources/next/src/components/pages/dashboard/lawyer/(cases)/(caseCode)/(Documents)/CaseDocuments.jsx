@@ -1,9 +1,10 @@
 'use client';
 
-import { File, FileImage, FileText, Info, UploadCloud, X } from 'lucide-react';
+import Image from 'next/image';
+import { File, FileText, Info, UploadCloud, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import DocumentCard from './DocumentCard';
 
+import DocumentCard from './DocumentCard';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -40,6 +41,8 @@ export default function CaseDocuments({ caseItem }) {
             objectUrls.forEach((url) => {
                 URL.revokeObjectURL(url);
             });
+
+            objectUrls.clear();
         };
     }, []);
 
@@ -222,6 +225,8 @@ export default function CaseDocuments({ caseItem }) {
                     tabIndex={0}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+
                             inputRef.current?.click();
                         }
                     }}
@@ -328,11 +333,16 @@ function DocumentPreviewModal({ document, onClose }) {
 
                 <div className="mt-5 min-h-0 flex-1 overflow-auto rounded-xl bg-[#f5f8f6]">
                     {isImage && (
-                        <img
-                            src={document.previewUrl}
-                            alt={document.name}
-                            className="mx-auto max-h-[70vh] max-w-full object-contain"
-                        />
+                        <div className="relative mx-auto h-[70vh] min-h-[300px] w-full max-w-4xl">
+                            <Image
+                                src={document.previewUrl}
+                                alt={document.name}
+                                fill
+                                unoptimized
+                                sizes="(max-width: 768px) 100vw, 1024px"
+                                className="object-contain"
+                            />
+                        </div>
                     )}
 
                     {isPdf && (

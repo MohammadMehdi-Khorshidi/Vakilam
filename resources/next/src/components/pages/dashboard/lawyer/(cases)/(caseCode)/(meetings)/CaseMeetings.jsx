@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarPlus, Phone, Video, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 
 import useCurrentDateTime from '@/hooks/useCurrentDateTime';
 import MeetingCard from '@/components/pages/dashboard/lawyer/(cases)/(caseCode)/(meetings)/MeetingCard';
@@ -56,14 +56,91 @@ function formatPersianDateTime(date) {
     });
 }
 
+function getStoredMeetings(storageKey, fallbackMeetings) {
+    if (typeof window === 'undefined') {
+        return fallbackMeetings;
+    }
+
+    try {
+        const storedValue = window.localStorage.getItem(storageKey);
+
+        if (!storedValue) {
+            return fallbackMeetings;
+        }
+
+        const parsedMeetings = JSON.parse(storedValue);
+
+        if (Array.isArray(parsedMeetings)) {
+            return parsedMeetings;
+        }
+    } catch {
+        // Ignore invalid localStorage data.
+    }
+
+    return fallbackMeetings;
+}
+
+function subscribeToMeetings(storageKey, callback) {
+    if (typeof window === 'undefined') {
+        return () => {};
+    }
+
+    const handleStorageChange = (event) => {
+        if (event.key === storageKey || event.key === null) {
+            callback();
+        }
+    };
+
+    const handleCustomChange = (event) => {
+        if (event.detail?.storageKey === storageKey) {
+            callback();
+        }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    window.addEventListener('vakilam-meetings-change', handleCustomChange);
+
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+
+        window.removeEventListener(
+            'vakilam-meetings-change',
+            handleCustomChange,
+        );
+    };
+}
+
+function saveMeetings(storageKey, meetings) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(storageKey, JSON.stringify(meetings));
+
+        window.dispatchEvent(
+            new CustomEvent('vakilam-meetings-change', {
+                detail: {
+                    storageKey,
+                },
+            }),
+        );
+    } catch {
+        // Ignore localStorage errors.
+    }
+}
+
 export default function CaseMeetings({ caseItem }) {
     const currentDate = useCurrentDateTime();
 
     const storageKey = `vakilam-case-meetings-${caseItem.code}`;
 
-    const [meetings, setMeetings] = useState(caseItem.meetings ?? []);
-
-    const [isLoaded, setIsLoaded] = useState(false);
+    const meetings = useSyncExternalStore(
+        (callback) => subscribeToMeetings(storageKey, callback),
+        () => getStoredMeetings(storageKey, caseItem.meetings ?? []),
+        () => caseItem.meetings ?? [],
+    );
 
     const [showForm, setShowForm] = useState(true);
 
@@ -77,32 +154,6 @@ export default function CaseMeetings({ caseItem }) {
 
     const minimumMeetingTime = toDateTimeLocal(currentDate);
 
-    useEffect(() => {
-        try {
-            const storedMeetings = window.localStorage.getItem(storageKey);
-
-            if (storedMeetings) {
-                const parsedMeetings = JSON.parse(storedMeetings);
-
-                if (Array.isArray(parsedMeetings)) {
-                    setMeetings(parsedMeetings);
-                }
-            }
-        } catch {
-            setMeetings(caseItem.meetings ?? []);
-        } finally {
-            setIsLoaded(true);
-        }
-    }, [caseItem.meetings, storageKey]);
-
-    useEffect(() => {
-        if (!isLoaded) {
-            return;
-        }
-
-        window.localStorage.setItem(storageKey, JSON.stringify(meetings));
-    }, [isLoaded, meetings, storageKey]);
-
     const sortedMeetings = useMemo(() => {
         return [...meetings].sort(
             (firstMeeting, secondMeeting) =>
@@ -110,6 +161,10 @@ export default function CaseMeetings({ caseItem }) {
                 new Date(firstMeeting.startsAt).getTime(),
         );
     }, [meetings]);
+
+    function updateMeetings(nextMeetings) {
+        saveMeetings(storageKey, nextMeetings);
+    }
 
     function handleChange(event) {
         const { name, value } = event.target;
@@ -146,7 +201,7 @@ export default function CaseMeetings({ caseItem }) {
             createdAt: now.toISOString(),
         };
 
-        setMeetings((currentMeetings) => [...currentMeetings, newMeeting]);
+        updateMeetings([...meetings, newMeeting]);
 
         setForm({
             title: '',
@@ -164,9 +219,7 @@ export default function CaseMeetings({ caseItem }) {
             return;
         }
 
-        setMeetings((currentMeetings) =>
-            currentMeetings.filter((meeting) => meeting.id !== meetingId),
-        );
+        updateMeetings(meetings.filter((meeting) => meeting.id !== meetingId));
 
         setSelectedMeeting(null);
     }

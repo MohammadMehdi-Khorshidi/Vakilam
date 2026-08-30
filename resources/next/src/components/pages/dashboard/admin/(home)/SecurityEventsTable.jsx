@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import { securityEvents } from './dashboardData';
 import PanelTitle from './PanelTitle';
@@ -48,38 +48,58 @@ function formatRelativeTime(dateString, currentTime) {
     }
 
     if (absoluteDifference < hour) {
-        const minutes = Math.floor(absoluteDifference / minute).toLocaleString(
-            'fa-IR',
-        );
+        const minutes = Math.floor(
+            absoluteDifference / minute,
+        ).toLocaleString('fa-IR');
 
-        return futureEvent ? `${minutes} دقیقه دیگر` : `${minutes} دقیقه پیش`;
+        return futureEvent
+            ? `${minutes} دقیقه دیگر`
+            : `${minutes} دقیقه پیش`;
     }
 
     if (absoluteDifference < day) {
-        const hours = Math.floor(absoluteDifference / hour).toLocaleString(
-            'fa-IR',
-        );
+        const hours = Math.floor(
+            absoluteDifference / hour,
+        ).toLocaleString('fa-IR');
 
-        return futureEvent ? `${hours} ساعت دیگر` : `${hours} ساعت پیش`;
+        return futureEvent
+            ? `${hours} ساعت دیگر`
+            : `${hours} ساعت پیش`;
     }
 
-    const days = Math.floor(absoluteDifference / day).toLocaleString('fa-IR');
+    const days = Math.floor(
+        absoluteDifference / day,
+    ).toLocaleString('fa-IR');
 
-    return futureEvent ? `${days} روز دیگر` : `${days} روز پیش`;
+    return futureEvent
+        ? `${days} روز دیگر`
+        : `${days} روز پیش`;
+}
+
+function subscribeToClock(callback) {
+    const interval = window.setInterval(callback, 60 * 1000);
+
+    return () => {
+        window.clearInterval(interval);
+    };
+}
+
+function getClientTime() {
+    return Date.now();
+}
+
+function getServerTime() {
+    return 0;
 }
 
 export default function SecurityEventsTable() {
-    const [currentTime, setCurrentTime] = useState(null);
+    const currentTime = useSyncExternalStore(
+        subscribeToClock,
+        getClientTime,
+        getServerTime,
+    );
 
-    useEffect(() => {
-        setCurrentTime(new Date());
-
-        const interval = setInterval(() => {
-            setCurrentTime(new Date());
-        }, 60 * 1000);
-
-        return () => clearInterval(interval);
-    }, []);
+    const now = new Date(currentTime);
 
     return (
         <section className="mt-5 overflow-hidden rounded-2xl border border-[#dce4df] bg-white p-5 shadow-[0_6px_18px_rgba(15,52,45,0.03)] md:p-6">
@@ -93,11 +113,17 @@ export default function SecurityEventsTable() {
                                 شناسه
                             </th>
 
-                            <th className="p-4 font-medium">عامل</th>
+                            <th className="p-4 font-medium">
+                                عامل
+                            </th>
 
-                            <th className="p-4 font-medium">رویداد</th>
+                            <th className="p-4 font-medium">
+                                رویداد
+                            </th>
 
-                            <th className="p-4 font-medium">زمان</th>
+                            <th className="p-4 font-medium">
+                                زمان
+                            </th>
 
                             <th className="rounded-l-xl p-4 font-medium">
                                 شدت
@@ -115,33 +141,37 @@ export default function SecurityEventsTable() {
                                     {item.id}
                                 </td>
 
-                                <td className="p-4">{item.actor}</td>
+                                <td className="p-4">
+                                    {item.actor}
+                                </td>
 
-                                <td className="p-4">{item.event}</td>
+                                <td className="p-4">
+                                    {item.event}
+                                </td>
 
                                 <td className="p-4">
                                     <span className="block text-xs font-medium text-[#334c45]">
-                                        {currentTime
-                                            ? formatRelativeTime(
-                                                  item.createdAt,
-                                                  currentTime,
-                                              )
-                                            : 'در حال محاسبه...'}
+                                        {formatRelativeTime(
+                                            item.createdAt,
+                                            now,
+                                        )}
                                     </span>
 
                                     <span
                                         dir="ltr"
                                         className="mt-1 block text-left text-[11px] text-[#8a9691]"
                                     >
-                                        {formatEventDate(item.createdAt)}
+                                        {formatEventDate(
+                                            item.createdAt,
+                                        )}
                                     </span>
                                 </td>
 
                                 <td className="p-4">
                                     <span
                                         className={`rounded-full border px-3 py-1 text-xs ${
-                                            badgeStyles[item.tone]
-                                        }`}
+    badgeStyles[item.tone]
+}`}
                                     >
                                         {item.severity}
                                     </span>

@@ -1,24 +1,133 @@
 'use client';
 
 import { Bot } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 
 import AssistantActionCard from '@/components/pages/dashboard/lawyer/(cases)/(caseCode)/(LegalAssistant)/AssistantActionCard';
+
 import AssistantControls from '@/components/pages/dashboard/lawyer/(cases)/(caseCode)/(LegalAssistant)/AssistantControls';
+
 import AssistantResult from '@/components/pages/dashboard/lawyer/(cases)/(caseCode)/(LegalAssistant)/AssistantResult';
+
 import AssistantSources from '@/components/pages/dashboard/lawyer/(cases)/(caseCode)/(LegalAssistant)/AssistantSources';
+
 import {
     assistantActions,
     legalSources,
 } from '@/components/pages/dashboard/lawyer/(cases)/(caseCode)/(LegalAssistant)/assistantData';
+
 import {
     createCaseSummary,
     createLegalDraft,
     filterLegalSources,
 } from '@/components/pages/dashboard/lawyer/(cases)/(caseCode)/(LegalAssistant)/assistantUtils';
 
+function getStoredHistory(storageKey) {
+    if (typeof window === 'undefined') {
+        return [];
+    }
+
+    try {
+        const storedHistory = window.localStorage.getItem(storageKey);
+
+        if (!storedHistory) {
+            return [];
+        }
+
+        const parsedHistory = JSON.parse(storedHistory);
+
+        if (Array.isArray(parsedHistory)) {
+            return parsedHistory;
+        }
+    } catch {
+        // Ignore invalid localStorage data.
+    }
+
+    return [];
+}
+
+function subscribeToHistory(storageKey, callback) {
+    if (typeof window === 'undefined') {
+        return () => {};
+    }
+
+    const handleStorageChange = (event) => {
+        if (event.key === storageKey || event.key === null) {
+            callback();
+        }
+    };
+
+    const handleCustomChange = (event) => {
+        if (event.detail?.storageKey === storageKey) {
+            callback();
+        }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    window.addEventListener(
+        'vakilam-assistant-history-change',
+        handleCustomChange,
+    );
+
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+
+        window.removeEventListener(
+            'vakilam-assistant-history-change',
+            handleCustomChange,
+        );
+    };
+}
+
+function saveHistoryToStorage(storageKey, history) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(storageKey, JSON.stringify(history));
+
+        window.dispatchEvent(
+            new CustomEvent('vakilam-assistant-history-change', {
+                detail: {
+                    storageKey,
+                },
+            }),
+        );
+    } catch {
+        // Ignore localStorage errors.
+    }
+}
+
+function createHistoryItem(type, content) {
+    const id =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `AI-${Math.random().toString(36).slice(2, 12)}`;
+
+    const createdAt =
+        typeof performance !== 'undefined' &&
+        typeof performance.timeOrigin === 'number'
+            ? new Date(performance.timeOrigin + performance.now()).toISOString()
+            : '';
+
+    return {
+        id: `AI-${id}`,
+        type,
+        title: content.title,
+        createdAt,
+    };
+}
+
 export default function CaseAssistant({ caseItem }) {
     const storageKey = `vakilam-case-assistant-${caseItem.code}`;
+
+    const history = useSyncExternalStore(
+        (callback) => subscribeToHistory(storageKey, callback),
+        () => getStoredHistory(storageKey),
+        () => [],
+    );
 
     const [activeAction, setActiveAction] = useState(null);
 
@@ -28,43 +137,15 @@ export default function CaseAssistant({ caseItem }) {
 
     const [isCopied, setIsCopied] = useState(false);
 
-    const [history, setHistory] = useState([]);
-
-    useEffect(() => {
-        try {
-            const storedHistory = window.localStorage.getItem(storageKey);
-
-            if (storedHistory) {
-                const parsedHistory = JSON.parse(storedHistory);
-
-                if (Array.isArray(parsedHistory)) {
-                    setHistory(parsedHistory);
-                }
-            }
-        } catch {
-            setHistory([]);
-        }
-    }, [storageKey]);
-
-    useEffect(() => {
-        window.localStorage.setItem(storageKey, JSON.stringify(history));
-    }, [history, storageKey]);
-
     const filteredSources = useMemo(
         () => filterLegalSources(legalSources, searchText),
         [searchText],
     );
 
     function saveToHistory(type, content) {
-        setHistory((currentHistory) => [
-            {
-                id: `AI-${Date.now()}`,
-                type,
-                title: content.title,
-                createdAt: new Date().toISOString(),
-            },
-            ...currentHistory,
-        ]);
+        const newHistoryItem = createHistoryItem(type, content);
+
+        saveHistoryToStorage(storageKey, [newHistoryItem, ...history]);
     }
 
     function handleAction(actionId) {
@@ -75,7 +156,9 @@ export default function CaseAssistant({ caseItem }) {
             const summary = createCaseSummary(caseItem);
 
             setResult(summary);
+
             saveToHistory('summary', summary);
+
             return;
         }
 
@@ -83,7 +166,9 @@ export default function CaseAssistant({ caseItem }) {
             const draft = createLegalDraft(caseItem);
 
             setResult(draft);
+
             saveToHistory('draft', draft);
+
             return;
         }
 

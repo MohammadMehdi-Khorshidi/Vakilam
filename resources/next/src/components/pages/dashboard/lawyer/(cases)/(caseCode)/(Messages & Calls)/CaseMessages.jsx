@@ -1,9 +1,9 @@
 'use client';
 
 import { Info, Mic, Phone, Send, Video } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import ChatMessage from './ChatMessage';
+import { useRef, useState, useSyncExternalStore } from 'react';
 
+import ChatMessage from './ChatMessage';
 
 const initialMessages = [
     {
@@ -24,50 +24,94 @@ function createMessageId() {
     return `MSG-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function getStoredMessages(storageKey) {
+    if (typeof window === 'undefined') {
+        return initialMessages;
+    }
+
+    try {
+        const storedMessages = window.localStorage.getItem(storageKey);
+
+        if (!storedMessages) {
+            return initialMessages;
+        }
+
+        const parsedMessages = JSON.parse(storedMessages);
+
+        if (Array.isArray(parsedMessages)) {
+            return parsedMessages;
+        }
+    } catch {
+        // Ignore invalid localStorage data.
+    }
+
+    return initialMessages;
+}
+
+function subscribeToMessages(storageKey, callback) {
+    if (typeof window === 'undefined') {
+        return () => {};
+    }
+
+    const handleStorageChange = (event) => {
+        if (event.key === storageKey || event.key === null) {
+            callback();
+        }
+    };
+
+    const handleCustomChange = (event) => {
+        if (event.detail?.storageKey === storageKey) {
+            callback();
+        }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    window.addEventListener('vakilam-messages-change', handleCustomChange);
+
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+
+        window.removeEventListener(
+            'vakilam-messages-change',
+            handleCustomChange,
+        );
+    };
+}
+
+function saveMessages(storageKey, messages) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(storageKey, JSON.stringify(messages));
+
+        window.dispatchEvent(
+            new CustomEvent('vakilam-messages-change', {
+                detail: {
+                    storageKey,
+                },
+            }),
+        );
+    } catch {
+        // Ignore localStorage errors.
+    }
+}
+
 export default function CaseMessages({ caseItem }) {
     const storageKey = `vakilam-case-messages-${caseItem.code}`;
 
-    const [messages, setMessages] = useState(initialMessages);
+    const messages = useSyncExternalStore(
+        (callback) => subscribeToMessages(storageKey, callback),
+        () => getStoredMessages(storageKey),
+        () => initialMessages,
+    );
 
     const [messageText, setMessageText] = useState('');
 
-    const [isLoaded, setIsLoaded] = useState(false);
-
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
-
-    useEffect(() => {
-        try {
-            const storedMessages = window.localStorage.getItem(storageKey);
-
-            if (storedMessages) {
-                const parsedMessages = JSON.parse(storedMessages);
-
-                if (Array.isArray(parsedMessages)) {
-                    setMessages(parsedMessages);
-                }
-            }
-        } catch {
-            setMessages(initialMessages);
-        } finally {
-            setIsLoaded(true);
-        }
-    }, [storageKey]);
-
-    useEffect(() => {
-        if (!isLoaded) {
-            return;
-        }
-
-        window.localStorage.setItem(storageKey, JSON.stringify(messages));
-    }, [isLoaded, messages, storageKey]);
-
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest',
-        });
-    }, [messages]);
 
     function sendMessage() {
         const cleanedMessage = messageText.trim();
@@ -83,11 +127,18 @@ export default function CaseMessages({ caseItem }) {
             sentAt: new Date().toISOString(),
         };
 
-        setMessages((currentMessages) => [...currentMessages, newMessage]);
+        saveMessages(storageKey, [...messages, newMessage]);
 
         setMessageText('');
 
         textareaRef.current?.focus();
+
+        requestAnimationFrame(() => {
+            messagesEndRef.current?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+            });
+        });
     }
 
     function handleSubmit(event) {
@@ -103,13 +154,13 @@ export default function CaseMessages({ caseItem }) {
     }
 
     function handleContactClick(type) {
-        const messages = {
+        const contactMessages = {
             voice: 'درخواست تماس صوتی داخل سامانه ثبت شد.',
             video: 'درخواست تماس تصویری داخل سامانه ثبت شد.',
             voiceMessage: 'امکان ضبط پیام صوتی در مرحله بعد اضافه می‌شود.',
         };
 
-        window.alert(messages[type]);
+        window.alert(contactMessages[type]);
     }
 
     return (

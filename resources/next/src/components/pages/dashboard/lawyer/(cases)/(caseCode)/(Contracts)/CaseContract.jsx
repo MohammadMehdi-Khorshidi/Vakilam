@@ -2,12 +2,11 @@
 
 import { CheckCircle2, FileText, Info, UploadCloud } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+
 import ContractStep from './ContractStep';
 import ContractInfoItem from './ContractInfoItem';
+
 import { calculateContractAmounts } from '@/components/pages/dashboard/lawyer/(cases)/(caseCode)/contractCalculations';
-
-
-
 
 function formatToman(value) {
     const normalizedValue = Number(value);
@@ -19,6 +18,41 @@ function formatToman(value) {
     return `${new Intl.NumberFormat('fa-IR').format(normalizedValue)} تومان`;
 }
 
+function getInitialContractState(contract, storageKey) {
+    if (!contract) {
+        return null;
+    }
+
+    if (typeof window === 'undefined') {
+        return contract;
+    }
+
+    try {
+        const storedState = window.localStorage.getItem(storageKey);
+
+        if (!storedState) {
+            return contract;
+        }
+
+        const parsedState = JSON.parse(storedState);
+
+        if (
+            !parsedState ||
+            typeof parsedState !== 'object' ||
+            Array.isArray(parsedState)
+        ) {
+            return contract;
+        }
+
+        return {
+            ...contract,
+            ...parsedState,
+        };
+    } catch {
+        return contract;
+    }
+}
+
 export default function CaseContract({ caseItem }) {
     const contract = caseItem?.contract;
 
@@ -27,13 +61,13 @@ export default function CaseContract({ caseItem }) {
     const fileInputRef = useRef(null);
     const fileUrlRef = useRef(null);
 
-    const [contractState, setContractState] = useState(contract);
+    const [contractState, setContractState] = useState(() =>
+        getInitialContractState(contract, storageKey),
+    );
 
     const [registeredFile, setRegisteredFile] = useState(null);
 
     const [error, setError] = useState('');
-
-    const [isLoaded, setIsLoaded] = useState(false);
 
     const amounts = useMemo(
         () => calculateContractAmounts(contractState),
@@ -41,31 +75,12 @@ export default function CaseContract({ caseItem }) {
     );
 
     useEffect(() => {
-        try {
-            const storedState = window.localStorage.getItem(storageKey);
-
-            if (storedState) {
-                const parsedState = JSON.parse(storedState);
-
-                setContractState((currentState) => ({
-                    ...currentState,
-                    ...parsedState,
-                }));
-            }
-        } catch {
-            setContractState(contract);
-        } finally {
-            setIsLoaded(true);
-        }
-    }, [contract, storageKey]);
-
-    useEffect(() => {
-        if (!isLoaded || !contractState) {
+        if (!contractState) {
             return;
         }
 
         window.localStorage.setItem(storageKey, JSON.stringify(contractState));
-    }, [contractState, isLoaded, storageKey]);
+    }, [contractState, storageKey]);
 
     useEffect(() => {
         return () => {
@@ -103,6 +118,7 @@ export default function CaseContract({ caseItem }) {
             setError('فقط فایل PDF، JPG، PNG یا WEBP مجاز است.');
 
             event.target.value = '';
+
             return;
         }
 
@@ -110,6 +126,7 @@ export default function CaseContract({ caseItem }) {
             setError('حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.');
 
             event.target.value = '';
+
             return;
         }
 
@@ -139,6 +156,7 @@ export default function CaseContract({ caseItem }) {
         }));
 
         setError('');
+
         event.target.value = '';
     }
 
@@ -174,73 +192,54 @@ export default function CaseContract({ caseItem }) {
     const steps = [
         {
             number: 1,
-
             title: 'پیش‌پرداخت',
-
             description: `${formatToman(
                 amounts.prepayment,
             )} · ${amounts.paidPercent.toLocaleString('fa-IR')}٪ مبلغ قرارداد`,
-
             status: contractState.paymentCompleted ? 'completed' : 'current',
         },
-
         {
             number: 2,
-
             title: 'ثبت در عدل ایران',
-
             description: contractState.adliranCode || 'منتظر ثبت',
-
             status: contractState.registeredInAdliran
                 ? 'completed'
                 : contractState.paymentCompleted
                   ? 'current'
                   : 'pending',
         },
-
         {
             number: 3,
-
             title: 'بارگذاری نسخه',
-
             description: contractState.registeredCopyUploaded
                 ? 'نسخه ثبت‌شده بارگذاری شده است'
                 : 'نسخه ثبت‌شده را بارگذاری کنید',
-
             status: contractState.registeredCopyUploaded
                 ? 'completed'
                 : contractState.registeredInAdliran
                   ? 'current'
                   : 'pending',
         },
-
         {
             number: 4,
-
             title: 'تأیید موکل',
-
             description: contractState.clientConfirmed
                 ? 'موکل قرارداد را تأیید کرده است'
                 : 'در انتظار تأیید موکل',
-
             status: contractState.clientConfirmed
                 ? 'completed'
                 : contractState.registeredCopyUploaded
                   ? 'current'
                   : 'pending',
         },
-
         {
             number: 5,
-
             title: 'تسویه سهم وکیل',
-
             description: contractState.lawyerSettled
                 ? `${formatToman(amounts.lawyerNetPrepayment)} تسویه شده است`
                 : `${formatToman(
                       amounts.lawyerNetPrepayment,
                   )} منتظر تأیید موکل`,
-
             status: contractState.lawyerSettled
                 ? 'completed'
                 : contractState.clientConfirmed

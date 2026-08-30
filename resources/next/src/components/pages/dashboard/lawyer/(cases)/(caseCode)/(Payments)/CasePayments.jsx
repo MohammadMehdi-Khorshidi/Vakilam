@@ -135,6 +135,8 @@ export default function CasePayments({ caseItem }) {
     );
 
     useEffect(() => {
+        let frameId;
+
         try {
             const storedContract =
                 window.localStorage.getItem(contractStorageKey);
@@ -142,17 +144,37 @@ export default function CasePayments({ caseItem }) {
             if (storedContract) {
                 const parsedContract = JSON.parse(storedContract);
 
-                setContractState((currentContract) => ({
-                    ...currentContract,
-                    ...parsedContract,
-                }));
+                if (parsedContract && typeof parsedContract === 'object') {
+                    frameId = window.requestAnimationFrame(() => {
+                        setContractState((currentContract) => ({
+                            ...currentContract,
+                            ...parsedContract,
+                        }));
+
+                        setIsLoaded(true);
+                    });
+
+                    return () => {
+                        if (frameId) {
+                            window.cancelAnimationFrame(frameId);
+                        }
+                    };
+                }
             }
-        } catch {
-            setContractState(defaultContract);
-        } finally {
-            setIsLoaded(true);
+        } catch (error) {
+            console.error('Error loading contract:', error);
         }
-    }, [contractStorageKey, defaultContract]);
+
+        frameId = window.requestAnimationFrame(() => {
+            setIsLoaded(true);
+        });
+
+        return () => {
+            if (frameId) {
+                window.cancelAnimationFrame(frameId);
+            }
+        };
+    }, [contractStorageKey]);
 
     useEffect(() => {
         if (!isLoaded || !contractState) {

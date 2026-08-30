@@ -4,12 +4,11 @@ import { useEffect, useState } from 'react';
 
 const useCase = (caseId) => {
     const [data, setData] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(Boolean(caseId));
     const [isError, setIsError] = useState(false);
 
     useEffect(() => {
         if (!caseId) {
-            setIsLoading(false);
             return;
         }
 
