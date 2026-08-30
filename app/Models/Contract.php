@@ -57,7 +57,7 @@ class Contract extends Model
     /** Invoices issued under this contract. */
     public function invoices()
     {
-        return $this->hasMany(Invoice::class);
+        return $this->morphMany(Invoice::class, 'payable');
     }
 
 }

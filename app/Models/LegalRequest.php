@@ -89,17 +89,10 @@ class LegalRequest extends Model
         return $this->hasMany(LegalRequestDistribution::class);
     }
 
-    /** Lawyer proposals submitted through this request's distributions. */
+    /** All lawyer proposals submitted for this request. */
     public function proposals()
     {
-        return $this->hasManyThrough(
-            LawyerProposal::class,
-            LegalRequestDistribution::class,
-            'legal_request_id',
-            'distribution_id',
-            'id',
-            'id',
-        );
+        return $this->hasMany(LawyerProposal::class);
     }
 
     /** Consultations opened from this request. */

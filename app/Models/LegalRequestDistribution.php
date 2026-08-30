@@ -9,6 +9,14 @@ class LegalRequestDistribution extends Model
 {
     use HasUuids;
 
+    public const STATUS_SENT = 'sent';
+    public const STATUS_ACCEPTED = 'accepted';
+    public const STATUS_SELECTED = 'selected';
+    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_EXPIRED = 'expired';
+    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_CLOSED = 'closed';
+
     /** The table has created_at but no updated_at column. */
     public const UPDATED_AT = null;
 
@@ -19,7 +27,9 @@ class LegalRequestDistribution extends Model
         'status',
         'sent_at',
         'viewed_at',
+        'responded_at',
         'expires_at',
+        'closed_at',
     ];
 
     /**
@@ -30,7 +40,9 @@ class LegalRequestDistribution extends Model
         return [
             'sent_at'    => 'datetime',
             'viewed_at'  => 'datetime',
+            'responded_at' => 'datetime',
             'expires_at' => 'datetime',
+            'closed_at' => 'datetime',
         ];
     }
 
@@ -49,8 +61,13 @@ class LegalRequestDistribution extends Model
         return $this->belongsTo(LawyerMatchCandidate::class);
     }
 
-    public function proposal()
+    public function proposals()
     {
-        return $this->hasOne(LawyerProposal::class, 'distribution_id');
+        return $this->hasMany(LawyerProposal::class, 'distribution_id');
+    }
+
+    public function negotiationThread()
+    {
+        return $this->hasOne(NegotiationThread::class, 'distribution_id');
     }
 }
