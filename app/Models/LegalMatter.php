@@ -31,6 +31,7 @@ class LegalMatter extends Model
         'originable_id',
         'engagement_id',
         'client_user_id',
+        'origin_type',
         'title',
         'status',
         'opened_at',

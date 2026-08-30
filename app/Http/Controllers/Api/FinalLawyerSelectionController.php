@@ -19,15 +19,25 @@ class FinalLawyerSelectionController extends Controller
         FinalLawyerSelectionService $selectionService,
     ): JsonResponse
     {
-        $proposal = $selectionService->select(
+        /** @var User $client */
+        $client = $request->user();
+
+        $result = $selectionService->select(
             $legalRequest,
             (string) $request->validated('proposal_public_id'),
+            $client,
+            $request->ip(),
         );
 
         return response()->json([
-            'message' => 'The final lawyer was selected successfully.',
-            'data' => FinalLawyerSelectionResource::make($proposal)->resolve(),
-        ]);
+            'message' => $result['created']
+                ? 'Final lawyer proposal selected successfully.'
+                : 'Final lawyer proposal was already selected.',
+            'proposal' => $result['proposal'],
+            'engagement' => $result['engagement'],
+            'data' => FinalLawyerSelectionResource::make($result['proposal'])->resolve(),
+            'deprecated' => true,
+        ], $result['created'] ? 201 : 200);
     }
 
     public function show(

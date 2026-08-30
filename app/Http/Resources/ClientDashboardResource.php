@@ -19,6 +19,10 @@ class ClientDashboardResource extends JsonResource
                 $this['draft_cases']
             ),
 
+            'submitted_requests' => LegalRequestResource::collection(
+                $this['submitted_requests'] ?? []
+            ),
+
             'active_cases' => LegalMatterResource::collection(
                 $this['active_cases']
             ),

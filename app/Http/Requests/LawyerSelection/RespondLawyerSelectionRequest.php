@@ -27,7 +27,8 @@ class RespondLawyerSelectionRequest extends FormRequest
 
         $lawyerProfile = $user->lawyerProfile;
 
-        return $lawyerProfile !== null
+        return $user->mayActAsRole('lawyer')
+            && $lawyerProfile !== null
             && $lawyerProfile->verification_status === 'approved'
             && $distribution->lawyer_profile_id === $lawyerProfile->id;
     }

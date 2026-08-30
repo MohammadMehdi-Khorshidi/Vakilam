@@ -22,7 +22,8 @@ class SubmitLawyerProposalRequest extends FormRequest
 
         $lawyerProfile = $user->lawyerProfile;
 
-        return $lawyerProfile !== null
+        return $user->mayActAsRole('lawyer')
+            && $lawyerProfile !== null
             && $lawyerProfile->verification_status === 'approved'
             && $proposal->lawyer_profile_id === $lawyerProfile->id;
     }
@@ -42,15 +43,24 @@ class SubmitLawyerProposalRequest extends FormRequest
                 return;
             }
 
-            $proposal->loadMissing('distribution.legalRequest');
+            $proposal->loadMissing(['legalRequest', 'negotiation']);
+            $legalRequest = $proposal->legalRequest;
 
             if ($proposal->status !== LawyerProposal::STATUS_DRAFT
-                || $proposal->distribution?->legalRequest?->status !== 'submitted') {
+                || $legalRequest?->status !== 'submitted') {
                 return;
             }
 
+            if ($proposal->negotiation === null || $proposal->negotiation->status !== \App\Models\Negotiation::STATUS_ACTIVE) {
+                $validator->errors()->add('negotiation', 'An active negotiation is required before final proposal submission.');
+            }
+
             if (blank($proposal->summary)) {
-                $validator->errors()->add('summary', 'A proposal summary is required before submission.');
+                $validator->errors()->add('summary', 'A final proposal explanation is required before submission.');
+            }
+
+            if (blank($proposal->service_scope)) {
+                $validator->errors()->add('service_scope', 'A service scope is required before submission.');
             }
 
             if ($proposal->proposed_fee_rial === null) {

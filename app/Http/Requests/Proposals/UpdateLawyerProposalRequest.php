@@ -29,7 +29,8 @@ class UpdateLawyerProposalRequest extends FormRequest
 
         $lawyerProfile = $user->lawyerProfile;
 
-        return $lawyerProfile !== null
+        return $user->mayActAsRole('lawyer')
+            && $lawyerProfile !== null
             && $lawyerProfile->verification_status === 'approved'
             && $proposal->lawyer_profile_id === $lawyerProfile->id;
     }
@@ -48,6 +49,7 @@ class UpdateLawyerProposalRequest extends FormRequest
     {
         return [
             'summary' => ['sometimes', 'nullable', 'string'],
+            'service_scope' => ['sometimes', 'nullable', 'string'],
             'proposed_fee_rial' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'estimated_days' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ];

@@ -132,7 +132,10 @@ class LawyerMatchingController extends Controller
         $data['candidates'] = LawyerMatchCandidateResource::collection(
             $candidates->getCollection(),
         )->resolve();
-        $selectedCount = $legalRequest->distributions()->count();
+        $selectedCount = $legalRequest->distributions()
+            ->where('source', 'client_invite')
+            ->whereIn('status', ['pending', 'negotiating'])
+            ->count();
 
         return [
             ...$extra,

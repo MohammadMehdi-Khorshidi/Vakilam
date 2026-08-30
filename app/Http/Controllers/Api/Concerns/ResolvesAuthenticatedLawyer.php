@@ -16,10 +16,7 @@ trait ResolvesAuthenticatedLawyer
         abort_unless(
             $user instanceof User
                 && $user->status === 'active'
-                && $user->roles()
-                    ->where('roles.code', 'lawyer')
-                    ->wherePivotNull('revoked_at')
-                    ->exists(),
+                && $user->mayActAsRole('lawyer'),
             403,
             'Only active lawyers may manage a lawyer profile.',
         );

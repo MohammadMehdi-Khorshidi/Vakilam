@@ -21,7 +21,8 @@ class StoreLawyerProposalRequest extends FormRequest
 
         $lawyerProfile = $user->lawyerProfile;
 
-        return $lawyerProfile !== null
+        return $user->mayActAsRole('lawyer')
+            && $lawyerProfile !== null
             && $lawyerProfile->verification_status === 'approved'
             && $distribution->lawyer_profile_id === $lawyerProfile->id;
     }
@@ -31,6 +32,7 @@ class StoreLawyerProposalRequest extends FormRequest
     {
         return [
             'summary' => ['nullable', 'string'],
+            'service_scope' => ['nullable', 'string'],
             'proposed_fee_rial' => ['nullable', 'integer', 'min:0'],
             'estimated_days' => ['nullable', 'integer', 'min:1'],
         ];
