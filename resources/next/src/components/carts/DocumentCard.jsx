@@ -1,4 +1,10 @@
-import { FileText, CheckCircle2, Clock3 } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock3,
+    File,
+    FileImage,
+    FileText,
+} from 'lucide-react';
 
 import { Vazirmatn } from 'next/font/google';
 
@@ -10,67 +16,122 @@ const vazirmatn = Vazirmatn({
 const statusStyles = {
     نهایی: {
         className: 'border-[#cce4d8] bg-[#f0f8f4] text-[#277356]',
-        icon: CheckCircle2,
+        icon: 'check',
     },
 
     تأییدشده: {
         className: 'border-[#cce4d8] bg-[#f0f8f4] text-[#277356]',
-        icon: CheckCircle2,
+        icon: 'check',
     },
 
     بررسی‌شده: {
         className: 'border-[#cfe4e8] bg-[#f1f8fa] text-[#397889]',
-        icon: CheckCircle2,
+        icon: 'check',
     },
 
     'نیازمند بررسی': {
         className: 'border-[#eadcb8] bg-[#fff9e9] text-[#ad8227]',
-        icon: Clock3,
+        icon: 'clock',
     },
 };
 
-const DocumentCard = ({ title, type, category, status }) => {
-    const statusData = statusStyles[status] || statusStyles['نهایی'];
+const fileIcons = {
+    pdf: 'text',
+    jpg: 'image',
+    jpeg: 'image',
+    png: 'image',
+    webp: 'image',
+    doc: 'text',
+    docx: 'text',
+};
 
-    const StatusIcon = statusData.icon;
+function FileTypeIcon({ extension }) {
+    const normalizedExtension = extension?.toLowerCase();
+
+    const iconType =
+        fileIcons[normalizedExtension] || 'file';
+
+    if (iconType === 'image') {
+        return <FileImage size={22} />;
+    }
+
+    if (iconType === 'text') {
+        return <FileText size={22} />;
+    }
+
+    return <File size={22} />;
+}
+
+function StatusIcon({ type }) {
+    if (type === 'clock') {
+        return <Clock3 size={11} />;
+    }
+
+    return <CheckCircle2 size={11} />;
+}
+
+const DocumentCard = ({
+    document,
+    onPreview,
+    onDelete,
+}) => {
+    const status =
+        document.status || 'نهایی';
+
+    const statusData =
+        statusStyles[status] ||
+        statusStyles['نهایی'];
 
     return (
         <article
             dir="rtl"
-            className={`${vazirmatn.className} group rounded-[17px] border border-[#dfe7e3] bg-white p-4 transition-all duration-200 hover:-translate-y-[1px] hover:border-[#c8d6d0] hover:shadow-[0_10px_25px_rgba(18,63,55,0.07)]`}
+            className={`${vazirmatn.className} flex flex-col justify-between gap-4 rounded-xl border border-[#e3eae7] bg-white p-5 transition hover:border-[#bfd0ca] sm:flex-row sm:items-center`}
         >
-            <div className="flex items-center justify-between gap-4">
-                {/* اطلاعات سند */}
-                <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] bg-[#edf4f1] text-[#123f37] transition-colors duration-200 group-hover:bg-[#e5efeb]">
-                        <FileText size={20} strokeWidth={1.9} />
-                    </div>
-
-                    <div className="min-w-0 text-right">
-                        <h3 className="truncate  font-extrabold text-[#193f38]">
-                            {title}
-                        </h3>
-
-                        <p className="mt-1 text-[10px] text-[#899691]">
-                            {category} · {type.toUpperCase()}
-                        </p>
-
-                        <div
-                            className={`mt-2 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold ${statusData.className}`}
-                        >
-                            <StatusIcon size={11} />
-
-                            <span>{status}</span>
-                        </div>
-                    </div>
+            <div className="flex min-w-0 items-start gap-4">
+                <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#edf6f2] text-[#0b5648]">
+                    <FileTypeIcon
+                        extension={document.extension}
+                    />
                 </div>
 
-                {/* دکمه پیش‌نمایش */}
+                <div className="min-w-0">
+                    <h3 className="truncate text-sm font-bold text-[#183d36]">
+                        {document.name}
+                    </h3>
+
+                    <p className="mt-1 text-xs text-[#879590]">
+                        {document.category || 'مدرک پرونده'} ·{' '}
+                        {document.extension?.toUpperCase() ||
+                            'FILE'}
+                    </p>
+
+                    <div
+                        className={`mt-2 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold ${statusData.className}`}
+                    >
+                        <StatusIcon
+                            type={statusData.icon}
+                        />
+
+                        <span>{status}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
                 <button
                     type="button"
-                    className="shrink-0 rounded-[10px] border border-[#d5e0dc] bg-white px-4 py-2 text-[10px] font-bold text-[#294e46] transition-all duration-200 hover:border-[#123f37] hover:bg-[#123f37] hover:text-white"
+                    onClick={() => onPreview?.(document)}
+                    className="rounded-[10px] border border-[#d5e0dc] bg-white px-4 py-2 text-[10px] font-bold text-[#294e46] transition-all duration-200 hover:border-[#123f37] hover:bg-[#123f37] hover:text-white"
                 >
                     پیش‌نمایش امن
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => onDelete?.(document.id)}
+                    className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-2 text-[10px] font-bold text-red-700 transition hover:bg-red-100"
+                >
+                    حذف
                 </button>
             </div>
         </article>

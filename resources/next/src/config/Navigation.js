@@ -48,7 +48,7 @@ export const clientNav = [
         icon: Scale,
     },
     {
-        href: '/client/new-case/start',
+        href: '/client/legal-request/start',
         label: 'شرح مسئله جدید',
         icon: FilePlus2,
     },
@@ -58,7 +58,7 @@ export const clientNav = [
         icon: FolderOpen,
     },
     {
-        href: '/client/lawyers',
+        href: '/client/lawyersAdmin',
         label: 'همه وکلا',
         icon: Users,
     },
@@ -138,7 +138,7 @@ export const lawyerNav = [
         icon: CircleDollarSign,
     },
     {
-        href: '/lawyer/reviews',
+        href: '/lawyer/feedbacks',
         label: 'بازخوردها',
         icon: CheckCircle2,
     },
@@ -158,7 +158,7 @@ export const adminNav = [
         icon: Users,
     },
     {
-        href: '/admin/lawyers',
+        href: '/admin/lawyersAdmin',
         label: 'وکلا',
         icon: UserCog,
     },

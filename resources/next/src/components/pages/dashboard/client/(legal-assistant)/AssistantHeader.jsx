@@ -1,6 +1,7 @@
 'use client';
 
 import { Vazirmatn } from 'next/font/google';
+import Link from 'next/link';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -16,18 +17,18 @@ const AssistantHeader = () => {
                         راهنمای مرحله‌به‌مرحله برای پرونده شما
                     </h1>
 
-                    <p className="mt-2 text-right  leading-7 text-[#8a9994]">
+                    <p className="mt-2 text-right leading-7 text-[#8a9994]">
                         سؤال خود را ساده بپرسید؛ پاسخ‌ها راهنمای اولیه‌اند و
                         اقدام حقوقی نهایی محسوب نمی‌شوند.
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    className="w-fit rounded-xl border border-[#c9a96e] bg-white px-5 py-3  font-bold text-[#315e52] transition hover:bg-[#faf7ee]"
+                <Link
+                    href="/client/lawyers"
+                    className="w-fit rounded-xl border border-[#c9a96e] bg-white px-5 py-3 font-bold text-[#315e52] transition hover:bg-[#faf7ee]"
                 >
                     در صورت نیاز، مشاهده وکلا
-                </button>
+                </Link>
             </div>
         </header>
     );
