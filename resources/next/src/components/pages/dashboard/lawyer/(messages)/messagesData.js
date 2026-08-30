@@ -1,0 +1,32 @@
+export const messages = [
+    {
+        id: 1,
+        avatar: 'ف',
+        title: 'مطالبه وجه چک',
+        caseCode: 'VK-1405-00128',
+        messageType: 'پیام جدید',
+        clientName: 'فرزام ن.',
+        status: 'نیازمند مشاهده',
+        unread: true,
+    },
+    {
+        id: 2,
+        avatar: 'ا',
+        title: 'تنظیم قرارداد تجاری',
+        caseCode: 'VK-1405-00121',
+        messageType: 'پیام جدید',
+        clientName: 'الهام ر.',
+        status: 'نیازمند مشاهده',
+        unread: true,
+    },
+    {
+        id: 3,
+        avatar: 'م',
+        title: 'اختلاف در قرارداد اجاره',
+        caseCode: 'VK-1404-00987',
+        messageType: 'پیام جدید',
+        clientName: 'موکل سابق',
+        status: 'بدون پیام جدید',
+        unread: false,
+    },
+];

@@ -48,7 +48,7 @@ const menuItems = [
         icon: Bot,
     },
     {
-        href: '/client/new-case',
+        href: '/client/legal-request',
         label: 'شرح مسئله جدید',
         icon: FilePlus2,
     },
@@ -58,7 +58,7 @@ const menuItems = [
         icon: BriefcaseBusiness,
     },
     {
-        href: '/client/lawyers',
+        href: '/client/lawyersAdmin',
         label: 'همه وکلا',
         icon: UsersRound,
     },

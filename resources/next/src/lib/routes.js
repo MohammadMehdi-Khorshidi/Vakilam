@@ -3,9 +3,9 @@ export const clientNav = [
     { href: '/client/actions', label: 'مرکز اقدامات' },
     { href: '/client/inbox', label: 'صندوق هوشمند' },
     { href: '/client/assistant', label: 'دستیار حقوقی' },
-    { href: '/client/new-case/start', label: 'شرح مسئله جدید' },
+    { href: '/client/legal-request/start', label: 'شرح مسئله جدید' },
     { href: '/client/case', label: 'پرونده‌های من' },
-    { href: '/client/lawyers', label: 'همه وکلا' },
+    { href: '/client/lawyersAdmin', label: 'همه وکلا' },
     { href: '/client/proposals', label: 'پیشنهادها' },
     { href: '/client/case/messages', label: 'پیام‌ها و تماس‌ها' },
     { href: '/client/case/meetings', label: 'جلسات' },
@@ -23,13 +23,13 @@ export const lawyerNav = [
     { href: '/lawyer/meetings', label: 'جلسات' },
     { href: '/lawyer/tasks', label: 'کارها' },
     { href: '/lawyer/earnings', label: 'درآمد' },
-    { href: '/lawyer/reviews', label: 'بازخوردها' },
+    { href: '/lawyer/feedbacks', label: 'بازخوردها' },
 ];
 
 export const adminNav = [
     { href: '/admin/home', label: 'خانه' },
     { href: '/admin/users', label: 'کاربران' },
-    { href: '/admin/lawyers', label: 'وکلا' },
+    { href: '/admin/lawyersAdmin', label: 'وکلا' },
     { href: '/admin/verifications', label: 'احراز هویت' },
     { href: '/admin/cases', label: 'پرونده‌ها' },
     { href: '/admin/contracts', label: 'قراردادها' },
