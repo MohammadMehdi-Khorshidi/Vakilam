@@ -97,17 +97,6 @@ class LawyerProfile extends Model
         return $this->hasMany(LawyerProposal::class);
     }
 
-    public function negotiationThreads()
-    {
-        return $this->hasManyThrough(
-            NegotiationThread::class,
-            LegalRequestDistribution::class,
-            'lawyer_profile_id',
-            'distribution_id',
-            'id',
-            'id',
-        );
-    }
     public function negotiations()
     {
         return $this->hasMany(Negotiation::class);

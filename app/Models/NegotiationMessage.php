@@ -13,20 +13,14 @@ class NegotiationMessage extends Model
 
     public function uniqueIds(): array
     {
-        return ['id', 'public_id'];
+        return ['id'];
     }
 
     protected $fillable = [
-        'negotiation_thread_id',
         'negotiation_id',
         'sender_user_id',
         'body',
     ];
-
-    public function negotiationThread()
-    {
-        return $this->belongsTo(NegotiationThread::class);
-    }
 
     public function negotiation()
     {

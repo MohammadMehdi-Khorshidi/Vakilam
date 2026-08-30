@@ -291,7 +291,6 @@ class LegalRequestController extends Controller
         $this->ensureOwner($request, $legalRequest);
 
         $proposals = $legalRequest->proposals()
-            ->with(['lawyerProfile', 'negotiationThread'])
             ->with(['lawyerProfile', 'negotiation:id,public_id,status'])
             ->whereNotNull('lawyer_proposals.negotiation_id')
             ->where('lawyer_proposals.status', '!=', 'draft')
@@ -304,16 +303,8 @@ class LegalRequestController extends Controller
                 'service_scope' => $proposal->service_scope,
                 'source' => $proposal->source,
                 'proposed_fee_rial' => $proposal->proposed_fee_rial,
-                'advance_payment_rial' => $proposal->advance_payment_rial,
                 'estimated_days' => $proposal->estimated_days,
-                'version_number' => $proposal->version_number,
-                'service_scope' => $proposal->service_scope,
-                'excluded_services' => $proposal->excluded_services,
-                'payment_terms' => $proposal->payment_terms,
-                'other_terms' => $proposal->other_terms,
-                'terms_hash' => $proposal->terms_hash,
                 'status' => $proposal->status,
-                'negotiation_public_id' => $proposal->negotiationThread?->public_id,
                 'submitted_at' => $proposal->submitted_at,
                 'expires_at' => $proposal->expires_at,
                 'negotiation' => $proposal->negotiation === null ? null : [

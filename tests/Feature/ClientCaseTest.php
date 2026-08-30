@@ -21,23 +21,15 @@ function clientCaseMatter(LegalRequest $legalRequest): LegalMatter
 test('client can view own case details with timeline', function () {
     $client = User::factory()->create();
 
-  $legalRequest = LegalRequest::query()->create([
-    'client_user_id' => $client->id,
-    'title' => 'Test Legal Request',
-    'description' => 'Testing case detail.',
-    'status' => 'submitted',
-    'submitted_at' => now(),
+    $legalRequest = LegalRequest::query()->create([
+        'client_user_id' => $client->id,
+        'title' => 'Test Legal Request',
+        'description' => 'Testing case detail.',
+        'status' => 'submitted',
+        'submitted_at' => now(),
     ]);
 
-$matter = clientCaseMatter($legalRequest);
-$matter = LegalMatter::query()->create([
-        'source_legal_request_id' => $legalRequest->id,
-        'client_user_id' => $legalRequest->client_user_id,
-        'origin_type' => 'lawyer_selection',
-        'title' => $legalRequest->title,
-        'status' => 'active',
-        'opened_at' => now(),
-    ]);
+    $matter = clientCaseMatter($legalRequest);
 
     MatterTimeline::query()->create([
         'legal_matter_id' => $matter->id,
@@ -59,23 +51,15 @@ test('client cannot view another clients case', function () {
     $owner = User::factory()->create();
     $otherUser = User::factory()->create();
 
-   $legalRequest = LegalRequest::query()->create([
-    'client_user_id' => $owner->id,
-    'title' => 'Private Request',
-    'description' => 'Private case test.',
-    'status' => 'submitted',
-    'submitted_at' => now(),
+    $legalRequest = LegalRequest::query()->create([
+        'client_user_id' => $owner->id,
+        'title' => 'Private Request',
+        'description' => 'Private case test.',
+        'status' => 'submitted',
+        'submitted_at' => now(),
     ]);
 
-$matter = clientCaseMatter($legalRequest);
-$matter = LegalMatter::query()->create([
-        'source_legal_request_id' => $legalRequest->id,
-        'client_user_id' => $legalRequest->client_user_id,
-        'origin_type' => 'lawyer_selection',
-        'title' => $legalRequest->title,
-        'status' => 'active',
-        'opened_at' => now(),
-    ]);
+    $matter = clientCaseMatter($legalRequest);
 
     Sanctum::actingAs($otherUser);
 
@@ -95,14 +79,6 @@ test('client case details include documents', function () {
     ]);
 
     $matter = clientCaseMatter($legalRequest);
-    $matter = LegalMatter::query()->create([
-        'source_legal_request_id' => $legalRequest->id,
-        'client_user_id' => $legalRequest->client_user_id,
-        'origin_type' => 'lawyer_selection',
-        'title' => $legalRequest->title,
-        'status' => 'active',
-        'opened_at' => now(),
-    ]);
 
     \App\Models\Document::query()->create([
         'legal_matter_id' => $matter->id,

@@ -24,8 +24,6 @@ use App\Http\Controllers\Api\LegalRequestServiceIntentController;
 use App\Http\Controllers\Api\LocationReferenceController;
 use App\Http\Controllers\Api\SpecialtyReferenceController;
 use App\Http\Controllers\Api\NegotiationController;
-use App\Http\Controllers\Api\ContractWorkflowController;
-use App\Http\Controllers\Api\PaymentWorkflowController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Resources\AuthenticatedUserResource;
 use Illuminate\Http\Request;
@@ -113,13 +111,16 @@ Route::middleware(['auth:sanctum', 'active'])->controller(LawyerMatchingControll
         Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
     });
 
-Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(function () {
-    Route::middleware(['auth:sanctum', 'active'])->controller(FinalLawyerSelectionController::class)->group(function () {
-            Route::post('/legal-requests/{legalRequest}/lawyer-selection', 'store');
-            Route::get('/legal-requests/{legalRequest}/lawyer-selection', 'show');
-        });
+Route::middleware(['auth:sanctum', 'active'])
+    ->controller(FinalLawyerSelectionController::class)
+    ->group(function () {
+        Route::post('/legal-requests/{legalRequest}/lawyer-selection', 'store');
+        Route::get('/legal-requests/{legalRequest}/lawyer-selection', 'show');
+    });
 
-    Route::middleware(['auth:sanctum', 'active'])->controller(DocumentController::class)->group(function () {
+Route::middleware(['auth:sanctum', 'active'])
+    ->controller(DocumentController::class)
+    ->group(function () {
         Route::prefix('legal-requests/{legalRequest}/documents')->group(function () {
             Route::get('/', 'index');
             Route::post('/', 'store');
@@ -137,188 +138,70 @@ Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(
             Route::delete('/', 'destroy');
         });
     });
-    Route::middleware('auth:sanctum')->controller(NegotiationController::class)->group(function () {
-            Route::get('/legal-requests/{legalRequest}/negotiations', 'index');
-            Route::get('/negotiations/{negotiation}', 'show');
-            Route::get('/negotiations/{negotiation}/messages', 'messages');
-            Route::post('/negotiations/{negotiation}/messages', 'storeMessage');
-            Route::post('/negotiations/{negotiation}/proposals', 'storeProposal');
-            Route::post('/negotiations/{negotiation}/proposals/{proposal}/reject', 'rejectProposal');
-            Route::post('/negotiations/{negotiation}/proposals/{proposal}/accept', 'acceptProposal');
-            Route::post('/negotiations/{negotiation}/cancel', 'cancel');
-        });
 
-    Route::middleware('auth:sanctum')->controller(ContractWorkflowController::class)
-        ->group(function () {
-            Route::post('/engagements/{engagement}/contract', 'store');
-            Route::get('/engagements/{engagement}/contract', 'show');
-            Route::post('/contracts/{contract}/sign', 'sign');
-        });
-
-    Route::middleware('auth:sanctum')->post('/invoices/{invoice}/payments', [PaymentWorkflowController::class, 'store']);
-    Route::post('/payments/webhook', [PaymentWorkflowController::class, 'webhook'])
-        ->middleware('throttle:30,1');
-    Route::middleware(['auth:sanctum', 'active'])->group(function () {
-
-        Route::controller(LawyerProposalController::class)->group(function () {
-            Route::post('/lawyer/distributions/{distribution}/proposal', 'store');
-            Route::patch('/lawyer/proposals/{proposal:public_id}', 'update');
-            Route::post('/lawyer/proposals/{proposal:public_id}/submit', 'submit');
-            Route::post('/lawyer/proposals/{proposal:public_id}/withdraw', 'withdraw');
-            Route::post('/lawyer/proposals/{proposal:public_id}/select', 'select');
-            Route::post('/legal-requests/{legalRequest}/proposals/{proposal:public_id}/select', 'selectForLegalRequest');
-        });
-
-        Route::controller(LawyerWorkspaceController::class)->group(function () {
-            Route::get('/lawyer/opportunities', 'opportunities');
-            Route::get('/lawyer/proposals', 'proposals');
-            Route::get('/lawyer/engagements', 'engagements');
-        });
-
-        Route::controller(EngagementController::class)->group(function () {
-            Route::get('/engagements/{engagement:public_id}', 'show');
-            Route::get('/legal-requests/{legalRequest}/engagement', 'showForLegalRequest');
-            Route::post('/engagements/{engagement:public_id}/confirm', 'confirm');
-        });
-
-        Route::controller(LawyerInterestController::class)->group(function () {
-            Route::get('/lawyer/open-opportunities', 'openOpportunities');
-            Route::post('/lawyer/legal-requests/{legalRequest:public_id}/interest', 'store');
-            Route::get('/legal-requests/{legalRequest}/lawyer-interests', 'indexForClient');
-            Route::post('/legal-requests/{legalRequest}/lawyer-interests/{distribution}/respond', 'respond');
-        });
-
-        Route::controller(NegotiationController::class)->group(function () {
-            Route::get('/legal-requests/{legalRequest}/negotiations', 'indexForLegalRequest');
-            Route::get('/lawyer/negotiations', 'indexForLawyer');
-            Route::get('/negotiations/{negotiation:public_id}', 'show');
-            Route::post('/negotiations/{negotiation:public_id}/messages', 'message');
-            Route::post('/negotiations/{negotiation:public_id}/close', 'close');
-            Route::post('/negotiations/{negotiation:public_id}/proposal', 'storeFinalProposal');
-        });
-
-        Route::controller(ContractController::class)->group(function () {
-            Route::get('/contracts/{contract:public_id}', 'show');
-            Route::post('/contracts/{contract:public_id}/sign', 'sign');
-        });
-
-        Route::controller(PaymentController::class)->group(function () {
-            Route::post('/invoices/{invoice:public_id}/payments', 'store');
-            Route::get('/payments/{payment:public_id}', 'show');
-        });
-
-        Route::prefix('lawyer/availabilities')->group(function () {
-            Route::post('/', [LawyerAvailabilityController::class, 'store']);
-        });
-
-        Route::get('/legal-requests/{legalRequest}/consultation-lawyers/{publicId}/slots',
-            [LawyerAvailabilityController::class, 'consultationSlots']);
-
-        Route::post('/legal-requests/{legalRequest}/consultation-slots/{slot}/reserve',
-            [ConsultationController::class, 'reserve']);
-
-        Route::post('/legal-requests/{legalRequest}/lawyer-selection/{lawyerProfile:public_id}',
-            [LawyerSelectionController::class, 'store'])
-            ->withoutScopedBindings();
-
-        Route::post('/lawyer/distributions/{distribution}/respond', [LawyerSelectionController::class, 'respond']);
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
+    Route::controller(LawyerProposalController::class)->group(function () {
+        Route::post('/lawyer/distributions/{distribution}/proposal', 'store');
+        Route::patch('/lawyer/proposals/{proposal:public_id}', 'update');
+        Route::post('/lawyer/proposals/{proposal:public_id}/submit', 'submit');
+        Route::post('/lawyer/proposals/{proposal:public_id}/withdraw', 'withdraw');
+        Route::post('/legal-requests/{legalRequest}/proposals/{proposal:public_id}/select', 'selectForLegalRequest');
     });
 
-    Route::middleware('auth:sanctum')->get('/lawyer/invitations', [LawyerSelectionController::class, 'lawyerInvitations']);
-    Route::middleware('auth:sanctum')->get('/legal-requests/{legalRequest}/lawyer-requests', [LawyerSelectionController::class, 'clientInvitations']);
+    Route::controller(LawyerWorkspaceController::class)->group(function () {
+        Route::get('/lawyer/opportunities', 'opportunities');
+        Route::get('/lawyer/proposals', 'proposals');
+        Route::get('/lawyer/engagements', 'engagements');
+    });
 
-    Route::post('/payments/{payment:public_id}/webhook', [PaymentController::class, 'webhook'])
-        ->middleware('throttle:30,1');
+    Route::controller(EngagementController::class)->group(function () {
+        Route::get('/engagements/{engagement:public_id}', 'show');
+        Route::get('/legal-requests/{legalRequest}/engagement', 'showForLegalRequest');
+        Route::post('/engagements/{engagement:public_id}/confirm', 'confirm');
+    });
+
+    Route::controller(LawyerInterestController::class)->group(function () {
+        Route::get('/lawyer/open-opportunities', 'openOpportunities');
+        Route::post('/lawyer/legal-requests/{legalRequest:public_id}/interest', 'store');
+        Route::get('/legal-requests/{legalRequest}/lawyer-interests', 'indexForClient');
+        Route::post('/legal-requests/{legalRequest}/lawyer-interests/{distribution}/respond', 'respond');
+    });
+
+    Route::controller(NegotiationController::class)->group(function () {
+        Route::get('/legal-requests/{legalRequest}/negotiations', 'indexForLegalRequest');
+        Route::get('/lawyer/negotiations', 'indexForLawyer');
+        Route::get('/negotiations/{negotiation:public_id}', 'show');
+        Route::post('/negotiations/{negotiation:public_id}/messages', 'message');
+        Route::post('/negotiations/{negotiation:public_id}/close', 'close');
+        Route::post('/negotiations/{negotiation:public_id}/proposal', 'storeFinalProposal');
+    });
+
+    Route::controller(ContractController::class)->group(function () {
+        Route::get('/contracts/{contract:public_id}', 'show');
+        Route::post('/contracts/{contract:public_id}/sign', 'sign');
+    });
+
+    Route::controller(PaymentController::class)->group(function () {
+        Route::post('/invoices/{invoice:public_id}/payments', 'store');
+        Route::get('/payments/{payment:public_id}', 'show');
+    });
+
+    Route::post('/legal-requests/{legalRequest}/lawyer-selection/{lawyerProfile:public_id}',
+        [LawyerSelectionController::class, 'store'])
+        ->withoutScopedBindings();
+    Route::post('/lawyer/distributions/{distribution}/respond', [LawyerSelectionController::class, 'respond']);
+    Route::get('/lawyer/invitations', [LawyerSelectionController::class, 'lawyerInvitations']);
+    Route::get('/legal-requests/{legalRequest}/lawyer-requests', [LawyerSelectionController::class, 'clientInvitations']);
+
+    Route::prefix('lawyer/availabilities')->group(function () {
+        Route::post('/', [LawyerAvailabilityController::class, 'store']);
+    });
+
+    Route::get('/legal-requests/{legalRequest}/consultation-lawyers/{publicId}/slots',
+        [LawyerAvailabilityController::class, 'consultationSlots']);
+    Route::post('/legal-requests/{legalRequest}/consultation-slots/{slot}/reserve',
+        [ConsultationController::class, 'reserve']);
 });
 
-
-//    Route::middleware('auth:sanctum')->prefix('lawyer/availabilities')->group(function () {
-//        Route::middleware(['auth:sanctum', 'active'])->controller(LawyerProposalController::class)
-//            ->group(function () {
-//                Route::post('/lawyer/distributions/{distribution}/proposal', 'store');
-//                Route::patch('/lawyer/proposals/{proposal:public_id}', 'update');
-//                Route::post('/lawyer/proposals/{proposal:public_id}/submit', 'submit');
-//                Route::post('/lawyer/proposals/{proposal:public_id}/withdraw', 'withdraw');
-//                Route::post('/lawyer/proposals/{proposal:public_id}/select', 'select');
-//            });
-//
-//        Route::middleware(['auth:sanctum', 'active'])->controller(LawyerWorkspaceController::class)
-//            ->group(function () {
-//                Route::get('/lawyer/opportunities', 'opportunities');
-//                Route::get('/lawyer/proposals', 'proposals');
-//                Route::get('/lawyer/engagements', 'engagements');
-//            });
-//
-//        Route::middleware(['auth:sanctum', 'active'])->controller(EngagementController::class)
-//            ->group(function () {
-//                Route::get('/engagements/{engagement:public_id}', 'show');
-//                Route::get('/legal-requests/{legalRequest}/engagement', 'showForLegalRequest');
-//            });
-//
-//        Route::middleware(['auth:sanctum', 'active'])->controller(LawyerInterestController::class)
-//            ->group(function () {
-//                Route::get('/lawyer/open-opportunities', 'openOpportunities');
-//                Route::post('/lawyer/legal-requests/{legalRequest:public_id}/interest', 'store');
-//                Route::get('/legal-requests/{legalRequest}/lawyer-interests', 'indexForClient');
-//                Route::post('/legal-requests/{legalRequest}/lawyer-interests/{distribution}/respond', 'respond');
-//            });
-//
-//        Route::middleware(['auth:sanctum', 'active'])->controller(NegotiationController::class)
-//            ->group(function () {
-//                Route::get('/legal-requests/{legalRequest}/negotiations', 'indexForLegalRequest');
-//                Route::get('/lawyer/negotiations', 'indexForLawyer');
-//                Route::get('/negotiations/{negotiation:public_id}', 'show');
-//                Route::post('/negotiations/{negotiation:public_id}/messages', 'message');
-//                Route::post('/negotiations/{negotiation:public_id}/close', 'close');
-//                Route::post('/negotiations/{negotiation:public_id}/proposal', 'storeFinalProposal');
-//            });
-//
-//        Route::middleware(['auth:sanctum', 'active'])->controller(LawyerProposalController::class)
-//            ->group(function () {
-//                Route::post('/legal-requests/{legalRequest}/proposals/{proposal:public_id}/select', 'selectForLegalRequest');
-//            });
-//
-//        Route::middleware(['auth:sanctum', 'active'])->controller(EngagementController::class)
-//            ->group(function () {
-//                Route::post('/engagements/{engagement:public_id}/confirm', 'confirm');
-//            });
-//
-//        Route::middleware(['auth:sanctum', 'active'])->controller(ContractController::class)
-//            ->group(function () {
-//                Route::get('/contracts/{contract:public_id}', 'show');
-//                Route::post('/contracts/{contract:public_id}/sign', 'sign');
-//            });
-//
-//        Route::middleware(['auth:sanctum', 'active'])->controller(PaymentController::class)
-//            ->group(function () {
-//                Route::post('/invoices/{invoice:public_id}/payments', 'store');
-//                Route::get('/payments/{payment:public_id}', 'show');
-//            });
-//
-//        Route::post('/payments/{payment:public_id}/webhook', [PaymentController::class, 'webhook'])
-//            ->middleware('throttle:30,1');
-//
-//        Route::middleware(['auth:sanctum', 'active'])->prefix('lawyer/availabilities')->group(function () {
-//            Route::post('/', [LawyerAvailabilityController::class, 'store']);
-//        });
-//
-//        Route::middleware(['auth:sanctum', 'active'])->get('/legal-requests/{legalRequest}/consultation-lawyers/{publicId}/slots',
-//            [LawyerAvailabilityController::class, 'consultationSlots'],
-//        );
-//
-//        Route::middleware(['auth:sanctum', 'active'])->post('/legal-requests/{legalRequest}/consultation-slots/{slot}/reserve',
-//            [ConsultationController::class, 'reserve'],
-//        );
-//
-//        Route::middleware('auth:sanctum')->get('/lawyer/invitations', [LawyerSelectionController::class, 'lawyerInvitations']);
-//
-//        Route::middleware('auth:sanctum')->get('/legal-requests/{legalRequest}/lawyer-requests', [LawyerSelectionController::class, 'clientInvitations'],
-//        );
-//        Route::middleware(['auth:sanctum', 'active'])
-//            ->post('/legal-requests/{legalRequest}/lawyer-selection/{lawyerProfile:public_id}', [LawyerSelectionController::class, 'store'],)
-//            ->withoutScopedBindings();
-//
-//        Route::middleware(['auth:sanctum', 'active'])
-//            ->post('/lawyer/distributions/{distribution}/respond', [LawyerSelectionController::class, 'respond'],
-//            );
-//    })
+Route::post('/payments/{payment:public_id}/webhook', [PaymentController::class, 'webhook'])
+    ->middleware('throttle:30,1');

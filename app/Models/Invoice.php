@@ -9,10 +9,6 @@ class Invoice extends Model
 {
     use HasUuids;
 
-    public const PURPOSE_LAWYER_CONTRACT = 'lawyer_contract';
-    public const PURPOSE_AI_SERVICE = 'ai_service';
-    public const PURPOSE_CONSULTATION = 'consultation';
-
     /** The table has created_at but no updated_at column. */
     public const UPDATED_AT = null;
 
@@ -29,9 +25,6 @@ class Invoice extends Model
     /** Attributes that may be mass assigned. */
     protected $fillable = [
         'contract_id',
-        'purpose',
-        'payable_type',
-        'payable_id',
         'client_user_id',
         'subtotal_rial',
         'discount_rial',
@@ -63,12 +56,6 @@ class Invoice extends Model
     public function contract()
     {
         return $this->belongsTo(Contract::class);
-    }
-
-    /** Service, contract, consultation, or AI purchase billed by this invoice. */
-    public function payable()
-    {
-        return $this->morphTo();
     }
 
     /** Client user responsible for this invoice. */
