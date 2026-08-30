@@ -3,11 +3,17 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AuthenticatedUserResource;
 use App\Models\ClientProfile;
 use App\Models\LawyerProfile;
+use App\Models\Policy;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRole;
+use App\Models\UserPolicyAcceptance;
+use App\Exceptions\LawyerRegistryUnavailableException;
+use App\Services\Lawyers\LawyerRegistryVerificationException;
+use App\Services\Lawyers\LawyerRegistryVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -136,7 +142,10 @@ class RegisterController extends Controller
     }
 
     /** @throws ValidationException */
-    public function store(Request $request): JsonResponse
+    public function store(
+        Request $request,
+        LawyerRegistryVerifier $registryVerifier,
+    ): JsonResponse
     {
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
@@ -144,6 +153,12 @@ class RegisterController extends Controller
             'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'role' => ['required', Rule::in(['client', 'lawyer'])],
+            'license_number' => [
+                Rule::requiredIf(fn (): bool => $request->input('role') === 'lawyer'),
+                'nullable',
+                'string',
+                'max:30',
+            ],
             'terms_accepted' => ['accepted'],
             'verification_token' => ['required', 'string', 'size:64'],
         ]);
@@ -164,7 +179,26 @@ class RegisterController extends Controller
             ]);
         }
 
-        $user = DB::transaction(function () use ($data): User {
+        $registryMatch = null;
+
+        if ($data['role'] === 'lawyer') {
+            try {
+                $registryMatch = $registryVerifier->verify(
+                    $data['license_number'],
+                    $verifiedPhone,
+                );
+            } catch (LawyerRegistryVerificationException $exception) {
+                throw ValidationException::withMessages([
+                    $exception->field => $exception->getMessage(),
+                ]);
+            } catch (LawyerRegistryUnavailableException) {
+                return response()->json([
+                    'message' => 'Lawyer verification is temporarily unavailable.',
+                ], 503);
+            }
+        }
+
+        $user = DB::transaction(function () use ($data, $registryMatch, $request): User {
             $user = User::query()->create([
                 'name' => $data['first_name'],
                 'last_name' => $data['last_name'],
@@ -179,14 +213,10 @@ class RegisterController extends Controller
 
             $role = Role::query()->firstOrCreate(
                 ['code' => $data['role']],
-
-                ['name' => $data['role'] === 'lawyer' ? 'Lawyer' : 'Client'],
-
                 [
-                    'name' => $data['role'] === 'lawyer' ? 'وکیل' : 'موکل',
+                    'name' => $data['role'] === 'lawyer' ? 'Lawyer' : 'Client',
                     'is_system' => true,
                 ],
-
             );
 
             UserRole::query()->create([
@@ -198,10 +228,23 @@ class RegisterController extends Controller
             $fullName = $data['first_name'] . ' ' . $data['last_name'];
 
             if ($data['role'] === 'lawyer') {
-                LawyerProfile::query()->create([
+                $profile = LawyerProfile::query()->create([
                     'user_id' => $user->id,
                     'full_name' => $fullName,
-                    'verification_status' => 'pending',
+                    'license_number' => $registryMatch['license_number'],
+                    'verification_status' => 'approved',
+                ]);
+
+                $profile->verifications()->create([
+                    'status' => 'approved',
+                    'submitted_data' => [
+                        'license_number' => $registryMatch['license_number'],
+                        'organization' => $registryMatch['organization'],
+                        'registry_source_hash' => $registryMatch['source_hash'],
+                    ],
+                    'review_note' => 'Automatically matched against the lawyer registry.',
+                    'submitted_at' => now(),
+                    'reviewed_at' => now(),
                 ]);
             } else {
                 ClientProfile::query()->create([
@@ -210,25 +253,35 @@ class RegisterController extends Controller
                 ]);
             }
 
+            $currentTerms = Policy::currentOfType('terms_of_service');
+
+            if ($currentTerms !== null) {
+                UserPolicyAcceptance::query()->firstOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'policy_id' => $currentTerms->id,
+                    ],
+                    [
+                        'accepted_at' => now(),
+                        'ip_address' => $request->ip(),
+                        'user_agent' => mb_substr((string) $request->userAgent(), 0, 255),
+                    ],
+                );
+            }
+
             return $user;
         });
 
         Cache::forget($this->verificationCacheKey($data['verification_token']));
 
         $token = $user->createToken('registration')->plainTextToken;
+        $user->load(['roles:id,code,name', 'clientProfile', 'lawyerProfile']);
 
         return response()->json([
             'message' => 'Registered successfully.',
             'token_type' => 'Bearer',
             'access_token' => $token,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'last_name' => $user->last_name,
-                'phone' => $user->phone,
-                'role' => $data['role'],
-                'status' => $user->status,
-            ],
+            'user' => AuthenticatedUserResource::make($user)->resolve(),
         ], 201);
     }
 

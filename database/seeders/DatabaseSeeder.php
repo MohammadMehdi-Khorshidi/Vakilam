@@ -10,6 +10,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             LegalCategorySeeder::class,
+            SpecialtySeeder::class,
             DocumentTypeSeeder::class,
             ProvinceSeeder::class,
             CitySeeder::class,

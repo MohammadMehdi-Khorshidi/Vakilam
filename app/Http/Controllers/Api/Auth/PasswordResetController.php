@@ -36,12 +36,6 @@ class PasswordResetController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$user) {
-            throw ValidationException::withMessages([
-                'phone' => 'No active user was found with this phone number.',
-            ]);
-        }
-
         if (!Cache::add(
             $this->resendCacheKey($data['phone']),
             true,
@@ -53,7 +47,17 @@ class PasswordResetController extends Controller
             ], 429);
         }
 
-        $otp = (string)random_int(100000, 999999);
+        $response = [
+            'message' => 'If an active account exists for this phone number, a password reset code was sent.',
+            'expires_in' => self::OTP_TTL_SECONDS,
+            'resend_after' => self::OTP_RESEND_AFTER_SECONDS,
+        ];
+
+        if ($user === null) {
+            return response()->json($response);
+        }
+
+        $otp = (string) random_int(100000, 999999);
 
         Cache::put($this->otpCacheKey($data['phone']), [
             'user_id' => $user->id,
@@ -64,12 +68,6 @@ class PasswordResetController extends Controller
         ], self::OTP_TTL_SECONDS);
 
         // TODO: کد OTP در این نقطه به سرویس پیامک تحویل داده شود.
-        $response = [
-            'message' => 'The password reset code was sent.',
-            'expires_in' => self::OTP_TTL_SECONDS,
-            'resend_after' => self::OTP_RESEND_AFTER_SECONDS,
-        ];
-
         if (app()->environment(['local', 'testing'])) {
             $response['debug_otp'] = $otp;
         }

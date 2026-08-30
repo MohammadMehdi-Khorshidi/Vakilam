@@ -9,6 +9,7 @@ class LawyerSpecialty extends Pivot
 {
     use HasUuids;
 
+    protected $table = 'lawyer_specialties';
     /** The pivot table uses a UUID primary key. */
     public $incrementing = false;
 

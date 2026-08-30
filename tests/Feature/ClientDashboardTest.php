@@ -46,6 +46,16 @@ test('client dashboard returns own drafts and active matters only', function () 
         'opened_at' => now(),
     ]);
 
+
+    LegalRequest::query()->create([
+        'client_user_id' => $client->id,
+        'title' => 'My Submitted Request',
+        'description' => 'Submitted description',
+        'service_intent' => 'lawyer_selection',
+        'status' => 'submitted',
+        'submitted_at' => now(),
+    ]);
+
     LegalRequest::query()->create([
         'client_user_id' => $otherClient->id,
         'title' => 'Other Draft Case',
@@ -58,7 +68,9 @@ test('client dashboard returns own drafts and active matters only', function () 
     $this->getJson('/api/client/dashboard')
         ->assertOk()
         ->assertJsonCount(1, 'draft_cases')
+        ->assertJsonCount(1, 'submitted_requests')
         ->assertJsonCount(1, 'active_cases')
         ->assertJsonPath('draft_cases.0.title', 'My Draft Case')
+        ->assertJsonPath('submitted_requests.0.title', 'My Submitted Request')
         ->assertJsonPath('active_cases.0.title', 'My Active Case');
 });

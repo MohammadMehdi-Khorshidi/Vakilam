@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AuthenticatedUserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,6 +34,7 @@ class LoginController extends Controller
         }
 
         $user->forceFill(['last_login_at' => now()])->save();
+        $user->load(['roles:id,code,name', 'clientProfile', 'lawyerProfile']);
 
         $token = $user->createToken($data['device_name'] ?? 'web')->plainTextToken;
 
@@ -40,12 +42,7 @@ class LoginController extends Controller
             'message' => 'Logged in successfully.',
             'token_type' => 'Bearer',
             'access_token' => $token,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'phone' => $user->phone,
-                'status' => $user->status,
-            ],
+            'user' => AuthenticatedUserResource::make($user)->resolve(),
         ]);
     }
 

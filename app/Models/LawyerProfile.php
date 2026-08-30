@@ -97,6 +97,22 @@ class LawyerProfile extends Model
         return $this->hasMany(LawyerProposal::class);
     }
 
+    public function negotiationThreads()
+    {
+        return $this->hasManyThrough(
+            NegotiationThread::class,
+            LegalRequestDistribution::class,
+            'lawyer_profile_id',
+            'distribution_id',
+            'id',
+            'id',
+        );
+    }
+    public function negotiations()
+    {
+        return $this->hasMany(Negotiation::class);
+    }
+
     /** Consultations assigned to this lawyer. */
     public function consultations()
     {
@@ -119,5 +135,11 @@ class LawyerProfile extends Model
     public function settlements()
     {
         return $this->hasMany(Settlement::class);
+    }
+
+    /** Published consultation availability slots for this lawyer. */
+    public function availabilities()
+    {
+        return $this->hasMany(LawyerAvailability::class);
     }
 }

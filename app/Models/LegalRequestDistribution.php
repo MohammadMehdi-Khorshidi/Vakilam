@@ -9,23 +9,31 @@ class LegalRequestDistribution extends Model
 {
     use HasUuids;
 
+    public const STATUS_SENT = 'sent';
+    public const STATUS_ACCEPTED = 'accepted';
+    public const STATUS_SELECTED = 'selected';
+    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_EXPIRED = 'expired';
+    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_CLOSED = 'closed';
+
     /** The table has created_at but no updated_at column. */
     public const UPDATED_AT = null;
 
-    /** Attributes that may be mass assigned. */
     protected $fillable = [
         'legal_request_id',
         'lawyer_profile_id',
         'match_candidate_id',
+        'source',
         'status',
         'sent_at',
         'viewed_at',
+        'responded_at',
         'expires_at',
+        'closed_at',
     ];
 
     /**
-     * Cast database values to useful PHP types.
-     *
      * @return array<string, string>
      */
     protected function casts(): array
@@ -33,32 +41,39 @@ class LegalRequestDistribution extends Model
         return [
             'sent_at' => 'datetime',
             'viewed_at' => 'datetime',
+            'responded_at' => 'datetime',
             'expires_at' => 'datetime',
+            'closed_at' => 'datetime',
         ];
     }
 
-    /** Legal request distributed to a lawyer. */
     public function legalRequest()
     {
         return $this->belongsTo(LegalRequest::class);
     }
 
-    /** Lawyer profile that received this distribution. */
     public function lawyerProfile()
     {
         return $this->belongsTo(LawyerProfile::class);
     }
 
-    /** Optional matching candidate that produced this distribution. */
     public function matchCandidate()
     {
         return $this->belongsTo(LawyerMatchCandidate::class);
     }
 
-    /** Single proposal attached to this distribution. */
-    public function proposal()
+    public function negotiation()
     {
-        return $this->hasOne(LawyerProposal::class, 'distribution_id');
+        return $this->hasOne(Negotiation::class, 'distribution_id');
     }
 
+    public function proposal()
+    {
+        return $this->hasMany(LawyerProposal::class, 'distribution_id');
+    }
+
+    public function negotiationThread()
+    {
+        return $this->hasOne(NegotiationThread::class, 'distribution_id');
+    }
 }

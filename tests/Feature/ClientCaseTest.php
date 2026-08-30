@@ -3,8 +3,20 @@
 use App\Models\MatterTimeline;
 use App\Models\User;
 use App\Models\LegalRequest;
-use App\Services\LegalMatters\LegalMatterFormationService;
+use App\Models\LegalMatter;
 use Laravel\Sanctum\Sanctum;
+
+function clientCaseMatter(LegalRequest $legalRequest): LegalMatter
+{
+    return LegalMatter::query()->create([
+        'source_legal_request_id' => $legalRequest->id,
+        'origin_type' => 'lawyer_selection',
+        'client_user_id' => $legalRequest->client_user_id,
+        'title' => $legalRequest->title,
+        'status' => 'active',
+        'opened_at' => now(),
+    ]);
+}
 
 test('client can view own case details with timeline', function () {
     $client = User::factory()->create();
@@ -17,8 +29,15 @@ test('client can view own case details with timeline', function () {
     'submitted_at' => now(),
     ]);
 
-$matter = app(LegalMatterFormationService::class)
-    ->createFromLegalRequest($legalRequest);
+$matter = clientCaseMatter($legalRequest);
+$matter = LegalMatter::query()->create([
+        'source_legal_request_id' => $legalRequest->id,
+        'client_user_id' => $legalRequest->client_user_id,
+        'origin_type' => 'lawyer_selection',
+        'title' => $legalRequest->title,
+        'status' => 'active',
+        'opened_at' => now(),
+    ]);
 
     MatterTimeline::query()->create([
         'legal_matter_id' => $matter->id,
@@ -48,8 +67,15 @@ test('client cannot view another clients case', function () {
     'submitted_at' => now(),
     ]);
 
-$matter = app(LegalMatterFormationService::class)
-    ->createFromLegalRequest($legalRequest);
+$matter = clientCaseMatter($legalRequest);
+$matter = LegalMatter::query()->create([
+        'source_legal_request_id' => $legalRequest->id,
+        'client_user_id' => $legalRequest->client_user_id,
+        'origin_type' => 'lawyer_selection',
+        'title' => $legalRequest->title,
+        'status' => 'active',
+        'opened_at' => now(),
+    ]);
 
     Sanctum::actingAs($otherUser);
 
@@ -68,8 +94,15 @@ test('client case details include documents', function () {
         'submitted_at' => now(),
     ]);
 
-    $matter = app(LegalMatterFormationService::class)
-        ->createFromLegalRequest($legalRequest);
+    $matter = clientCaseMatter($legalRequest);
+    $matter = LegalMatter::query()->create([
+        'source_legal_request_id' => $legalRequest->id,
+        'client_user_id' => $legalRequest->client_user_id,
+        'origin_type' => 'lawyer_selection',
+        'title' => $legalRequest->title,
+        'status' => 'active',
+        'opened_at' => now(),
+    ]);
 
     \App\Models\Document::query()->create([
         'legal_matter_id' => $matter->id,

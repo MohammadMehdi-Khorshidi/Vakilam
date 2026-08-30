@@ -4,10 +4,14 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -39,7 +43,7 @@ use Laravel\Sanctum\HasApiTokens;
  */
 #[Fillable(['name', 'last_name', 'email', 'phone', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements PasskeyUser
+class User extends Authenticatable implements FilamentUser, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasUuids, Notifiable, PasskeyAuthenticatable, SoftDeletes, TwoFactorAuthenticatable;
@@ -77,7 +81,44 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->belongsToMany(Role::class, 'user_roles')
             ->using(UserRole::class)
-            ->withPivot(['id', 'granted_at', 'revoked_at']);
+            ->withPivot(['id', 'granted_at', 'revoked_at'])
+            ->wherePivotNull('revoked_at');
+    }
+
+    /** Determine whether the user currently has the given role. */
+    public function hasActiveRole(string $code): bool
+    {
+        return $this->roles()
+            ->where('roles.code', $code)
+            ->exists();
+    }
+
+    /**
+     * Allow legacy profile-backed accounts that predate role assignments, while
+     * still honoring an explicit role revocation once role history exists.
+     */
+    public function mayActAsRole(string $code): bool
+    {
+        $hasRoleHistory = $this->roleAssignments()
+            ->whereHas('role', fn ($query) => $query->where('code', $code))
+            ->exists();
+
+        if ($hasRoleHistory) {
+            return $this->hasActiveRole($code);
+        }
+
+        return match ($code) {
+            'lawyer' => $this->lawyerProfile()->exists(),
+            'client' => $this->clientProfile()->exists(),
+            default => false,
+        };
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $panel->getId() === 'admin'
+            && $this->status === 'active'
+            && $this->roles()->where('code', 'admin')->exists();
     }
 
     /** Legal requests created by this user as a client. */
@@ -229,10 +270,45 @@ class User extends Authenticatable implements PasskeyUser
         return $this->hasMany(Message::class, 'sender_user_id');
     }
 
+    /** Immutable messages sent during pre-contract negotiations. */
+    public function sentNegotiationMessages()
+    {
+        return $this->hasMany(NegotiationMessage::class, 'sender_user_id');
+    }
+
     /** Meetings organized by this user. */
     public function organizedMeetings()
     {
         return $this->hasMany(Meeting::class, 'organizer_user_id');
+    }
+
+    public function policyAcceptances(): HasMany
+    {
+        return $this->hasMany(UserPolicyAcceptance::class, 'user_id');
+    }
+
+    public function acceptedPolicies(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Policy::class,
+            'user_policy_acceptances',
+            'user_id',
+            'policy_id'
+        )->withPivot(['accepted_at', 'ip_address', 'user_agent'])
+            ->withTimestamps(false);
+    }
+
+    // Helper مفید
+    public function hasAcceptedPolicy(string $type): bool
+    {
+        $current = Policy::currentOfType($type);
+        if (! $current) {
+            return false;
+        }
+
+        return $this->policyAcceptances()
+            ->where('policy_id', $current->id)
+            ->exists();
     }
 
     /**
