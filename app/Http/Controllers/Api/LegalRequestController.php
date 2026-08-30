@@ -292,6 +292,8 @@ class LegalRequestController extends Controller
 
         $proposals = $legalRequest->proposals()
             ->with(['lawyerProfile', 'negotiationThread'])
+            ->with(['lawyerProfile', 'negotiation:id,public_id,status'])
+            ->whereNotNull('lawyer_proposals.negotiation_id')
             ->where('lawyer_proposals.status', '!=', 'draft')
             ->latest('lawyer_proposals.submitted_at')
             ->get()
@@ -299,6 +301,8 @@ class LegalRequestController extends Controller
                 'id' => $proposal->id,
                 'public_id' => $proposal->public_id,
                 'summary' => $proposal->summary,
+                'service_scope' => $proposal->service_scope,
+                'source' => $proposal->source,
                 'proposed_fee_rial' => $proposal->proposed_fee_rial,
                 'advance_payment_rial' => $proposal->advance_payment_rial,
                 'estimated_days' => $proposal->estimated_days,
@@ -312,6 +316,10 @@ class LegalRequestController extends Controller
                 'negotiation_public_id' => $proposal->negotiationThread?->public_id,
                 'submitted_at' => $proposal->submitted_at,
                 'expires_at' => $proposal->expires_at,
+                'negotiation' => $proposal->negotiation === null ? null : [
+                    'public_id' => $proposal->negotiation->public_id,
+                    'status' => $proposal->negotiation->status,
+                ],
                 'lawyer' => $proposal->lawyerProfile === null
                     ? null
                     : [

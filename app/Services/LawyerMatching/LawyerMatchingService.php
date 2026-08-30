@@ -7,6 +7,7 @@ use App\Models\LawyerMatchRun;
 use App\Models\LawyerProfile;
 use App\Models\LegalRequest;
 use App\Models\LegalRequestDistribution;
+use App\Models\Negotiation;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -103,7 +104,10 @@ class LawyerMatchingService
     }
 
     /**
-     * Send the request to up to five lawyers explicitly selected by the client.
+     * Send invitations to up to five lawyers explicitly selected by the client.
+     *
+     * Invitations are independent from final proposals. A lawyer acceptance only
+     * opens a Negotiation and never creates Engagement directly.
      *
      * @param  array<int, string>  $lawyerPublicIds
      * @return Collection<int, LegalRequestDistribution>
@@ -111,8 +115,7 @@ class LawyerMatchingService
     public function sendRequests(
         LegalRequest $legalRequest,
         array $lawyerPublicIds,
-    ): Collection
-    {
+    ): Collection {
         return DB::transaction(function () use ($legalRequest, $lawyerPublicIds): Collection {
             $lockedRequest = LegalRequest::query()
                 ->whereKey($legalRequest->id)
@@ -125,6 +128,8 @@ class LawyerMatchingService
                 409,
                 'Lawyer requests are only available for submitted lawyer-selection requests.',
             );
+
+            abort_unless(count($lawyerPublicIds) === count(array_unique($lawyerPublicIds)), 422, 'Duplicate lawyers are not allowed.');
 
             $run = $lockedRequest->matchRuns()
                 ->where('algorithm_version', self::ALGORITHM_VERSION)
@@ -139,7 +144,14 @@ class LawyerMatchingService
             $candidates = $run->candidates()
                 ->whereHas(
                     'lawyerProfile',
-                    fn ($query) => $query->whereIn('public_id', $lawyerPublicIds),
+                    fn ($query) => $query
+                        ->whereIn('public_id', $lawyerPublicIds)
+                        ->where('verification_status', 'approved')
+                        ->where('is_available', true)
+                        ->whereHas(
+                            'user',
+                            fn ($userQuery) => $userQuery->where('status', 'active'),
+                        ),
                 )
                 ->with('lawyerProfile:id,public_id')
                 ->get()
@@ -153,13 +165,23 @@ class LawyerMatchingService
                 ]);
             }
 
-            $selectedProfileIds = $candidates
-                ->pluck('lawyer_profile_id')
-                ->values();
-            $existingProfileIds = $lockedRequest->distributions()
+            LegalRequestDistribution::query()
+                ->where('legal_request_id', $lockedRequest->id)
+                ->where('source', 'client_invite')
+                ->where('status', 'pending')
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<=', now())
+                ->update(['status' => 'expired']);
+
+            $existingInviteLawyerIds = LegalRequestDistribution::query()
+                ->where('legal_request_id', $lockedRequest->id)
+                ->where('source', 'client_invite')
+                ->whereIn('status', ['pending', 'negotiating'])
                 ->pluck('lawyer_profile_id');
 
-            if ($existingProfileIds->merge($selectedProfileIds)->unique()->count() > 5) {
+            $selectedProfileIds = $candidates->pluck('lawyer_profile_id')->values();
+
+            if ($existingInviteLawyerIds->merge($selectedProfileIds)->unique()->count() > 5) {
                 throw ValidationException::withMessages([
                     'lawyer_public_ids' => [
                         'A legal request can be sent to at most five lawyers.',
@@ -178,18 +200,65 @@ class LawyerMatchingService
                     ]);
                 }
 
-                $lockedRequest->distributions()->firstOrCreate(
-                    ['lawyer_profile_id' => $candidate->lawyer_profile_id],
-                    [
+                $distribution = LegalRequestDistribution::query()
+                    ->where('legal_request_id', $lockedRequest->id)
+                    ->where('lawyer_profile_id', $candidate->lawyer_profile_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($distribution !== null) {
+                    abort_if(
+                        $distribution->source === 'lawyer_interest'
+                            && in_array($distribution->status, ['interest_pending', 'negotiating'], true),
+                        409,
+                        'This lawyer already has an active interest in the legal request.',
+                    );
+
+                    abort_if(
+                        $distribution->negotiation()
+                            ->whereIn('status', [
+                                Negotiation::STATUS_CLOSED,
+                                Negotiation::STATUS_CANCELLED,
+                                Negotiation::STATUS_WON,
+                            ])
+                            ->exists(),
+                        409,
+                        'A closed negotiation with this lawyer cannot be reopened.',
+                    );
+
+                    if ($distribution->source === 'client_invite'
+                        && in_array($distribution->status, ['pending', 'negotiating'], true)) {
+                        continue;
+                    }
+
+                    $distribution->forceFill([
                         'match_candidate_id' => $candidate->id,
-                        'status' => 'sent',
+                        'source' => 'client_invite',
+                        'status' => 'pending',
                         'sent_at' => now(),
-                        'expires_at' => now()->addHours(self::INVITATION_EXPIRY_HOURS),
-                    ],
-                );
+                        'viewed_at' => null,
+                        'responded_at' => null,
+                        'expires_at' => now()->addHours(72),
+                    ])->save();
+
+                    continue;
+                }
+
+                LegalRequestDistribution::query()->create([
+                    'legal_request_id' => $lockedRequest->id,
+                    'lawyer_profile_id' => $candidate->lawyer_profile_id,
+                    'match_candidate_id' => $candidate->id,
+                    'source' => 'client_invite',
+                    'status' => 'pending',
+                    'sent_at' => now(),
+                    'expires_at' => now()->addHours(72),
+                ]);
             }
 
-            return $lockedRequest->distributions()
+            return LegalRequestDistribution::query()
+                ->where('legal_request_id', $lockedRequest->id)
+                ->where('source', 'client_invite')
+                ->whereIn('status', ['pending', 'negotiating'])
                 ->with([
                     'lawyerProfile.lawyerSpecialties.specialty:id,code,name,status',
                     'lawyerProfile.serviceAreas.province:id,name',
@@ -223,8 +292,7 @@ class LawyerMatchingService
     private function rankedLawyers(
         LegalRequest $legalRequest,
         bool $requireOpenConsultationSlot = false,
-    ): Collection
-    {
+    ): Collection {
         $legalRequest->loadMissing('legalCategory:id,code,status');
 
         abort_unless(
@@ -301,8 +369,7 @@ class LawyerMatchingService
         string $categoryCode,
         int $provinceId,
         int $cityId,
-    ): array
-    {
+    ): array {
         $matchingSpecialty = $lawyer->lawyerSpecialties
             ->filter(fn ($assignment) => $assignment->specialty?->status
                 && $assignment->specialty->code === $categoryCode)

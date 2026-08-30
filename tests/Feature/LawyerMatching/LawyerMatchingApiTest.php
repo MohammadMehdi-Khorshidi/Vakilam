@@ -65,8 +65,7 @@ function matchingLawyer(
     ?City $city,
     array $profileAttributes = [],
     int $yearsExperience = 5,
-): LawyerProfile
-{
+): LawyerProfile {
     $userAttributes = $profileAttributes['user'] ?? [];
     unset($profileAttributes['user']);
     $user = User::factory()->create($userAttributes);
@@ -274,4 +273,61 @@ test('matching endpoints enforce ownership and the selected service path', funct
     $fixture['legal_request']->forceFill(['service_intent' => 'consultation'])->save();
     $this->postJson("/api/legal-requests/{$fixture['legal_request']->id}/matching")
         ->assertStatus(409);
+});
+
+test('a matched lawyer must remain eligible when the client sends an invitation', function () {
+    $fixture = lawyerMatchingFixture();
+
+    $suspendedLawyer = matchingLawyer(
+        $fixture['specialty'],
+        $fixture['province'],
+        $fixture['city'],
+    );
+
+    $unavailableLawyer = matchingLawyer(
+        $fixture['specialty'],
+        $fixture['province'],
+        $fixture['city'],
+    );
+
+    $unapprovedLawyer = matchingLawyer(
+        $fixture['specialty'],
+        $fixture['province'],
+        $fixture['city'],
+    );
+
+    Sanctum::actingAs($fixture['client']);
+
+    $this->postJson(
+        "/api/legal-requests/{$fixture['legal_request']->id}/matching",
+    )
+        ->assertCreated()
+        ->assertJsonPath('data.candidates_count', 3);
+
+    $suspendedLawyer->user
+        ->forceFill(['status' => 'suspended'])
+        ->save();
+
+    $unavailableLawyer
+        ->forceFill(['is_available' => false])
+        ->save();
+
+    $unapprovedLawyer
+        ->forceFill(['verification_status' => 'pending'])
+        ->save();
+
+    foreach ([
+        $suspendedLawyer,
+        $unavailableLawyer,
+        $unapprovedLawyer,
+    ] as $lawyer) {
+        $this->postJson(
+            "/api/legal-requests/{$fixture['legal_request']->id}/lawyer-requests",
+            ['lawyer_public_ids' => [$lawyer->public_id]],
+        )
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('lawyer_public_ids');
+    }
+
+    $this->assertDatabaseCount('legal_request_distributions', 0);
 });

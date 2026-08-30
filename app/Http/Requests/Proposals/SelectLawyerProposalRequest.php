@@ -25,9 +25,11 @@ class SelectLawyerProposalRequest extends FormRequest
             return false;
         }
 
-        $proposal->loadMissing('distribution.legalRequest');
+        $proposal->loadMissing(['legalRequest', 'distribution.legalRequest']);
 
-        return $proposal->distribution?->legalRequest?->client_user_id === $user->id;
+        $legalRequest = $proposal->legalRequest ?? $proposal->distribution?->legalRequest;
+
+        return $legalRequest?->client_user_id === $user->id;
     }
 
     /**

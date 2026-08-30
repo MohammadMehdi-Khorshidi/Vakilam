@@ -18,6 +18,7 @@ class NegotiationMessage extends Model
 
     protected $fillable = [
         'negotiation_thread_id',
+        'negotiation_id',
         'sender_user_id',
         'body',
     ];
@@ -25,6 +26,11 @@ class NegotiationMessage extends Model
     public function negotiationThread()
     {
         return $this->belongsTo(NegotiationThread::class);
+    }
+
+    public function negotiation()
+    {
+        return $this->belongsTo(Negotiation::class);
     }
 
     public function sender()

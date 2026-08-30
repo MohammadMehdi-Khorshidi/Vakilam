@@ -85,6 +85,35 @@ class User extends Authenticatable implements FilamentUser, PasskeyUser
             ->wherePivotNull('revoked_at');
     }
 
+    /** Determine whether the user currently has the given role. */
+    public function hasActiveRole(string $code): bool
+    {
+        return $this->roles()
+            ->where('roles.code', $code)
+            ->exists();
+    }
+
+    /**
+     * Allow legacy profile-backed accounts that predate role assignments, while
+     * still honoring an explicit role revocation once role history exists.
+     */
+    public function mayActAsRole(string $code): bool
+    {
+        $hasRoleHistory = $this->roleAssignments()
+            ->whereHas('role', fn ($query) => $query->where('code', $code))
+            ->exists();
+
+        if ($hasRoleHistory) {
+            return $this->hasActiveRole($code);
+        }
+
+        return match ($code) {
+            'lawyer' => $this->lawyerProfile()->exists(),
+            'client' => $this->clientProfile()->exists(),
+            default => false,
+        };
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
         return $panel->getId() === 'admin'

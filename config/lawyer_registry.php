@@ -1,10 +1,8 @@
 <?php
 
 return [
-    'path' => env(
-        'LAWYER_REGISTRY_PATH',
-        storage_path('app/private/lawyers.json'),
-    ),
+    'path' => env('LAWYER_REGISTRY_PATH')
+        ?: storage_path('app/private/lawyers.json'),
 
     // Leave records_key null when the JSON root is an array. A common
     // alternative is "data" when records are wrapped in an object.

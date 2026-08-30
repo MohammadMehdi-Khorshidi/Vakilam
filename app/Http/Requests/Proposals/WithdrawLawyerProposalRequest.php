@@ -25,7 +25,8 @@ class WithdrawLawyerProposalRequest extends FormRequest
 
         $lawyerProfile = $user->lawyerProfile;
 
-        return $lawyerProfile !== null
+        return $user->mayActAsRole('lawyer')
+            && $lawyerProfile !== null
             && $lawyerProfile->verification_status === 'approved'
             && $proposal->lawyer_profile_id === $lawyerProfile->id;
     }

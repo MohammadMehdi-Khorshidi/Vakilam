@@ -15,6 +15,7 @@ class LawyerProposal extends Model
     public const STATUS_COUNTERED   = 'countered';
     public const STATUS_ACCEPTED    = 'accepted';
     public const STATUS_REJECTED    = 'rejected';
+    public const STATUS_CANCELLED   = 'cancelled';
     public const STATUS_EXPIRED     = 'expired';
 
     public const SOURCE_INVITED = 'invited';
@@ -32,12 +33,14 @@ class LawyerProposal extends Model
     protected $fillable = [
         'public_id',
         'legal_request_id',
+        'negotiation_id',
         'distribution_id',
         'negotiation_thread_id',
         'parent_proposal_id',
         'version_number',
         'lawyer_profile_id',
         'summary',
+        'service_scope',
         'cover_letter',
         'experience_highlight',
         'proposed_fee_rial',
@@ -81,6 +84,11 @@ class LawyerProposal extends Model
     public function legalRequest()
     {
         return $this->belongsTo(LegalRequest::class);
+    }
+
+    public function negotiation()
+    {
+        return $this->belongsTo(Negotiation::class);
     }
 
     public function distribution()
@@ -144,6 +152,23 @@ class LawyerProposal extends Model
             'payment_terms' => $this->payment_terms ?? [],
             'other_terms' => $this->other_terms,
         ];
+        $this->loadMissing('negotiation');
+
+        if ($this->negotiation?->status !== Negotiation::STATUS_ACTIVE) {
+            throw new \LogicException('Final proposal submission requires an active negotiation.');
+        }
+
+        $submittedAt = now();
+
+        $this->update([
+            'status'       => self::STATUS_SUBMITTED,
+            'submitted_at' => $submittedAt,
+            'expires_at'   => $submittedAt->copy()->addHours($expireHours),
+        ]);
+
+        $this->negotiation->forceFill([
+            'status' => Negotiation::STATUS_PROPOSAL_SUBMITTED,
+        ])->save();
     }
 
     public function markExpired(): void
