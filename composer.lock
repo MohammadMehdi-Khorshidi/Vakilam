@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "603f2e6fcc7f257c5283a21d5f6ef7d2",
+    "content-hash": "a8952633faaef4d1e8650d9c961456f1",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -2401,6 +2401,64 @@
                 "source": "https://github.com/inertiajs/inertia-laravel/tree/v3.1.1"
             },
             "time": "2026-07-02T12:45:54+00:00"
+        },
+        {
+            "name": "ippanelcom/laravel-sdk",
+            "version": "1.0.5",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ippanelcom/laravel-sdk.git",
+                "reference": "84098002b31593c0efc07d7a0196da9ec7441e99"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ippanelcom/laravel-sdk/zipball/84098002b31593c0efc07d7a0196da9ec7441e99",
+                "reference": "84098002b31593c0efc07d7a0196da9ec7441e99",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.0",
+                "php": "^7.4|^8.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "IPPanel": "Ippanel\\Facades\\IPPanel"
+                    },
+                    "providers": [
+                        "Ippanel\\IppanelServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Ippanel\\": "src/IPPanel/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "IPPanel",
+                    "email": "devops@ippanel.com"
+                }
+            ],
+            "description": "Laravel SDK for IPPanel SMS API",
+            "homepage": "https://github.com/ippanelcom/laravel-sdk",
+            "keywords": [
+                "IPPanel",
+                "laravel",
+                "notification",
+                "sms"
+            ],
+            "support": {
+                "issues": "https://github.com/ippanelcom/laravel-sdk/issues",
+                "source": "https://github.com/ippanelcom/laravel-sdk/tree/v1.0.5"
+            },
+            "time": "2025-05-23T11:48:57+00:00"
         },
         {
             "name": "kirschbaum-development/eloquent-power-joins",

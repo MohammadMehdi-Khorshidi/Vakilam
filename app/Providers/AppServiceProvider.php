@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Contracts\OtpSender;
+use App\Services\Sms\IppanelOtpSender;
+use App\Services\Sms\NullOtpSender;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -12,7 +16,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(OtpSender::class, function (Application $app): OtpSender {
+            return $app->environment('testing')
+                ? $app->make(NullOtpSender::class)
+                : $app->make(IppanelOtpSender::class);
+        });
     }
 
     /**

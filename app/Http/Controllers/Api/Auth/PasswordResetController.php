@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
+use App\Contracts\OtpSender;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class PasswordResetController extends Controller
 {
@@ -25,7 +27,7 @@ class PasswordResetController extends Controller
     /**
      * @throws ValidationException
      */
-    public function sendOtp(Request $request): JsonResponse
+    public function sendOtp(Request $request, OtpSender $otpSender): JsonResponse
     {
         $data = $request->validate([
             'phone' => 'required|string|regex:/^09\d{9}$/',
@@ -67,8 +69,19 @@ class PasswordResetController extends Controller
             'expires_at' => now()->addSeconds(self::OTP_TTL_SECONDS)->timestamp,
         ], self::OTP_TTL_SECONDS);
 
-        // TODO: کد OTP در این نقطه به سرویس پیامک تحویل داده شود.
-        if (app()->environment(['local', 'testing'])) {
+        try {
+            $otpSender->send($data['phone'], $otp);
+        } catch (Throwable $exception) {
+            Cache::forget($this->otpCacheKey($data['phone']));
+            Cache::forget($this->resendCacheKey($data['phone']));
+            report($exception);
+
+            return response()->json([
+                'message' => 'The password reset code could not be sent. Please try again.',
+            ], 503);
+        }
+
+        if (app()->environment('testing')) {
             $response['debug_otp'] = $otp;
         }
 
