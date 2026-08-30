@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
+use App\Contracts\OtpSender;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AuthenticatedUserResource;
 use App\Models\ClientProfile;
@@ -22,6 +23,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class RegisterController extends Controller
 {
@@ -33,7 +35,7 @@ class RegisterController extends Controller
 
     private const VERIFICATION_TTL_SECONDS = 600;
 
-    public function sendOtp(Request $request): JsonResponse
+    public function sendOtp(Request $request, OtpSender $otpSender): JsonResponse
     {
         $data = $request->validate([
             'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
@@ -64,14 +66,25 @@ class RegisterController extends Controller
             'expires_at' => now()->addSeconds(self::OTP_TTL_SECONDS)->timestamp,
         ], self::OTP_TTL_SECONDS);
 
+        try {
+            $otpSender->send($data['phone'], $otp);
+        } catch (Throwable $exception) {
+            Cache::forget($this->otpCacheKey($data['phone']));
+            Cache::forget($this->resendCacheKey($data['phone']));
+            report($exception);
+
+            return response()->json([
+                'message' => 'The verification code could not be sent. Please try again.',
+            ], 503);
+        }
+
         $response = [
             'message' => 'Verification code generated.',
             'expires_in' => self::OTP_TTL_SECONDS,
             'resend_after' => self::OTP_RESEND_AFTER_SECONDS,
         ];
 
-        // تا قبل از اتصال سرویس پیامک، کد فقط در محیط توسعه و تست برگردانده می‌شود.
-        if (app()->environment(['local', 'testing'])) {
+        if (app()->environment('testing')) {
             $response['debug_otp'] = $otp;
         }
 
