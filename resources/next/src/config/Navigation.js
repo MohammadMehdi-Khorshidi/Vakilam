@@ -138,7 +138,7 @@ export const lawyerNav = [
         icon: CircleDollarSign,
     },
     {
-        href: '/lawyer/reviews',
+        href: '/lawyer/feedbacks',
         label: 'بازخوردها',
         icon: CheckCircle2,
     },

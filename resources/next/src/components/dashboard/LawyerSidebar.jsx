@@ -74,7 +74,7 @@ const menuItems = [
         icon: WalletCards,
     },
     {
-        href: '/lawyer/reviews',
+        href: '/lawyer/feedbacks',
         label: 'بازخوردها',
         icon: Star,
     },

@@ -23,7 +23,7 @@ export const lawyerNav = [
     { href: '/lawyer/meetings', label: 'جلسات' },
     { href: '/lawyer/tasks', label: 'کارها' },
     { href: '/lawyer/earnings', label: 'درآمد' },
-    { href: '/lawyer/reviews', label: 'بازخوردها' },
+    { href: '/lawyer/feedbacks', label: 'بازخوردها' },
 ];
 
 export const adminNav = [
