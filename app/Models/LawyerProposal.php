@@ -12,13 +12,15 @@ class LawyerProposal extends Model
     public const STATUS_DRAFT       = 'draft';
     public const STATUS_SUBMITTED   = 'submitted';
     public const STATUS_WITHDRAWN   = 'withdrawn';
-    public const STATUS_COUNTERED   = 'countered';
-    public const STATUS_ACCEPTED    = 'accepted';
+    public const STATUS_SHORTLISTED = 'shortlisted';
+    public const STATUS_SELECTED    = 'selected';
+    public const STATUS_ACCEPTED    = self::STATUS_SELECTED;
     public const STATUS_REJECTED    = 'rejected';
     public const STATUS_CANCELLED   = 'cancelled';
     public const STATUS_EXPIRED     = 'expired';
 
-    public const SOURCE_INVITED = 'invited';
+    public const SOURCE_MATCHED = 'matched';
+    public const SOURCE_OPEN = 'open';
 
     /**
      * Generate UUIDs for both the internal primary key and the public identifier.
@@ -35,29 +37,17 @@ class LawyerProposal extends Model
         'legal_request_id',
         'negotiation_id',
         'distribution_id',
-        'negotiation_thread_id',
-        'parent_proposal_id',
-        'version_number',
         'lawyer_profile_id',
         'summary',
         'service_scope',
         'cover_letter',
         'experience_highlight',
         'proposed_fee_rial',
-        'advance_payment_rial',
         'estimated_days',
-        'service_scope',
-        'excluded_services',
-        'payment_terms',
-        'other_terms',
-        'terms_hash',
         'status',
         'source',
         'submitted_at',
         'expires_at',
-        'accepted_at',
-        'rejected_at',
-        'countered_at',
     ];
 
     /**
@@ -67,17 +57,9 @@ class LawyerProposal extends Model
     {
         return [
             'proposed_fee_rial' => 'integer',
-            'advance_payment_rial' => 'integer',
             'estimated_days'    => 'integer',
-            'version_number' => 'integer',
-            'service_scope' => 'array',
-            'excluded_services' => 'array',
-            'payment_terms' => 'array',
             'submitted_at'      => 'datetime',
             'expires_at'        => 'datetime',
-            'accepted_at' => 'datetime',
-            'rejected_at' => 'datetime',
-            'countered_at' => 'datetime',
         ];
     }
 
@@ -94,21 +76,6 @@ class LawyerProposal extends Model
     public function distribution()
     {
         return $this->belongsTo(LegalRequestDistribution::class);
-    }
-
-    public function negotiationThread()
-    {
-        return $this->belongsTo(NegotiationThread::class);
-    }
-
-    public function parentProposal()
-    {
-        return $this->belongsTo(self::class, 'parent_proposal_id');
-    }
-
-    public function revisions()
-    {
-        return $this->hasMany(self::class, 'parent_proposal_id');
     }
 
     public function lawyerProfile()
@@ -144,31 +111,10 @@ class LawyerProposal extends Model
     {
         return [
             'summary' => $this->summary,
-            'total_fee_rial' => $this->proposed_fee_rial,
-            'advance_payment_rial' => $this->advance_payment_rial,
+            'service_scope' => $this->service_scope,
+            'proposed_fee_rial' => $this->proposed_fee_rial,
             'estimated_days' => $this->estimated_days,
-            'service_scope' => $this->service_scope ?? [],
-            'excluded_services' => $this->excluded_services ?? [],
-            'payment_terms' => $this->payment_terms ?? [],
-            'other_terms' => $this->other_terms,
         ];
-        $this->loadMissing('negotiation');
-
-        if ($this->negotiation?->status !== Negotiation::STATUS_ACTIVE) {
-            throw new \LogicException('Final proposal submission requires an active negotiation.');
-        }
-
-        $submittedAt = now();
-
-        $this->update([
-            'status'       => self::STATUS_SUBMITTED,
-            'submitted_at' => $submittedAt,
-            'expires_at'   => $submittedAt->copy()->addHours($expireHours),
-        ]);
-
-        $this->negotiation->forceFill([
-            'status' => Negotiation::STATUS_PROPOSAL_SUBMITTED,
-        ])->save();
     }
 
     public function markExpired(): void
