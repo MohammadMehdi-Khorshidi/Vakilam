@@ -27,11 +27,8 @@ class LegalMatter extends Model
     protected $fillable = [
         'source_legal_request_id',
         'origin_type',
-        'originable_type',
-        'originable_id',
         'engagement_id',
         'client_user_id',
-        'origin_type',
         'title',
         'status',
         'opened_at',
@@ -61,12 +58,6 @@ class LegalMatter extends Model
     public function engagement()
     {
         return $this->belongsTo(Engagement::class);
-    }
-
-    /** Business object whose successful payment formed this matter. */
-    public function originable()
-    {
-        return $this->morphTo();
     }
 
     /** Client user who owns this matter. */
