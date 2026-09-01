@@ -75,8 +75,8 @@ Route::controller(LocationReferenceController::class)->prefix('reference')
 Route::get('/reference/specialties', [SpecialtyReferenceController::class, 'index']);
 
 Route::controller(LawyerDirectoryController::class)->group(function () {
-    Route::get('/lawyers', 'index');
-    Route::get('/lawyers/{publicId}', 'show');
+    Route::get('/lawyersAdmin', 'index');
+    Route::get('/lawyersAdmin/{publicId}', 'show');
 });
 
 Route::middleware(['auth:sanctum', 'active'])->prefix('lawyer/profile')->group(function () {
@@ -110,7 +110,7 @@ Route::middleware(['auth:sanctum', 'active'])->controller(LawyerMatchingControll
         Route::post('/legal-requests/{legalRequest}/matching', 'store');
         Route::get('/legal-requests/{legalRequest}/matching', 'show');
         Route::post('/legal-requests/{legalRequest}/lawyer-requests', 'sendRequests');
-        Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
+        Route::get('/legal-requests/{legalRequest}/consultation-lawyersAdmin', 'consultationLawyers');
     });
 
 Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(function () {
@@ -211,7 +211,7 @@ Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(
             Route::post('/', [LawyerAvailabilityController::class, 'store']);
         });
 
-        Route::get('/legal-requests/{legalRequest}/consultation-lawyers/{publicId}/slots',
+        Route::get('/legal-requests/{legalRequest}/consultation-lawyersAdmin/{publicId}/slots',
             [LawyerAvailabilityController::class, 'consultationSlots']);
 
         Route::post('/legal-requests/{legalRequest}/consultation-slots/{slot}/reserve',
@@ -302,7 +302,7 @@ Route::middleware('auth:sanctum')->controller(DocumentController::class)->group(
 //            Route::post('/', [LawyerAvailabilityController::class, 'store']);
 //        });
 //
-//        Route::middleware(['auth:sanctum', 'active'])->get('/legal-requests/{legalRequest}/consultation-lawyers/{publicId}/slots',
+//        Route::middleware(['auth:sanctum', 'active'])->get('/legal-requests/{legalRequest}/consultation-lawyersAdmin/{publicId}/slots',
 //            [LawyerAvailabilityController::class, 'consultationSlots'],
 //        );
 //

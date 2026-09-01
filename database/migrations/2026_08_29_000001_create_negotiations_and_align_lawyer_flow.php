@@ -46,6 +46,7 @@ return new class extends Migration
         Schema::table('legal_request_distributions', function (Blueprint $table) {
             $table->string('source', 30)->default('client_invite')->after('match_candidate_id');
             $table->dateTime('responded_at', 6)->nullable()->after('viewed_at');
+            $table->dateTime('closed_at', 6)->nullable()->after('expires_at');
             $table->index(['source', 'status'], 'distribution_source_status_idx');
         });
 
@@ -95,7 +96,7 @@ return new class extends Migration
 
         Schema::table('legal_request_distributions', function (Blueprint $table) {
             $table->dropIndex('distribution_source_status_idx');
-            $table->dropColumn(['source', 'responded_at']);
+            $table->dropColumn(['source', 'responded_at', 'closed_at']);
         });
 
         Schema::dropIfExists('negotiation_messages');

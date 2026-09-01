@@ -144,7 +144,7 @@ test('a client can run idempotent matching for a submitted lawyer selection requ
     $this->assertDatabaseCount('legal_request_distributions', 0);
 });
 
-test('matching excludes ineligible lawyers and returns an empty successful result when needed', function () {
+test('matching excludes ineligible lawyersAdmin and returns an empty successful result when needed', function () {
     $fixture = lawyerMatchingFixture();
     matchingLawyer(
         $fixture['specialty'],
@@ -175,7 +175,7 @@ test('matching excludes ineligible lawyers and returns an empty successful resul
     $this->assertDatabaseCount('legal_request_distributions', 0);
 });
 
-test('matching is paginated and the client can send requests to at most five lawyers', function () {
+test('matching is paginated and the client can send requests to at most five lawyersAdmin', function () {
     $fixture = lawyerMatchingFixture();
     $lawyers = collect();
 
@@ -228,7 +228,7 @@ test('matching is paginated and the client can send requests to at most five law
     $this->assertDatabaseCount('legal_request_distributions', 5);
 });
 
-test('a consultation request receives matching lawyers with open slots without persisted matching', function () {
+test('a consultation request receives matching lawyersAdmin with open slots without persisted matching', function () {
     $fixture = lawyerMatchingFixture('consultation');
     $availableLawyer = matchingLawyer(
         $fixture['specialty'],
@@ -246,7 +246,7 @@ test('a consultation request receives matching lawyers with open slots without p
 
     Sanctum::actingAs($fixture['client']);
 
-    $this->getJson("/api/legal-requests/{$fixture['legal_request']->id}/consultation-lawyers")
+    $this->getJson("/api/legal-requests/{$fixture['legal_request']->id}/consultation-lawyersAdmin")
         ->assertOk()
         ->assertJsonPath('meta.count', 1)
         ->assertJsonPath('data.0.lawyer.public_id', $availableLawyer->public_id);
@@ -267,7 +267,7 @@ test('matching endpoints enforce ownership and the selected service path', funct
         ->assertForbidden();
 
     Sanctum::actingAs($fixture['client']);
-    $this->getJson("/api/legal-requests/{$fixture['legal_request']->id}/consultation-lawyers")
+    $this->getJson("/api/legal-requests/{$fixture['legal_request']->id}/consultation-lawyersAdmin")
         ->assertStatus(409);
 
     $fixture['legal_request']->forceFill(['service_intent' => 'consultation'])->save();

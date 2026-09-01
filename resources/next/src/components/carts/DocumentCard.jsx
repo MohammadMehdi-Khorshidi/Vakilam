@@ -1,10 +1,4 @@
-import {
-    CheckCircle2,
-    Clock3,
-    File,
-    FileImage,
-    FileText,
-} from 'lucide-react';
+import { CheckCircle2, Clock3, File, FileImage, FileText } from 'lucide-react';
 
 import { Vazirmatn } from 'next/font/google';
 
@@ -48,8 +42,7 @@ const fileIcons = {
 function FileTypeIcon({ extension }) {
     const normalizedExtension = extension?.toLowerCase();
 
-    const iconType =
-        fileIcons[normalizedExtension] || 'file';
+    const iconType = fileIcons[normalizedExtension] || 'file';
 
     if (iconType === 'image') {
         return <FileImage size={22} />;
@@ -70,17 +63,12 @@ function StatusIcon({ type }) {
     return <CheckCircle2 size={11} />;
 }
 
-const DocumentCard = ({
-    document,
-    onPreview,
-    onDelete,
-}) => {
-    const status =
-        document.status || 'نهایی';
+const DocumentCard = ({ document, onPreview, onDelete }) => {
+    if (!document) return null;
 
-    const statusData =
-        statusStyles[status] ||
-        statusStyles['نهایی'];
+    const status = document?.status ?? 'نهایی';
+
+    const statusData = statusStyles[status] || statusStyles['نهایی'];
 
     return (
         <article
@@ -89,9 +77,7 @@ const DocumentCard = ({
         >
             <div className="flex min-w-0 items-start gap-4">
                 <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#edf6f2] text-[#0b5648]">
-                    <FileTypeIcon
-                        extension={document.extension}
-                    />
+                    <FileTypeIcon extension={document?.extension} />
                 </div>
 
                 <div className="min-w-0">
@@ -101,17 +87,13 @@ const DocumentCard = ({
 
                     <p className="mt-1 text-xs text-[#879590]">
                         {document.category || 'مدرک پرونده'} ·{' '}
-                        {document.extension?.toUpperCase() ||
-                            'FILE'}
+                        {document.extension?.toUpperCase() || 'FILE'}
                     </p>
 
                     <div
                         className={`mt-2 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold ${statusData.className}`}
                     >
-                        <StatusIcon
-                            type={statusData.icon}
-                        />
-
+                        <StatusIcon type={statusData.icon} />
                         <span>{status}</span>
                     </div>
                 </div>

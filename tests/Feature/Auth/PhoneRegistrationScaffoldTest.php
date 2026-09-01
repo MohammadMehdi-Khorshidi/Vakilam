@@ -12,14 +12,14 @@ beforeEach(function () {
     Storage::fake('local');
     config()->set(
         'lawyer_registry.path',
-        Storage::disk('local')->path('lawyers.json'),
+        Storage::disk('local')->path('lawyersAdmin.json'),
     );
     config()->set('lawyer_registry.records_key', null);
     config()->set('lawyer_registry.license_key', 'license_number');
     config()->set('lawyer_registry.phone_key', 'phone');
     config()->set('lawyer_registry.organization_key', 'organization');
 
-    Storage::disk('local')->put('lawyers.json', json_encode([
+    Storage::disk('local')->put('lawyersAdmin.json', json_encode([
         [
             'license_number' => '۱۲۳-۴۵',
             'phone' => '+989121111111',
@@ -229,7 +229,7 @@ test('a phone mismatch is rejected without creating an account', function () {
 });
 
 test('lawyer registration returns service unavailable when registry file is missing', function () {
-    Storage::disk('local')->delete('lawyers.json');
+    Storage::disk('local')->delete('lawyersAdmin.json');
     $otpResponse = $this->postJson('/api/auth/register/send-otp', [
         'phone' => '09121111111',
     ])->assertOk();

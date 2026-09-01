@@ -1,6 +1,7 @@
 'use client';
 
 import { Vazirmatn } from 'next/font/google';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 const vazir = Vazirmatn({
@@ -9,11 +10,16 @@ const vazir = Vazirmatn({
 });
 
 const RegisterUi = () => {
+    const router = useRouter();
+
     const [form, setForm] = useState({
         first_name: '',
         last_name: '',
         phone: '',
     });
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     const handleChange = (e) => {
         setForm({
@@ -22,10 +28,75 @@ const RegisterUi = () => {
         });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        console.log(form);
+        setError('');
+
+        if (!form.first_name.trim()) {
+            setError('لطفاً نام خود را وارد کنید.');
+            return;
+        }
+
+        if (!form.last_name.trim()) {
+            setError('لطفاً نام خانوادگی خود را وارد کنید.');
+            return;
+        }
+
+        if (!form.phone.trim()) {
+            setError('لطفاً شماره موبایل خود را وارد کنید.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            const response = await fetch(
+                'http://127.0.0.1:8000/api/auth/register/send-otp',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify({
+                        first_name: form.first_name,
+                        last_name: form.last_name,
+                        phone: form.phone,
+                    }),
+                }
+            );
+
+            const data = await response.json();
+
+            console.log('Send OTP:', data);
+
+            if (!response.ok) {
+                setError(
+                    data.message || 'ارسال کد تأیید ناموفق بود.'
+                );
+                return;
+            }
+
+            // اطلاعات ثبت نام را موقتاً نگه می‌داریم
+            sessionStorage.setItem(
+                'register_data',
+                JSON.stringify({
+                    first_name: form.first_name,
+                    last_name: form.last_name,
+                    phone: form.phone,
+                })
+            );
+
+            // رفتن به صفحه OTP
+            router.push('/register/verify');
+
+        } catch (error) {
+            console.error(error);
+            setError('ارتباط با سرور برقرار نشد.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -62,7 +133,7 @@ const RegisterUi = () => {
                         placeholder="نام خود را وارد کنید"
                         value={form.first_name}
                         onChange={handleChange}
-                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] transition outline-none focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
+                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] outline-none focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
                     />
                 </div>
 
@@ -81,7 +152,7 @@ const RegisterUi = () => {
                         placeholder="نام خانوادگی خود را وارد کنید"
                         value={form.last_name}
                         onChange={handleChange}
-                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] transition outline-none focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
+                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] outline-none focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
                     />
                 </div>
 
@@ -101,26 +172,24 @@ const RegisterUi = () => {
                         placeholder="مثلاً 09123456789"
                         value={form.phone}
                         onChange={handleChange}
-                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] transition outline-none focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
+                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] outline-none focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
                     />
                 </div>
 
+                {error && (
+                    <p className="text-center text-[13px] font-medium text-red-500">
+                        {error}
+                    </p>
+                )}
+
                 <button
                     type="submit"
-                    className="h-[52px] w-full rounded-[13px] bg-[#123c35] text-[14px] font-bold text-white transition hover:bg-[#1c554a] active:scale-[0.99]"
+                    disabled={loading}
+                    className="h-[52px] w-full rounded-[13px] bg-[#123c35] text-[14px] font-bold text-white transition hover:bg-[#1c554a] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    ثبت‌نام
+                    {loading ? 'در حال ارسال کد...' : 'دریافت کد تأیید'}
                 </button>
             </form>
-
-            {/*<p*/}
-            {/*    className={`${vazir.className} mt-5 text-center text-[12px] font-medium text-[#7c8985]`}*/}
-            {/*>*/}
-            {/*    قبلاً حساب کاربری دارید؟*/}
-            {/*    <span className="mr-1 cursor-pointer font-bold text-[#123c35] hover:text-[#1c554a]">*/}
-            {/*        ورود*/}
-            {/*    </span>*/}
-            {/*</p>*/}
         </div>
     );
 };

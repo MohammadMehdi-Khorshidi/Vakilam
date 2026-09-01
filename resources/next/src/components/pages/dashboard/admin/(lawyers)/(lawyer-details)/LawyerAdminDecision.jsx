@@ -46,7 +46,7 @@ export default function LawyerAdminDecision({ lawyerId }) {
              * اتصال API Laravel:
              *
              * const response = await fetch(
-             *     `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lawyers/${lawyerId}/decisions`,
+             *     `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lawyersAdmin/${lawyerId}/decisions`,
              *     {
              *         method: 'POST',
              *         credentials: 'include',
