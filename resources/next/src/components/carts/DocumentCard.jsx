@@ -1,10 +1,4 @@
-import {
-    CheckCircle2,
-    Clock3,
-    File,
-    FileImage,
-    FileText,
-} from 'lucide-react';
+import { CheckCircle2, Clock3, File, FileImage, FileText } from 'lucide-react';
 
 import {Vazirmatn} from 'next/font/google';
 
@@ -48,8 +42,7 @@ const fileIcons = {
 function FileTypeIcon({extension}) {
     const normalizedExtension = extension?.toLowerCase();
 
-    const iconType =
-        fileIcons[normalizedExtension] || 'file';
+    const iconType = fileIcons[normalizedExtension] || 'file';
 
     if (iconType === 'image') {
         return <FileImage size={22}/>;
@@ -79,9 +72,9 @@ const DocumentCard = ({
 
     const status = document?.status ?? 'نهایی';
 
-    const statusData =
-        statusStyles[status] ||
-        statusStyles['نهایی'];
+    const status = document?.status ?? 'نهایی';
+
+    const statusData = statusStyles[status] || statusStyles['نهایی'];
 
     return (
         <article dir="rtl"

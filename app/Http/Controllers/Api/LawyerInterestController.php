@@ -241,7 +241,7 @@ class LawyerInterestController extends Controller
         abort_unless(
             $lawyer->verification_status === 'approved' && $lawyer->is_available,
             403,
-            'Only approved and available lawyers may express interest.',
+            'Only approved and available lawyersAdmin may express interest.',
         );
 
         return $lawyer;

@@ -256,7 +256,7 @@ test('open interest negotiation produces an open source final proposal', functio
     ])->assertCreated()->assertJsonPath('proposal.source', 'open');
 });
 
-test('another lawyer cannot create update submit or withdraw another lawyers final proposal', function () {
+test('another lawyer cannot create update submit or withdraw another lawyersAdmin final proposal', function () {
     $fixture = finalProposalFixture();
     $other = finalProposalFixture();
 

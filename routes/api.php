@@ -73,8 +73,8 @@ Route::controller(LocationReferenceController::class)->prefix('reference')
 Route::get('/reference/specialties', [SpecialtyReferenceController::class, 'index']);
 
 Route::controller(LawyerDirectoryController::class)->group(function () {
-    Route::get('/lawyers', 'index');
-    Route::get('/lawyers/{publicId}', 'show');
+    Route::get('/lawyersAdmin', 'index');
+    Route::get('/lawyersAdmin/{publicId}', 'show');
 });
 
 Route::middleware(['auth:sanctum', 'active'])->prefix('lawyer/profile')->group(function () {
@@ -108,7 +108,7 @@ Route::middleware(['auth:sanctum', 'active'])->controller(LawyerMatchingControll
         Route::post('/legal-requests/{legalRequest}/matching', 'store');
         Route::get('/legal-requests/{legalRequest}/matching', 'show');
         Route::post('/legal-requests/{legalRequest}/lawyer-requests', 'sendRequests');
-        Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
+        Route::get('/legal-requests/{legalRequest}/consultation-lawyersAdmin', 'consultationLawyers');
     });
 
 Route::middleware(['auth:sanctum', 'active'])
@@ -139,13 +139,80 @@ Route::middleware(['auth:sanctum', 'active'])
         });
     });
 
-Route::middleware(['auth:sanctum', 'active'])->group(function () {
-    Route::controller(LawyerProposalController::class)->group(function () {
-        Route::post('/lawyer/distributions/{distribution}/proposal', 'store');
-        Route::patch('/lawyer/proposals/{proposal:public_id}', 'update');
-        Route::post('/lawyer/proposals/{proposal:public_id}/submit', 'submit');
-        Route::post('/lawyer/proposals/{proposal:public_id}/withdraw', 'withdraw');
-        Route::post('/legal-requests/{legalRequest}/proposals/{proposal:public_id}/select', 'selectForLegalRequest');
+    Route::middleware('auth:sanctum')->controller(ContractWorkflowController::class)
+        ->group(function () {
+            Route::post('/engagements/{engagement}/contract', 'store');
+            Route::get('/engagements/{engagement}/contract', 'show');
+            Route::post('/contracts/{contract}/sign', 'sign');
+        });
+
+    Route::middleware('auth:sanctum')->post('/invoices/{invoice}/payments', [PaymentWorkflowController::class, 'store']);
+    Route::post('/payments/webhook', [PaymentWorkflowController::class, 'webhook'])
+        ->middleware('throttle:30,1');
+    Route::middleware(['auth:sanctum', 'active'])->group(function () {
+
+        Route::controller(LawyerProposalController::class)->group(function () {
+            Route::post('/lawyer/distributions/{distribution}/proposal', 'store');
+            Route::patch('/lawyer/proposals/{proposal:public_id}', 'update');
+            Route::post('/lawyer/proposals/{proposal:public_id}/submit', 'submit');
+            Route::post('/lawyer/proposals/{proposal:public_id}/withdraw', 'withdraw');
+            Route::post('/lawyer/proposals/{proposal:public_id}/select', 'select');
+            Route::post('/legal-requests/{legalRequest}/proposals/{proposal:public_id}/select', 'selectForLegalRequest');
+        });
+
+        Route::controller(LawyerWorkspaceController::class)->group(function () {
+            Route::get('/lawyer/opportunities', 'opportunities');
+            Route::get('/lawyer/proposals', 'proposals');
+            Route::get('/lawyer/engagements', 'engagements');
+        });
+
+        Route::controller(EngagementController::class)->group(function () {
+            Route::get('/engagements/{engagement:public_id}', 'show');
+            Route::get('/legal-requests/{legalRequest}/engagement', 'showForLegalRequest');
+            Route::post('/engagements/{engagement:public_id}/confirm', 'confirm');
+        });
+
+        Route::controller(LawyerInterestController::class)->group(function () {
+            Route::get('/lawyer/open-opportunities', 'openOpportunities');
+            Route::post('/lawyer/legal-requests/{legalRequest:public_id}/interest', 'store');
+            Route::get('/legal-requests/{legalRequest}/lawyer-interests', 'indexForClient');
+            Route::post('/legal-requests/{legalRequest}/lawyer-interests/{distribution}/respond', 'respond');
+        });
+
+        Route::controller(NegotiationController::class)->group(function () {
+            Route::get('/legal-requests/{legalRequest}/negotiations', 'indexForLegalRequest');
+            Route::get('/lawyer/negotiations', 'indexForLawyer');
+            Route::get('/negotiations/{negotiation:public_id}', 'show');
+            Route::post('/negotiations/{negotiation:public_id}/messages', 'message');
+            Route::post('/negotiations/{negotiation:public_id}/close', 'close');
+            Route::post('/negotiations/{negotiation:public_id}/proposal', 'storeFinalProposal');
+        });
+
+        Route::controller(ContractController::class)->group(function () {
+            Route::get('/contracts/{contract:public_id}', 'show');
+            Route::post('/contracts/{contract:public_id}/sign', 'sign');
+        });
+
+        Route::controller(PaymentController::class)->group(function () {
+            Route::post('/invoices/{invoice:public_id}/payments', 'store');
+            Route::get('/payments/{payment:public_id}', 'show');
+        });
+
+        Route::prefix('lawyer/availabilities')->group(function () {
+            Route::post('/', [LawyerAvailabilityController::class, 'store']);
+        });
+
+        Route::get('/legal-requests/{legalRequest}/consultation-lawyersAdmin/{publicId}/slots',
+            [LawyerAvailabilityController::class, 'consultationSlots']);
+
+        Route::post('/legal-requests/{legalRequest}/consultation-slots/{slot}/reserve',
+            [ConsultationController::class, 'reserve']);
+
+        Route::post('/legal-requests/{legalRequest}/lawyer-selection/{lawyerProfile:public_id}',
+            [LawyerSelectionController::class, 'store'])
+            ->withoutScopedBindings();
+
+        Route::post('/lawyer/distributions/{distribution}/respond', [LawyerSelectionController::class, 'respond']);
     });
 
     Route::controller(LawyerWorkspaceController::class)->group(function () {

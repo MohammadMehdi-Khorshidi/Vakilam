@@ -36,7 +36,7 @@ class LawyerSelectionController extends Controller
             && $profile !== null
             && $profile->verification_status === 'approved',
             403,
-            'Only approved lawyers can view invitations.',
+            'Only approved lawyersAdmin can view invitations.',
         );
 
         $invitations = $profile->distributions()

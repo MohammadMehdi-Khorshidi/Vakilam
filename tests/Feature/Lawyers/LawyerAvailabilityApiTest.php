@@ -156,7 +156,7 @@ test('a client can view only open future consultation slots for an eligible lawy
     Sanctum::actingAs($client);
 
     $this->getJson(
-        "/api/legal-requests/{$legalRequest->id}/consultation-lawyers/{$lawyer->public_id}/slots"
+        "/api/legal-requests/{$legalRequest->id}/consultation-lawyersAdmin/{$lawyer->public_id}/slots"
     )
         ->assertOk()
         ->assertJsonCount(1, 'data')

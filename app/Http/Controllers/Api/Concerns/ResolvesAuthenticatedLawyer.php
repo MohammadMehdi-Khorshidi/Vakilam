@@ -18,7 +18,7 @@ trait ResolvesAuthenticatedLawyer
                 && $user->status === 'active'
                 && $user->mayActAsRole('lawyer'),
             403,
-            'Only active lawyers may manage a lawyer profile.',
+            'Only active lawyersAdmin may manage a lawyer profile.',
         );
 
         return LawyerProfile::query()

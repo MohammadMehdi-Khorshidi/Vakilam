@@ -242,7 +242,7 @@ class NegotiationController extends Controller
                 && $user->lawyerProfile !== null
                 && $user->lawyerProfile->verification_status === 'approved',
             403,
-            'Only approved lawyers may use negotiations.',
+            'Only approved lawyersAdmin may use negotiations.',
         );
 
         return $user;
