@@ -28,11 +28,8 @@ use Throwable;
 class RegisterController extends Controller
 {
     private const OTP_TTL_SECONDS = 120;
-
     private const OTP_RESEND_AFTER_SECONDS = 60;
-
     private const OTP_MAX_ATTEMPTS = 5;
-
     private const VERIFICATION_TTL_SECONDS = 600;
 
     public function sendOtp(Request $request, OtpSender $otpSender): JsonResponse
