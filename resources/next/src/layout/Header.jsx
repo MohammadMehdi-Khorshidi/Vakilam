@@ -4,11 +4,9 @@ import { useState } from 'react';
 import Image from 'next/image';
 import ButtonHeader from '@/components/ui/button/ButtonHeader';
 import HeaderIcon from '@/assets/images/HeaderIcon.svg';
-// import { useRouter } from 'next/navigation';
 
 export default function Header() {
     const [open, setOpen] = useState(false);
-    // const router = useRouter();
 
     const menuItems = [
         { label: 'تیم‌ما', path: '/teams' },
@@ -21,11 +19,9 @@ export default function Header() {
         <header dir="ltr" className="sticky top-0 z-100 bg-white shadow-lg">
             <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 md:h-20 lg:px-0">
                 <div className="hidden items-center gap-2 lg:flex">
-                    {/* <ButtonHeader variant="primary" href="/submit">
-            شرح مسئله حقوقی
-          </ButtonHeader> */}
 
-                    <ButtonHeader variant="primary" href="/register">
+
+                    <ButtonHeader variant="primary" href="/auth">
                         ورود / ثبت نام
                     </ButtonHeader>
                 </div>

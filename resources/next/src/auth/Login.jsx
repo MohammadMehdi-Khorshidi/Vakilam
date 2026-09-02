@@ -1,8 +1,6 @@
 'use client';
 
 import { Vazirmatn } from 'next/font/google';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -10,93 +8,6 @@ const vazir = Vazirmatn({
 });
 
 const LoginUi = () => {
-    const router = useRouter();
-
-    const [form, setForm] = useState({
-        phone: '',
-        password: '',
-    });
-
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    const handleChange = (e) => {
-        setForm({
-            ...form,
-            [e.target.name]: e.target.value,
-        });
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        setError('');
-
-        if (!form.phone.trim()) {
-            setError('لطفاً شماره موبایل خود را وارد کنید.');
-            return;
-        }
-
-        if (!form.password) {
-            setError('لطفاً رمز عبور خود را وارد کنید.');
-            return;
-        }
-
-        try {
-            setLoading(true);
-
-            const response = await fetch(
-                'http://127.0.0.1:8000/api/auth/login',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                    },
-                    body: JSON.stringify({
-                        phone: form.phone,
-                        password: form.password,
-                    }),
-                },
-            );
-
-            const data = await response.json();
-
-            console.log('Login Response:', data);
-
-            if (!response.ok) {
-                setError(
-                    data.message || 'شماره موبایل یا رمز عبور اشتباه است.',
-                );
-                return;
-            }
-
-            /*
-             * اگر API توکن برگرداند،
-             * فعلاً آن را ذخیره می‌کنیم.
-             */
-            if (data.token) {
-                localStorage.setItem('token', data.token);
-            }
-
-            /*
-             * اگر توکن داخل data.data باشد
-             */
-            if (data.data?.token) {
-                localStorage.setItem('token', data.data.token);
-            }
-
-            // بعداً مسیر داشبورد را بر اساس role تنظیم می‌کنیم
-            router.push('/dashboard');
-        } catch (error) {
-            console.error('Login Error:', error);
-
-            setError('ارتباط با سرور برقرار نشد.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     return (
         <div
             dir="rtl"
@@ -112,10 +23,9 @@ const LoginUi = () => {
                 </p>
             </header>
 
-            <form
-                onSubmit={handleSubmit}
-                className={`${vazir.className} mt-7 space-y-5`}
-            >
+            <form className={`${vazir.className} mt-7 space-y-5`}>
+                {/* شماره موبایل */}
+
                 <div>
                     <label
                         htmlFor="phone"
@@ -130,11 +40,11 @@ const LoginUi = () => {
                         type="tel"
                         inputMode="numeric"
                         placeholder="مثلاً 09123456789"
-                        value={form.phone}
-                        onChange={handleChange}
-                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] outline-none focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
+                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] outline-none transition focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
                     />
                 </div>
+
+                {/* رمز عبور */}
 
                 <div>
                     <label
@@ -149,14 +59,12 @@ const LoginUi = () => {
                         name="password"
                         type="password"
                         placeholder="رمز عبور خود را وارد کنید"
-                        value={form.password}
-                        onChange={handleChange}
-                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] outline-none focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
+                        className="h-[52px] w-full rounded-[13px] border border-[#dfe7e4] bg-[#fafcfb] px-4 text-[14px] text-[#123c35] outline-none transition focus:border-[#1c554a] focus:ring-2 focus:ring-[#1c554a]/10"
                     />
-                    <div className="flex justify-start">
+
+                    <div className="mt-2 flex justify-start">
                         <button
                             type="button"
-                            onClick={() => router.push('/forgot-password')}
                             className={`${vazir.className} text-[12px] font-bold text-[#123c35] transition hover:text-[#c9a96e]`}
                         >
                             رمز عبورم را فراموش کرده‌ام
@@ -164,18 +72,13 @@ const LoginUi = () => {
                     </div>
                 </div>
 
-                {error && (
-                    <p className="text-center text-[13px] font-medium text-red-500">
-                        {error}
-                    </p>
-                )}
+                {/* دکمه ورود */}
 
                 <button
-                    type="submit"
-                    disabled={loading}
-                    className="h-[52px] w-full rounded-[13px] bg-[#123c35] text-[14px] font-bold text-white transition hover:bg-[#1c554a] disabled:cursor-not-allowed disabled:opacity-60"
+                    type="button"
+                    className="h-[52px] w-full rounded-[13px] bg-[#123c35] text-[14px] font-bold text-white transition hover:bg-[#1c554a] active:scale-[0.99]"
                 >
-                    {loading ? 'در حال ورود...' : 'ورود'}
+                    ورود
                 </button>
             </form>
         </div>

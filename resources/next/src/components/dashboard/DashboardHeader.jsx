@@ -99,7 +99,7 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
     return (
         <header
             dir="rtl"
-            className={`${vazir.className} fixed left-0 right-0 top-20 z-40 h-[80px] border-b border-[#e7ebe9] bg-white lg:right-[280px]`}
+            className={`${vazir.className} fixed left-0 right-0 top-20 z-40 h-[80px] border-b border-[#e7ebe9] bg-white lg:right-[270px]`}
         >
             <div className="flex h-full w-full items-center justify-between px-4 sm:px-6 lg:px-8">
                 {/* ================= Right Side ================= */}
