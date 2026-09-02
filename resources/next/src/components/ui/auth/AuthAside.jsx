@@ -38,7 +38,7 @@ export function AuthAside() {
                         همکاری حقوقی
                     </h2>
 
-                    <p
+                    <p dir="rtl"
                         className={` ${vazir.className} mt-4 ml-auto max-w-[560px] text-xs leading-7 text-green-100/80 sm:text-sm md:mt-5 md:text-[15px] md:leading-8`}
                     >
                         اطلاعات پرونده فقط برای کمک در همان پرونده استفاده
