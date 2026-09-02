@@ -32,6 +32,11 @@ return [
         'webhook_secret' => env('PAYMENT_WEBHOOK_SECRET'),
     ],
 
+    'ippanel' => [
+        'from' => env('IPPANEL_FROM'),
+        'otp_pattern' => env('IPPANEL_OTP_PATTERN'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

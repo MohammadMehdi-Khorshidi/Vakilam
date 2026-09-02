@@ -69,11 +69,7 @@ class LegalRequestDistribution extends Model
 
     public function proposal()
     {
-        return $this->hasMany(LawyerProposal::class, 'distribution_id');
+        return $this->hasOne(LawyerProposal::class, 'distribution_id');
     }
 
-    public function negotiationThread()
-    {
-        return $this->hasOne(NegotiationThread::class, 'distribution_id');
-    }
 }
