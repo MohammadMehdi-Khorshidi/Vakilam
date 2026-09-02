@@ -174,6 +174,3 @@ const RegisterOtp = () => {
 };
 
 export default RegisterOtp;
-
-
-WebcoreMainAP;
