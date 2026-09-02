@@ -72,8 +72,6 @@ const DocumentCard = ({
 
     const status = document?.status ?? 'نهایی';
 
-    const status = document?.status ?? 'نهایی';
-
     const statusData = statusStyles[status] || statusStyles['نهایی'];
 
     return (
