@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\ClientCaseController;
 use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\ConsultationController;
 use App\Http\Controllers\Api\ContractController;
-use App\Http\Controllers\Api\ContractWorkflowController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EngagementController;
 use App\Http\Controllers\Api\FinalLawyerSelectionController;
@@ -26,7 +25,6 @@ use App\Http\Controllers\Api\LegalRequestServiceIntentController;
 use App\Http\Controllers\Api\LocationReferenceController;
 use App\Http\Controllers\Api\NegotiationController;
 use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\PaymentWorkflowController;
 use App\Http\Controllers\Api\SpecialtyReferenceController;
 use App\Http\Resources\AuthenticatedUserResource;
 use Illuminate\Http\Request;
@@ -217,21 +215,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/contracts/{contract:public_id}/sign', 'sign');
     });
 
-    // Contract Workflow (engagement-linked)
-    Route::controller(ContractWorkflowController::class)->group(function () {
-        Route::post('/engagements/{engagement}/contract', 'store');
-        Route::get('/engagements/{engagement}/contract', 'show');
-        Route::post('/contracts/{contract}/sign', 'sign');
-    });
-
     // Payments
     Route::controller(PaymentController::class)->group(function () {
         Route::post('/invoices/{invoice:public_id}/payments', 'store');
         Route::get('/payments/{payment:public_id}', 'show');
     });
-
-    // Payment Workflow (alternative / legacy path)
-    Route::post('/invoices/{invoice}/payments', [PaymentWorkflowController::class, 'store']);
 
     // Lawyer Availability
     Route::prefix('lawyer/availabilities')->group(function () {
@@ -266,9 +254,5 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::post('/payments/webhook', [PaymentWorkflowController::class, 'webhook'])
-    ->middleware('throttle:30,1');
-
 Route::post('/payments/{payment:public_id}/webhook', [PaymentController::class, 'webhook'])
     ->middleware('throttle:30,1');
-

@@ -83,7 +83,7 @@ class LawyerMatchingService
     }
 
     /**
-     * Return ranked consultation lawyersAdmin without creating matching records.
+     * Return ranked consultation lawyers without creating matching records.
      *
      * @return Collection<int, array{
      *     lawyer: LawyerProfile,
@@ -104,7 +104,7 @@ class LawyerMatchingService
     }
 
     /**
-     * Send invitations to up to five lawyersAdmin explicitly selected by the client.
+     * Send invitations to up to five lawyers explicitly selected by the client.
      *
      * Invitations are independent from final proposals. A lawyer acceptance only
      * opens a Negotiation and never creates Engagement directly.
@@ -129,7 +129,7 @@ class LawyerMatchingService
                 'Lawyer requests are only available for submitted lawyer-selection requests.',
             );
 
-            abort_unless(count($lawyerPublicIds) === count(array_unique($lawyerPublicIds)), 422, 'Duplicate lawyersAdmin are not allowed.');
+            abort_unless(count($lawyerPublicIds) === count(array_unique($lawyerPublicIds)), 422, 'Duplicate lawyers are not allowed.');
 
             $run = $lockedRequest->matchRuns()
                 ->where('algorithm_version', self::ALGORITHM_VERSION)
@@ -138,7 +138,7 @@ class LawyerMatchingService
                 ->first();
 
             if ($run === null) {
-                abort(409, 'Run lawyer matching before selecting lawyersAdmin.');
+                abort(409, 'Run lawyer matching before selecting lawyers.');
             }
 
             $candidates = $run->candidates()
@@ -184,7 +184,7 @@ class LawyerMatchingService
             if ($existingInviteLawyerIds->merge($selectedProfileIds)->unique()->count() > 5) {
                 throw ValidationException::withMessages([
                     'lawyer_public_ids' => [
-                        'A legal request can be sent to at most five lawyersAdmin.',
+                        'A legal request can be sent to at most five lawyers.',
                     ],
                 ]);
             }

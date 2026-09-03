@@ -1,6 +1,7 @@
 'use client';
 
 import { Vazirmatn } from 'next/font/google';
+import Link from 'next/link';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -63,12 +64,12 @@ const LoginUi = () => {
                     />
 
                     <div className="mt-2 flex justify-start">
-                        <button
-                            type="button"
+                        <Link
+                            href="/forgot-password"
                             className={`${vazir.className} text-[12px] font-bold text-[#123c35] transition hover:text-[#c9a96e]`}
                         >
                             رمز عبورم را فراموش کرده‌ام
-                        </button>
+                        </Link>
                     </div>
                 </div>
 

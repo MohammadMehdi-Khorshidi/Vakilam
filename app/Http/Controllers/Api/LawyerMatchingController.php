@@ -99,7 +99,7 @@ class LawyerMatchingController extends Controller
         );
 
         return response()->json([
-            'message' => 'The legal request was sent to the selected lawyersAdmin.',
+            'message' => 'The legal request was sent to the selected lawyers.',
             'data' => $distributions->map(fn ($distribution): array => [
                 'distribution_id' => $distribution->id,
                 'status' => $distribution->status,
