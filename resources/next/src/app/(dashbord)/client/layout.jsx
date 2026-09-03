@@ -4,11 +4,13 @@ import { useState } from 'react';
 
 import ClientSidebar from '@/components/dashboard/ClientSidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import AuthGuard from '@/auth/AuthGuard';
 
 const ClientDashboardLayout = ({ children }) => {
     const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
+        <AuthGuard roles={['client']}>
         <div
             dir="rtl"
             className="min-h-screen bg-[#f8faf9]"
@@ -39,6 +41,7 @@ const ClientDashboardLayout = ({ children }) => {
                 </div>
             </div>
         </div>
+        </AuthGuard>
     );
 };
 

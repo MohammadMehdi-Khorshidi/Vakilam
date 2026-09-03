@@ -1,17 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { apiRequest } from '@/lib/api/client';
 
 export const getCase = async (caseId) => {
-    const response = await fetch(`${API_URL}/client/cases/${caseId}`, {
+    const result = await apiRequest(`/client/cases/${caseId}`, {
         method: 'GET',
-        headers: {
-            Accept: 'application/json',
-        },
-        credentials: 'include',
+        auth: true,
     });
 
-    if (!response.ok) {
-        throw new Error('دریافت اطلاعات پرونده انجام نشد.');
-    }
-
-    return response.json();
+    return result.data ?? result;
 };

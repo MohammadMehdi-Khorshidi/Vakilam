@@ -141,29 +141,29 @@ class LawyerMatchingService
                 abort(409, 'Run lawyer matching before selecting lawyers.');
             }
 
-            $candidates = $run->candidates()
+            $lawyers = LawyerProfile::query()
+                ->whereIn('public_id', $lawyerPublicIds)
+                ->where('verification_status', 'approved')
+                ->where('is_available', true)
                 ->whereHas(
-                    'lawyerProfile',
-                    fn ($query) => $query
-                        ->whereIn('public_id', $lawyerPublicIds)
-                        ->where('verification_status', 'approved')
-                        ->where('is_available', true)
-                        ->whereHas(
-                            'user',
-                            fn ($userQuery) => $userQuery->where('status', 'active'),
-                        ),
+                    'user',
+                    fn ($query) => $query->where('status', 'active'),
                 )
-                ->with('lawyerProfile:id,public_id')
-                ->get()
-                ->keyBy(fn ($candidate) => $candidate->lawyerProfile->public_id);
+                ->get(['id', 'public_id'])
+                ->keyBy('public_id');
 
-            if ($candidates->count() !== count($lawyerPublicIds)) {
+            if ($lawyers->count() !== count($lawyerPublicIds)) {
                 throw ValidationException::withMessages([
                     'lawyer_public_ids' => [
-                        'Every selected lawyer must belong to the latest matching result.',
+                        'Every selected lawyer must be approved, available, and active.',
                     ],
                 ]);
             }
+
+            $candidates = $run->candidates()
+                ->whereIn('lawyer_profile_id', $lawyers->pluck('id'))
+                ->get()
+                ->keyBy('lawyer_profile_id');
 
             LegalRequestDistribution::query()
                 ->where('legal_request_id', $lockedRequest->id)
@@ -179,7 +179,7 @@ class LawyerMatchingService
                 ->whereIn('status', ['pending', 'negotiating'])
                 ->pluck('lawyer_profile_id');
 
-            $selectedProfileIds = $candidates->pluck('lawyer_profile_id')->values();
+            $selectedProfileIds = $lawyers->pluck('id')->values();
 
             if ($existingInviteLawyerIds->merge($selectedProfileIds)->unique()->count() > 5) {
                 throw ValidationException::withMessages([
@@ -190,19 +190,12 @@ class LawyerMatchingService
             }
 
             foreach ($lawyerPublicIds as $publicId) {
-                $candidate = $candidates->get($publicId);
-
-                if (! $candidate instanceof LawyerMatchCandidate) {
-                    throw ValidationException::withMessages([
-                        'lawyer_public_ids' => [
-                            'Every selected lawyer must belong to the latest matching result.',
-                        ],
-                    ]);
-                }
+                $lawyer = $lawyers->get($publicId);
+                $candidate = $candidates->get($lawyer->id);
 
                 $distribution = LegalRequestDistribution::query()
                     ->where('legal_request_id', $lockedRequest->id)
-                    ->where('lawyer_profile_id', $candidate->lawyer_profile_id)
+                    ->where('lawyer_profile_id', $lawyer->id)
                     ->lockForUpdate()
                     ->first();
 
@@ -232,7 +225,7 @@ class LawyerMatchingService
                     }
 
                     $distribution->forceFill([
-                        'match_candidate_id' => $candidate->id,
+                        'match_candidate_id' => $candidate?->id,
                         'source' => 'client_invite',
                         'status' => 'pending',
                         'sent_at' => now(),
@@ -246,8 +239,8 @@ class LawyerMatchingService
 
                 LegalRequestDistribution::query()->create([
                     'legal_request_id' => $lockedRequest->id,
-                    'lawyer_profile_id' => $candidate->lawyer_profile_id,
-                    'match_candidate_id' => $candidate->id,
+                    'lawyer_profile_id' => $lawyer->id,
+                    'match_candidate_id' => $candidate?->id,
                     'source' => 'client_invite',
                     'status' => 'pending',
                     'sent_at' => now(),

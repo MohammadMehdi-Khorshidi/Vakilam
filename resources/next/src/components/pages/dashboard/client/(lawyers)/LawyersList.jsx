@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation';
 import { Vazirmatn } from 'next/font/google';
 
 import LawyerCard from '@/components/carts/LawyerCard';
+import { apiRequest } from '@/lib/api/client';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
     weight: ['400', '500', '600', '700', '800'],
     display: 'swap',
 });
-
-const API_URL = 'http://127.0.0.1:8000/api/lawyers/{{lawyer_public_id}}';
 
 export default function LawyersList() {
     const router = useRouter();
@@ -27,23 +26,7 @@ export default function LawyersList() {
                 setLoading(true);
                 setError('');
 
-                const response = await fetch(`${API_URL}/lawyers`, {
-                    method: 'GET',
-                    headers: {
-                        Accept: 'application/json',
-                    },
-                });
-
-                const result = await response.json();
-
-                console.log('Lawyers API Response:', result);
-
-                if (!response.ok) {
-                    setError(
-                        result.message || 'دریافت لیست وکلا با خطا مواجه شد.',
-                    );
-                    return;
-                }
+                const result = await apiRequest('/lawyers');
 
                 const lawyerList = Array.isArray(result)
                     ? result

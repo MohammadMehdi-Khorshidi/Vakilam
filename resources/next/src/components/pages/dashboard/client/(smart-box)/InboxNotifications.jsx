@@ -9,7 +9,7 @@ const vazir = Vazirmatn({
 
 const notifications = [
     {
-        title: 'پیشنهاد جدید از نرگس سعادتی',
+        title: 'پیشنهاد همکاری جدید',
         subtitle: 'پیشنهاد · ۱۳ دقیقه پیش',
         icon: 'پ',
         active: true,

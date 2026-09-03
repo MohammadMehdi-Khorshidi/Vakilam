@@ -42,8 +42,8 @@ import { useEffect, useMemo, useState } from 'react';
  import LawyersHeader from './(lawyers)/LawyersHeader';
  import LawyersTable from './(lawyers)/LawyersTable';
 import LawyersFilters from './(lawyers)/LawyersFilters';
+import { apiRequest } from '@/lib/api/client';
 
-const API_URL = 'http://127.0.0.1:8000/api/lawyers';
 
 export default function LawyersPage() {
     const [lawyers, setLawyers] = useState([]);
@@ -63,47 +63,7 @@ export default function LawyersPage() {
                 setLoading(true);
                 setError('');
 
-                const token = localStorage.getItem('auth_token');
-
-                const headers = {
-                    Accept: 'application/json',
-                };
-
-                // اگر کاربر لاگین باشد
-                if (token) {
-                    headers.Authorization = `Bearer ${token}`;
-                }
-
-                const response = await fetch(API_URL, {
-                    method: 'GET',
-                    headers,
-                });
-
-                const result = await response.json();
-
-                console.log('Lawyers API Response:', result);
-
-                // =================================================
-                // خطای احراز هویت
-                // =================================================
-
-                if (response.status === 401) {
-                    setError('دسترسی شما برای مشاهده لیست وکلا مجاز نیست.');
-
-                    return;
-                }
-
-                // =================================================
-                // سایر خطاها
-                // =================================================
-
-                if (!response.ok) {
-                    setError(
-                        result.message || 'دریافت لیست وکلا با خطا مواجه شد.',
-                    );
-
-                    return;
-                }
+                const result = await apiRequest('/lawyers');
 
                 // =================================================
                 // گرفتن data

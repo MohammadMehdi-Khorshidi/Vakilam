@@ -8,7 +8,9 @@ use App\Http\Requests\LawyerMatching\SendLawyerRequestsRequest;
 use App\Http\Resources\LawyerMatchCandidateResource;
 use App\Http\Resources\LawyerMatchRunResource;
 use App\Http\Resources\LawyerPublicResource;
+use App\Models\LawyerMatchCandidate;
 use App\Models\LawyerMatchRun;
+use App\Models\LawyerProfile;
 use App\Models\LegalRequest;
 use App\Models\User;
 use App\Services\LawyerMatching\LawyerMatchingService;
@@ -58,6 +60,97 @@ class LawyerMatchingController extends Controller
             $run,
             $matchingService->paginateCandidates($run),
         ));
+    }
+
+    public function lawyers(
+        Request $request,
+        LegalRequest $legalRequest,
+        LawyerMatchingService $matchingService,
+    ): JsonResponse
+    {
+        $this->ensureOwner($request, $legalRequest);
+
+        abort_unless(
+            $legalRequest->status === 'submitted'
+                && $legalRequest->service_intent === 'lawyer_selection',
+            409,
+            'Lawyer directory is only available for submitted lawyer-selection requests.',
+        );
+
+        $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $result = $matchingService->run($legalRequest);
+        $run = $result['run'];
+        $search = trim((string) $request->query('q', ''));
+        $perPage = min(max((int) $request->integer('per_page', 20), 1), 50);
+
+        $scoreSubquery = LawyerMatchCandidate::query()
+            ->select('score')
+            ->whereColumn('lawyer_profile_id', 'lawyer_profiles.id')
+            ->where('match_run_id', $run->id)
+            ->limit(1);
+        $rankSubquery = LawyerMatchCandidate::query()
+            ->select('rank_position')
+            ->whereColumn('lawyer_profile_id', 'lawyer_profiles.id')
+            ->where('match_run_id', $run->id)
+            ->limit(1);
+
+        $lawyers = LawyerProfile::query()
+            ->where('verification_status', 'approved')
+            ->where('is_available', true)
+            ->whereHas('user', fn ($query) => $query->where('status', 'active'))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($query) use ($search): void {
+                    $query->where('full_name', 'like', "%{$search}%")
+                        ->orWhereHas('specialties', fn ($specialtyQuery) => $specialtyQuery
+                            ->where('specialties.status', true)
+                            ->where(function ($specialtyQuery) use ($search): void {
+                                $specialtyQuery->where('specialties.name', 'like', "%{$search}%")
+                                    ->orWhere('specialties.code', 'like', "%{$search}%");
+                            }));
+                });
+            })
+            ->addSelect([
+                'match_score' => $scoreSubquery,
+                'match_rank' => $rankSubquery,
+            ])
+            ->with([
+                'lawyerSpecialties.specialty:id,code,name,status',
+                'serviceAreas.province:id,name',
+                'serviceAreas.city:id,province_id,name',
+            ])
+            ->orderByDesc('match_score')
+            ->orderByDesc('average_rating')
+            ->orderBy('full_name')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return response()->json([
+            'data' => collect($lawyers->items())->map(fn (LawyerProfile $lawyer): array => [
+                'match_score' => $lawyer->getAttribute('match_score') !== null
+                    ? (float) $lawyer->getAttribute('match_score')
+                    : null,
+                'match_rank' => $lawyer->getAttribute('match_rank') !== null
+                    ? (int) $lawyer->getAttribute('match_rank')
+                    : null,
+                'is_matching_candidate' => $lawyer->getAttribute('match_score') !== null,
+                'lawyer' => LawyerPublicResource::make($lawyer)->resolve(),
+            ])->values(),
+            'meta' => [
+                'matching_run_id' => $run->id,
+                'pagination' => [
+                    'current_page' => $lawyers->currentPage(),
+                    'last_page' => $lawyers->lastPage(),
+                    'per_page' => $lawyers->perPage(),
+                    'total' => $lawyers->total(),
+                    'from' => $lawyers->firstItem(),
+                    'to' => $lawyers->lastItem(),
+                ],
+            ],
+        ]);
     }
 
     public function consultationLawyers(

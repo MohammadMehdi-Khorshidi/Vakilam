@@ -4,6 +4,7 @@ import { Vazirmatn } from 'next/font/google';
 import { useRouter } from 'next/navigation';
 import { Scale, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { storeAuthSession } from '@/lib/api/client';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -289,8 +290,7 @@ export default function RegisterUi() {
                 }),
             });
 
-            localStorage.setItem('auth_token', payload.access_token);
-            localStorage.setItem('auth_user', JSON.stringify(payload.user));
+            storeAuthSession(payload);
             sessionStorage.removeItem(STORAGE_KEY);
             router.replace(profile.role === 'lawyer' ? '/lawyer' : '/client');
         } catch (requestError) {

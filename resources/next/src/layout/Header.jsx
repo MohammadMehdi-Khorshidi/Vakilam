@@ -4,9 +4,14 @@ import { useState } from 'react';
 import Image from 'next/image';
 import ButtonHeader from '@/components/ui/button/ButtonHeader';
 import HeaderIcon from '@/assets/images/HeaderIcon.svg';
+import { useAuth } from '@/auth/AuthProvider';
+import { dashboardPathForUser } from '@/lib/api/client';
 
 export default function Header() {
     const [open, setOpen] = useState(false);
+    const { user, loading } = useAuth();
+    const accountHref = user ? dashboardPathForUser(user) : '/auth';
+    const accountLabel = user ? 'داشبورد من' : 'ورود / ثبت نام';
 
     const menuItems = [
         { label: 'تیم‌ما', path: '/teams' },
@@ -21,8 +26,8 @@ export default function Header() {
                 <div className="hidden items-center gap-2 lg:flex">
 
 
-                    <ButtonHeader variant="primary" href="/auth">
-                        ورود / ثبت نام
+                    <ButtonHeader variant="primary" href={accountHref}>
+                        {loading ? '...' : accountLabel}
                     </ButtonHeader>
                 </div>
 
@@ -73,8 +78,8 @@ export default function Header() {
                             شرح مسئله حقوقی
                         </ButtonHeader>
 
-                        <ButtonHeader variant="ghost" full href="/auth">
-                            ورود / ثبت نام
+                        <ButtonHeader variant="ghost" full href={accountHref}>
+                            {loading ? '...' : accountLabel}
                         </ButtonHeader>
                     </div>
                 </div>

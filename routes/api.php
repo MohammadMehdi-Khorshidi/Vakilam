@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EngagementController;
 use App\Http\Controllers\Api\FinalLawyerSelectionController;
 use App\Http\Controllers\Api\LawyerAvailabilityController;
+use App\Http\Controllers\Api\LegalCategoryReferenceController;
 use App\Http\Controllers\Api\LawyerDirectoryController;
 use App\Http\Controllers\Api\LawyerInterestController;
 use App\Http\Controllers\Api\LawyerMatchingController;
@@ -66,6 +67,7 @@ Route::prefix('reference')->group(function () {
     });
 
     Route::get('/specialties', [SpecialtyReferenceController::class, 'index']);
+    Route::get('/legal-categories', [LegalCategoryReferenceController::class, 'index']);
 });
 
 /*
@@ -137,6 +139,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::controller(LawyerMatchingController::class)->group(function () {
         Route::post('/legal-requests/{legalRequest}/matching', 'store');
         Route::get('/legal-requests/{legalRequest}/matching', 'show');
+        Route::get('/legal-requests/{legalRequest}/lawyers', 'lawyers');
         Route::post('/legal-requests/{legalRequest}/lawyer-requests', 'sendRequests');
         Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
     });
