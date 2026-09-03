@@ -17,18 +17,27 @@ beforeEach(function () {
     config()->set('lawyer_registry.records_key', null);
     config()->set('lawyer_registry.license_key', 'license_number');
     config()->set('lawyer_registry.phone_key', 'phone');
+    config()->set('lawyer_registry.name_key', 'full_name');
     config()->set('lawyer_registry.organization_key', 'organization');
 
     Storage::disk('local')->put('lawyers.json', json_encode([
         [
             'license_number' => '۱۲۳-۴۵',
             'phone' => '+989121111111',
+            'full_name' => 'Sara Karimi',
             'organization' => 'Judiciary Center',
         ],
         [
             'license_number' => '12345',
             'phone' => '09122222222',
+            'full_name' => 'Reza Ahmadi',
             'organization' => 'Bar Association',
+        ],
+        [
+            'license_number' => '54321',
+            'phone' => '09125555555',
+            'full_name' => 'ابوالفضل رستم تبار',
+            'organization' => 'Test Registry',
         ],
     ], JSON_UNESCAPED_UNICODE));
 });
@@ -226,6 +235,55 @@ test('a phone mismatch is rejected without creating an account', function () {
         ->assertJsonValidationErrors('phone');
 
     expect(User::query()->where('phone', '09123333333')->exists())->toBeFalse();
+});
+
+test('a lawyer name mismatch is rejected without creating an account', function () {
+    $otpResponse = $this->postJson('/api/auth/register/send-otp', [
+        'phone' => '09121111111',
+    ])->assertOk();
+    $verificationToken = $this->postJson('/api/auth/register/verify-otp', [
+        'phone' => '09121111111',
+        'otp' => $otpResponse->json('debug_otp'),
+    ])->assertOk()->json('verification_token');
+
+    $this->postJson('/api/auth/register', [
+        'first_name' => 'Ali',
+        'last_name' => 'Ahmadi',
+        'phone' => '09121111111',
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
+        'role' => 'lawyer',
+        'license_number' => '12345',
+        'terms_accepted' => true,
+        'verification_token' => $verificationToken,
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('first_name');
+
+    expect(User::query()->where('phone', '09121111111')->exists())->toBeFalse();
+});
+
+test('persian name normalization accepts spaces and half spaces', function () {
+    $otpResponse = $this->postJson('/api/auth/register/send-otp', [
+        'phone' => '09125555555',
+    ])->assertOk();
+    $verificationToken = $this->postJson('/api/auth/register/verify-otp', [
+        'phone' => '09125555555',
+        'otp' => $otpResponse->json('debug_otp'),
+    ])->assertOk()->json('verification_token');
+
+    $this->postJson('/api/auth/register', [
+        'first_name' => 'ابوالفضل',
+        'last_name' => 'رستم‌تبار',
+        'phone' => '09125555555',
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
+        'role' => 'lawyer',
+        'license_number' => '54321',
+        'terms_accepted' => true,
+        'verification_token' => $verificationToken,
+    ])->assertCreated();
+
+    expect(User::query()->where('phone', '09125555555')->exists())->toBeTrue();
 });
 
 test('lawyer registration returns service unavailable when registry file is missing', function () {

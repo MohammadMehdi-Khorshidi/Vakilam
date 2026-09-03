@@ -9,12 +9,17 @@ use JsonException;
 class LawyerRegistryVerifier
 {
     /**
-     * @return array{license_number: string, organization: mixed, source_hash: string}
+     * @return array{license_number: string, full_name: string, organization: mixed, source_hash: string}
      */
-    public function verify(string $licenseNumber, string $verifiedPhone): array
+    public function verify(
+        string $licenseNumber,
+        string $verifiedPhone,
+        string $providedFullName,
+    ): array
     {
         $normalizedLicense = $this->normalizeLicenseNumber($licenseNumber);
         $normalizedPhone = $this->normalizePhone($verifiedPhone);
+        $normalizedFullName = $this->normalizePersonName($providedFullName);
 
         if ($normalizedLicense === '') {
             throw LawyerRegistryVerificationException::invalidLicense();
@@ -56,8 +61,26 @@ class LawyerRegistryVerifier
             throw LawyerRegistryVerificationException::phoneMismatch();
         }
 
+        $registryFullName = (string) $this->recordValue(
+            $matchedRecord,
+            (string) config('lawyer_registry.name_key'),
+            ['full_name', 'name', 'lawyer_name', 'نام و نام خانوادگی', 'نام'],
+        );
+
+        if (
+            $normalizedFullName === ''
+            || $this->normalizePersonName($registryFullName) === ''
+            || ! hash_equals(
+                $this->normalizePersonName($registryFullName),
+                $normalizedFullName,
+            )
+        ) {
+            throw LawyerRegistryVerificationException::nameMismatch();
+        }
+
         return [
             'license_number' => $normalizedLicense,
+            'full_name' => trim($registryFullName),
             'organization' => $this->recordValue(
                 $matchedRecord,
                 (string) config('lawyer_registry.organization_key'),
@@ -156,6 +179,26 @@ class LawyerRegistryVerifier
         }
 
         return $phone;
+    }
+
+
+    private function normalizePersonName(string $name): string
+    {
+        $name = strtr($name, [
+            'ي' => 'ی',
+            'ى' => 'ی',
+            'ك' => 'ک',
+            '‌' => ' ',
+            '‏' => '',
+            '‎' => '',
+        ]);
+
+        $name = preg_replace('/[\x{064B}-\x{065F}\x{0670}]/u', '', $name) ?? $name;
+        $name = mb_strtolower(trim($name), 'UTF-8');
+
+        // Spaces, half-spaces and common separators should not make an
+        // otherwise identical Persian name fail registry verification.
+        return (string) preg_replace('/[\s\-‐‑‒–—_]+/u', '', $name);
     }
 
     private function toEnglishDigits(string $value): string

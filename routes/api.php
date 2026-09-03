@@ -40,6 +40,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth/register')->name('apiRegister.')->controller(RegisterController::class)->group(function () {
     Route::post('/send-otp', 'sendOtp')->middleware('throttle:3,1')->name('sendOtp');
     Route::post('/verify-otp', 'verifyOtp')->middleware('throttle:10,1')->name('verifyOtp');
+    Route::post('/validate-lawyer', 'validateLawyer')->middleware('throttle:10,1')->name('validateLawyer');
     Route::post('/', 'store')->middleware('throttle:10,1')->name('store');
 });
 

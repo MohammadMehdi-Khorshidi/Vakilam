@@ -40,7 +40,7 @@ class RegisterController extends Controller
 
         if (User::query()->where('phone', $data['phone'])->exists()) {
             throw ValidationException::withMessages([
-                'phone' => 'This phone number is already registered.',
+                'phone' => 'این شماره موبایل قبلاً ثبت‌نام شده است.',
             ]);
         }
 
@@ -50,7 +50,7 @@ class RegisterController extends Controller
             self::OTP_RESEND_AFTER_SECONDS,
         )) {
             return response()->json([
-                'message' => 'Please wait before requesting another code.',
+                'message' => 'لطفاً کمی صبر کنید و سپس دوباره درخواست کد تأیید بدهید.',
                 'retry_after' => self::OTP_RESEND_AFTER_SECONDS,
             ], 429);
         }
@@ -71,12 +71,12 @@ class RegisterController extends Controller
             report($exception);
 
             return response()->json([
-                'message' => 'The verification code could not be sent. Please try again.',
+                'message' => 'ارسال کد تأیید ناموفق بود. لطفاً دوباره تلاش کنید.',
             ], 503);
         }
 
         $response = [
-            'message' => 'Verification code generated.',
+            'message' => 'کد تأیید ارسال شد.',
             'expires_in' => self::OTP_TTL_SECONDS,
             'resend_after' => self::OTP_RESEND_AFTER_SECONDS,
         ];
@@ -105,7 +105,7 @@ class RegisterController extends Controller
             Cache::forget($cacheKey);
 
             throw ValidationException::withMessages([
-                'otp' => 'The verification code is invalid or has expired.',
+                'otp' => 'کد تأیید نامعتبر است یا منقضی شده است.',
             ]);
         }
 
@@ -113,7 +113,7 @@ class RegisterController extends Controller
             Cache::forget($cacheKey);
 
             throw ValidationException::withMessages([
-                'otp' => 'The maximum number of attempts has been reached. Request a new code.',
+                'otp' => 'تعداد تلاش‌های مجاز به پایان رسیده است. لطفاً کد جدید درخواست کنید.',
             ]);
         }
 
@@ -129,8 +129,8 @@ class RegisterController extends Controller
 
             throw ValidationException::withMessages([
                 'otp' => $otpData['attempts'] >= self::OTP_MAX_ATTEMPTS
-                    ? 'The maximum number of attempts has been reached. Request a new code.'
-                    : 'The verification code is invalid or has expired.',
+                    ? 'تعداد تلاش‌های مجاز به پایان رسیده است. لطفاً کد جدید درخواست کنید.'
+                    : 'کد تأیید نامعتبر است یا منقضی شده است.',
             ]);
         }
 
@@ -145,9 +145,57 @@ class RegisterController extends Controller
         );
 
         return response()->json([
-            'message' => 'Phone number verified.',
+            'message' => 'شماره موبایل با موفقیت تأیید شد.',
             'verification_token' => $verificationToken,
             'expires_in' => self::VERIFICATION_TTL_SECONDS,
+        ]);
+    }
+
+    /** @throws ValidationException */
+    public function validateLawyer(
+        Request $request,
+        LawyerRegistryVerifier $registryVerifier,
+    ): JsonResponse {
+        $data = $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
+            'license_number' => ['required', 'string', 'max:30'],
+            'verification_token' => ['required', 'string', 'size:64'],
+        ]);
+
+        $verifiedPhone = Cache::get(
+            $this->verificationCacheKey($data['verification_token']),
+        );
+
+        if (! is_string($verifiedPhone) || ! hash_equals($verifiedPhone, $data['phone'])) {
+            throw ValidationException::withMessages([
+                'verification_token' => 'اعتبارسنجی شماره موبایل نامعتبر است یا منقضی شده است. لطفاً دوباره کد تأیید دریافت کنید.',
+            ]);
+        }
+
+        try {
+            $match = $registryVerifier->verify(
+                $data['license_number'],
+                $verifiedPhone,
+                $data['first_name'].' '.$data['last_name'],
+            );
+        } catch (LawyerRegistryVerificationException $exception) {
+            throw ValidationException::withMessages([
+                $exception->field => $exception->getMessage(),
+            ]);
+        } catch (LawyerRegistryUnavailableException) {
+            return response()->json([
+                'message' => 'سرویس اعتبارسنجی وکیل موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید.',
+            ], 503);
+        }
+
+        return response()->json([
+            'message' => 'اطلاعات وکیل با موفقیت با مرجع اعتبارسنجی تطبیق داده شد.',
+            'lawyer' => [
+                'license_number' => $match['license_number'],
+                'full_name' => $match['full_name'],
+            ],
         ]);
     }
 
@@ -179,13 +227,13 @@ class RegisterController extends Controller
 
         if (!is_string($verifiedPhone) || !hash_equals($verifiedPhone, $data['phone'])) {
             throw ValidationException::withMessages([
-                'verification_token' => 'The phone verification is invalid or has expired.',
+                'verification_token' => 'اعتبارسنجی شماره موبایل نامعتبر است یا منقضی شده است. لطفاً دوباره کد تأیید دریافت کنید.',
             ]);
         }
 
         if (User::query()->where('phone', $data['phone'])->exists()) {
             throw ValidationException::withMessages([
-                'phone' => 'This phone number is already registered.',
+                'phone' => 'این شماره موبایل قبلاً ثبت‌نام شده است.',
             ]);
         }
 
@@ -196,6 +244,7 @@ class RegisterController extends Controller
                 $registryMatch = $registryVerifier->verify(
                     $data['license_number'],
                     $verifiedPhone,
+                    $data['first_name'].' '.$data['last_name'],
                 );
             } catch (LawyerRegistryVerificationException $exception) {
                 throw ValidationException::withMessages([
@@ -203,7 +252,7 @@ class RegisterController extends Controller
                 ]);
             } catch (LawyerRegistryUnavailableException) {
                 return response()->json([
-                    'message' => 'Lawyer verification is temporarily unavailable.',
+                    'message' => 'سرویس اعتبارسنجی وکیل موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید.',
                 ], 503);
             }
         }
@@ -249,10 +298,11 @@ class RegisterController extends Controller
                     'status' => 'approved',
                     'submitted_data' => [
                         'license_number' => $registryMatch['license_number'],
+                        'registry_full_name' => $registryMatch['full_name'],
                         'organization' => $registryMatch['organization'],
                         'registry_source_hash' => $registryMatch['source_hash'],
                     ],
-                    'review_note' => 'Automatically matched against the lawyer registry.',
+                    'review_note' => 'اطلاعات به‌صورت خودکار با مرجع اعتبارسنجی وکلا تطبیق داده شد.',
                     'submitted_at' => now(),
                     'reviewed_at' => now(),
                 ]);
@@ -288,7 +338,7 @@ class RegisterController extends Controller
         $user->load(['roles:id,code,name', 'clientProfile', 'lawyerProfile']);
 
         return response()->json([
-            'message' => 'Registered successfully.',
+            'message' => 'ثبت‌نام با موفقیت انجام شد.',
             'token_type' => 'Bearer',
             'access_token' => $token,
             'user' => AuthenticatedUserResource::make($user)->resolve(),

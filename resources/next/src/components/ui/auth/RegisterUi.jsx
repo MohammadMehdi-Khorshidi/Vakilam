@@ -234,9 +234,14 @@ export default function RegisterUi() {
         setError('');
     };
 
-    const handleProfileSubmit = (event) => {
+    const handleProfileSubmit = async (event) => {
         event.preventDefault();
         clearMessages();
+
+        if (!profile.first_name.trim() || !profile.last_name.trim()) {
+            setError('نام و نام خانوادگی را کامل وارد کنید.');
+            return;
+        }
 
         if (!profile.role) {
             setError('نقش خود را انتخاب کنید.');
@@ -248,7 +253,30 @@ export default function RegisterUi() {
             return;
         }
 
-        setStep(3);
+        if (profile.role !== 'lawyer') {
+            setStep(3);
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            await request('/auth/register/validate-lawyer', {
+                method: 'POST',
+                body: JSON.stringify({
+                    first_name: profile.first_name.trim(),
+                    last_name: profile.last_name.trim(),
+                    phone,
+                    license_number: profile.license_number.trim(),
+                    verification_token: verificationToken,
+                }),
+            });
+            setStep(3);
+        } catch (requestError) {
+            setError(requestError.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleRegister = async (event) => {
@@ -524,9 +552,10 @@ export default function RegisterUi() {
                     )}
                     <button
                         type="submit"
-                        className="h-[52px] w-full rounded-[13px] bg-[#123c35] text-[14px] font-bold text-white transition hover:bg-[#1c554a]"
+                        disabled={loading}
+                        className="h-[52px] w-full rounded-[13px] bg-[#123c35] text-[14px] font-bold text-white transition hover:bg-[#1c554a] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        ادامه
+                        {loading ? 'در حال بررسی اطلاعات وکیل...' : 'ادامه'}
                     </button>
                 </form>
             )}
