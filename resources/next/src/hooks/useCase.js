@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getCase } from '@/services/caseService';
+
+import { getClientCase } from '@/lib/api/user';
 
 const useCase = (caseId) => {
     const [data, setData] = useState(null);
@@ -18,8 +19,7 @@ const useCase = (caseId) => {
                 setIsLoading(true);
                 setIsError(false);
 
-                const result = await getCase(caseId);
-                setData(result);
+                setData(await getClientCase(caseId));
             } catch (error) {
                 console.error('useCase error:', error);
 

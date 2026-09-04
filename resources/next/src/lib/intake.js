@@ -14,14 +14,11 @@ export const steps = [
 
 export const initialData = {
     description: '',
-    category: '',
-    legal_category_id: '',
-    province_id: '',
-    city_id: '',
+    category: 'حقوق و مالی',
     answer: '',
     action: '',
     city: '',
-    urgency: 'normal',
+    urgency: 'عادی',
     documents: [],
     privacy: 'استاندارد',
     confirmed: false,
@@ -63,7 +60,7 @@ export const categories = [
 
 export const paths = [
     {
-        id: 'lawyer_selection',
+        id: 'lawyer',
         title: 'انتخاب وکیل',
         text: 'دریافت پیشنهاد و انتخاب وکیل مناسب',
     },
@@ -73,7 +70,7 @@ export const paths = [
         text: 'انتخاب وکیل و زمان مشاوره',
     },
     {
-        id: 'ai_assistant',
+        id: 'ai',
         title: 'دستیار هوش مصنوعی',
         text: 'تحلیل هوشمند و پولی پرونده',
     },
