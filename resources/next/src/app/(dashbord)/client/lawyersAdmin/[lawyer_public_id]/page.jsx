@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Vazirmatn } from 'next/font/google';
 
 import {
@@ -13,23 +13,27 @@ import {
     Star,
     MapPin,
 } from 'lucide-react';
+import { apiRequest } from '@/lib/api/client';
+import { sendLawyerRequests } from '@/lib/api/legalRequests';
 
 const vazirmatn = Vazirmatn({
     subsets: ['arabic'],
     display: 'swap',
 });
 
-const API_URL = 'http://127.0.0.1:8000/api/lawyers/{{lawyer_public_id}}';
-
 export default function LawyerProfilePage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const legalRequestId = searchParams.get('legal_request');
 
     const lawyerPublicId = params?.lawyer_public_id;
 
     const [lawyer, setLawyer] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [sending, setSending] = useState(false);
+    const [message, setMessage] = useState('');
 
     useEffect(() => {
         if (!lawyerPublicId) {
@@ -41,29 +45,9 @@ export default function LawyerProfilePage() {
                 setLoading(true);
                 setError('');
 
-                const response = await fetch(
-                    `${API_URL}/lawyers/${lawyerPublicId}`,
-                    {
-                        method: 'GET',
-                        headers: {
-                            Accept: 'application/json',
-                        },
-                    },
-                );
+                const result = await apiRequest(`/lawyers/${lawyerPublicId}`);
 
-                const result = await response.json();
-
-                console.log('Lawyer Profile API Response:', result);
-
-                if (!response.ok) {
-                    setError(
-                        result.message || 'دریافت پروفایل وکیل ناموفق بود.',
-                    );
-
-                    return;
-                }
-
-                const profile = result.data?.data ?? result.data ?? result;
+                const profile = result.lawyer ?? result.data?.lawyer ?? result.data ?? result;
 
                 setLawyer(profile);
             } catch (err) {
@@ -192,6 +176,9 @@ export default function LawyerProfilePage() {
                     بازگشت به لیست وکلا
                 </button>
 
+                {error ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+                {message ? <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{message}</div> : null}
+
                 {/* Profile Header */}
                 <section className="overflow-hidden rounded-[22px] border border-[#dfe8e4] bg-white shadow-[0_8px_30px_rgba(18,63,55,0.05)]">
                     <div className="h-[130px] bg-[#123f37]" />
@@ -232,9 +219,23 @@ export default function LawyerProfilePage() {
 
                             <button
                                 type="button"
-                                className="rounded-[12px] bg-[#123f37] px-7 py-3.5 text-sm font-bold text-white transition hover:bg-[#0d302a]"
+                                disabled={sending || !legalRequestId}
+                                onClick={async () => {
+                                    if (!legalRequestId) {
+                                        setError('برای ارسال درخواست باید از صفحه Matching وارد پروفایل وکیل شوید.');
+                                        return;
+                                    }
+                                    setSending(true); setError(''); setMessage('');
+                                    try {
+                                        await sendLawyerRequests(legalRequestId, [lawyerPublicId]);
+                                        setMessage('درخواست همکاری برای این وکیل ارسال شد.');
+                                    } catch (err) {
+                                        setError(err.message || 'ارسال درخواست ناموفق بود.');
+                                    } finally { setSending(false); }
+                                }}
+                                className="rounded-[12px] bg-[#123f37] px-7 py-3.5 text-sm font-bold text-white transition hover:bg-[#0d302a] disabled:opacity-50"
                             >
-                                انتخاب این وکیل
+                                {sending ? 'در حال ارسال...' : 'ارسال درخواست به این وکیل'}
                             </button>
                         </div>
 

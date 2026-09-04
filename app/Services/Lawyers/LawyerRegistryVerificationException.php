@@ -17,7 +17,7 @@ class LawyerRegistryVerificationException extends RuntimeException
     {
         return new self(
             'license_number',
-            'The license number is invalid.',
+            'شماره پروانه واردشده معتبر نیست یا در مرجع وکلا پیدا نشد.',
         );
     }
 
@@ -25,7 +25,15 @@ class LawyerRegistryVerificationException extends RuntimeException
     {
         return new self(
             'phone',
-            'The verified phone number does not match the license record.',
+            'شماره موبایل تأییدشده با شماره ثبت‌شده برای این پروانه مطابقت ندارد.',
+        );
+    }
+
+    public static function nameMismatch(): self
+    {
+        return new self(
+            'first_name',
+            'نام و نام خانوادگی واردشده با اطلاعات ثبت‌شده برای این پروانه مطابقت ندارد.',
         );
     }
 }

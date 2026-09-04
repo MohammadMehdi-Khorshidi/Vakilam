@@ -167,7 +167,7 @@ class LawyerWorkspaceController extends Controller
         abort_unless(
             $lawyer->verification_status === 'approved',
             403,
-            'Only approved lawyersAdmin may use the lawyer workspace.',
+            'Only approved lawyers may use the lawyer workspace.',
         );
 
         return $lawyer;

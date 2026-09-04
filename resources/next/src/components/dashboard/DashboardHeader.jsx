@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { roleLabels } from '@/config/Navigation';
+import { useAuth } from '@/auth/AuthProvider';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -47,32 +48,17 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
 
     const currentRole = roleLabels?.[role] || 'موکل';
 
-    // =========================
-    // اطلاعات کاربر هر نقش
-    // =========================
-    const userInfo = {
-        client: {
-            name: 'فرزام نفعی',
-            initial: 'ف',
-        },
+    const { user } = useAuth();
 
-        lawyer: {
-            name: 'وکیل',
-            initial: 'و',
-        },
-
-        admin: {
-            name: 'ادمین',
-            initial: 'ا',
-        },
-    };
-
-    const currentUser = userInfo[role] || userInfo.client;
+    const fallbackName = roleLabels?.[role] || 'کاربر';
+    const fullName = [user?.name, user?.last_name].filter(Boolean).join(' ').trim();
+    const userName = fullName || user?.phone || fallbackName;
+    const userInitial = (fullName || fallbackName).trim().charAt(0) || 'ک';
 
     // =========================
     // نقش‌ها
     // =========================
-    const roles = [
+    const allRoles = [
         {
             key: 'client',
             label: 'موکل',
@@ -95,6 +81,10 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
             icon: ShieldCheck,
         },
     ];
+
+    const assignedRoles = new Set(user?.roles || (user?.role ? [user.role] : []));
+    if (assignedRoles.has('super_admin')) assignedRoles.add('admin');
+    const roles = allRoles.filter((item) => assignedRoles.has(item.key));
 
     return (
         <header
@@ -217,7 +207,7 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
                     >
                         {/* User Initial */}
                         <div className="flex h-[32px] w-[32px] items-center justify-center rounded-lg bg-[#edf2ef] text-[12px] font-bold text-[#123f37]">
-                            {currentUser.initial}
+                            {userInitial}
                         </div>
 
                         {/* User Info */}
@@ -227,7 +217,7 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
                             </p>
 
                             <p className="z-50 mt-0.5 text-[10px] font-bold text-[#123f37]">
-                                {currentUser.name}
+                                {userName}
                             </p>
                         </div>
 

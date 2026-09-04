@@ -2,6 +2,7 @@ import './globals.css';
 
 import Header from '@/layout/Header';
 import Footer from '@/layout/Footer';
+import { AuthProvider } from '@/auth/AuthProvider';
 
 import { Vazirmatn } from 'next/font/google';
 
@@ -23,9 +24,11 @@ export default function RootLayout({ children }) {
     return (
         <html lang="en">
             <body className={`flex min-h-screen flex-col ${vazir.variable}`}>
-                <Header />
-                {children}
-                <Footer />
+                <AuthProvider>
+                    <Header />
+                    {children}
+                    <Footer />
+                </AuthProvider>
             </body>
         </html>
     );

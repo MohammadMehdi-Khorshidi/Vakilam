@@ -83,7 +83,7 @@ class LawyerMatchingService
     }
 
     /**
-     * Return ranked consultation lawyersAdmin without creating matching records.
+     * Return ranked consultation lawyers without creating matching records.
      *
      * @return Collection<int, array{
      *     lawyer: LawyerProfile,
@@ -104,7 +104,7 @@ class LawyerMatchingService
     }
 
     /**
-     * Send invitations to up to five lawyersAdmin explicitly selected by the client.
+     * Send invitations to up to five lawyers explicitly selected by the client.
      *
      * Invitations are independent from final proposals. A lawyer acceptance only
      * opens a Negotiation and never creates Engagement directly.
@@ -129,7 +129,7 @@ class LawyerMatchingService
                 'Lawyer requests are only available for submitted lawyer-selection requests.',
             );
 
-            abort_unless(count($lawyerPublicIds) === count(array_unique($lawyerPublicIds)), 422, 'Duplicate lawyersAdmin are not allowed.');
+            abort_unless(count($lawyerPublicIds) === count(array_unique($lawyerPublicIds)), 422, 'Duplicate lawyers are not allowed.');
 
             $run = $lockedRequest->matchRuns()
                 ->where('algorithm_version', self::ALGORITHM_VERSION)
@@ -138,32 +138,32 @@ class LawyerMatchingService
                 ->first();
 
             if ($run === null) {
-                abort(409, 'Run lawyer matching before selecting lawyersAdmin.');
+                abort(409, 'Run lawyer matching before selecting lawyers.');
             }
 
-            $candidates = $run->candidates()
+            $lawyers = LawyerProfile::query()
+                ->whereIn('public_id', $lawyerPublicIds)
+                ->where('verification_status', 'approved')
+                ->where('is_available', true)
                 ->whereHas(
-                    'lawyerProfile',
-                    fn ($query) => $query
-                        ->whereIn('public_id', $lawyerPublicIds)
-                        ->where('verification_status', 'approved')
-                        ->where('is_available', true)
-                        ->whereHas(
-                            'user',
-                            fn ($userQuery) => $userQuery->where('status', 'active'),
-                        ),
+                    'user',
+                    fn ($query) => $query->where('status', 'active'),
                 )
-                ->with('lawyerProfile:id,public_id')
-                ->get()
-                ->keyBy(fn ($candidate) => $candidate->lawyerProfile->public_id);
+                ->get(['id', 'public_id'])
+                ->keyBy('public_id');
 
-            if ($candidates->count() !== count($lawyerPublicIds)) {
+            if ($lawyers->count() !== count($lawyerPublicIds)) {
                 throw ValidationException::withMessages([
                     'lawyer_public_ids' => [
-                        'Every selected lawyer must belong to the latest matching result.',
+                        'Every selected lawyer must be approved, available, and active.',
                     ],
                 ]);
             }
+
+            $candidates = $run->candidates()
+                ->whereIn('lawyer_profile_id', $lawyers->pluck('id'))
+                ->get()
+                ->keyBy('lawyer_profile_id');
 
             LegalRequestDistribution::query()
                 ->where('legal_request_id', $lockedRequest->id)
@@ -179,30 +179,23 @@ class LawyerMatchingService
                 ->whereIn('status', ['pending', 'negotiating'])
                 ->pluck('lawyer_profile_id');
 
-            $selectedProfileIds = $candidates->pluck('lawyer_profile_id')->values();
+            $selectedProfileIds = $lawyers->pluck('id')->values();
 
             if ($existingInviteLawyerIds->merge($selectedProfileIds)->unique()->count() > 5) {
                 throw ValidationException::withMessages([
                     'lawyer_public_ids' => [
-                        'A legal request can be sent to at most five lawyersAdmin.',
+                        'A legal request can be sent to at most five lawyers.',
                     ],
                 ]);
             }
 
             foreach ($lawyerPublicIds as $publicId) {
-                $candidate = $candidates->get($publicId);
-
-                if (! $candidate instanceof LawyerMatchCandidate) {
-                    throw ValidationException::withMessages([
-                        'lawyer_public_ids' => [
-                            'Every selected lawyer must belong to the latest matching result.',
-                        ],
-                    ]);
-                }
+                $lawyer = $lawyers->get($publicId);
+                $candidate = $candidates->get($lawyer->id);
 
                 $distribution = LegalRequestDistribution::query()
                     ->where('legal_request_id', $lockedRequest->id)
-                    ->where('lawyer_profile_id', $candidate->lawyer_profile_id)
+                    ->where('lawyer_profile_id', $lawyer->id)
                     ->lockForUpdate()
                     ->first();
 
@@ -232,7 +225,7 @@ class LawyerMatchingService
                     }
 
                     $distribution->forceFill([
-                        'match_candidate_id' => $candidate->id,
+                        'match_candidate_id' => $candidate?->id,
                         'source' => 'client_invite',
                         'status' => 'pending',
                         'sent_at' => now(),
@@ -246,8 +239,8 @@ class LawyerMatchingService
 
                 LegalRequestDistribution::query()->create([
                     'legal_request_id' => $lockedRequest->id,
-                    'lawyer_profile_id' => $candidate->lawyer_profile_id,
-                    'match_candidate_id' => $candidate->id,
+                    'lawyer_profile_id' => $lawyer->id,
+                    'match_candidate_id' => $candidate?->id,
                     'source' => 'client_invite',
                     'status' => 'pending',
                     'sent_at' => now(),

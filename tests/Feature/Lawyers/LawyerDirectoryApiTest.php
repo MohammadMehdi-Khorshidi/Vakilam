@@ -19,7 +19,7 @@ function createDirectoryLawyer(array $attributes = []): LawyerProfile
     ]);
 }
 
-test('only approved and available lawyersAdmin are publicly listed', function () {
+test('only approved and available lawyers are publicly listed', function () {
     $visible = createDirectoryLawyer(['full_name' => 'وکیل قابل نمایش']);
     createDirectoryLawyer([
         'full_name' => 'وکیل در انتظار',
@@ -32,7 +32,7 @@ test('only approved and available lawyersAdmin are publicly listed', function ()
     $suspended = createDirectoryLawyer(['full_name' => 'وکیل تعلیق‌شده']);
     $suspended->user->forceFill(['status' => 'suspended'])->save();
 
-    $response = $this->getJson('/api/lawyersAdmin');
+    $response = $this->getJson('/api/lawyers');
 
     $response
         ->assertOk()
@@ -42,11 +42,11 @@ test('only approved and available lawyersAdmin are publicly listed', function ()
         ->assertJsonMissing(['full_name' => 'وکیل غیرفعال'])
         ->assertJsonMissing(['full_name' => 'وکیل تعلیق‌شده']);
 
-    $this->getJson("/api/lawyersAdmin/{$suspended->public_id}")
+    $this->getJson("/api/lawyers/{$suspended->public_id}")
         ->assertNotFound();
 });
 
-test('lawyersAdmin can be filtered by specialty and service city', function () {
+test('lawyers can be filtered by specialty and service city', function () {
     $province = Province::query()->create(['name' => 'تهران']);
     $city = City::query()->create([
         'name' => 'تهران',
@@ -68,7 +68,7 @@ test('lawyersAdmin can be filtered by specialty and service city', function () {
     ]);
     createDirectoryLawyer(['full_name' => 'وکیل دیگر']);
 
-    $response = $this->getJson('/api/lawyersAdmin?'.http_build_query([
+    $response = $this->getJson('/api/lawyers?'.http_build_query([
         'specialty_id' => $specialty->id,
         'province_id' => $province->id,
         'city_id' => $city->id,
@@ -84,13 +84,13 @@ test('public lawyer detail uses public id and hides unapproved profiles', functi
     $approved = createDirectoryLawyer();
     $pending = createDirectoryLawyer(['verification_status' => 'pending']);
 
-    $this->getJson("/api/lawyersAdmin/{$approved->public_id}")
+    $this->getJson("/api/lawyers/{$approved->public_id}")
         ->assertOk()
         ->assertJsonPath('lawyer.public_id', $approved->public_id)
         ->assertJsonMissingPath('lawyer.id')
         ->assertJsonMissingPath('lawyer.license_number');
 
-    $this->getJson("/api/lawyersAdmin/{$pending->public_id}")
+    $this->getJson("/api/lawyers/{$pending->public_id}")
         ->assertNotFound();
 });
 
