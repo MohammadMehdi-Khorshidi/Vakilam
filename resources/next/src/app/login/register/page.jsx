@@ -4,7 +4,7 @@ import { Vazirmatn } from 'next/font/google';
 import { useRouter } from 'next/navigation';
 
 import { AuthAside } from '@/components/ui/auth/AuthAside';
-import LoginFlow from '@/features/auth/LoginFlow';
+import RegisterFlow from '@/features/auth/RegisterFlow';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -12,7 +12,7 @@ const vazir = Vazirmatn({
     display: 'swap',
 });
 
-export default function LoginPage() {
+export default function RegisterPage() {
     const router = useRouter();
 
     return (
@@ -23,8 +23,8 @@ export default function LoginPage() {
             <AuthAside />
 
             <div className="flex w-full items-center justify-center p-6 lg:w-1/2">
-                <LoginFlow
-                    onGoToRegister={() => router.push('/login/register')}
+                <RegisterFlow
+                    onGoToLogin={() => router.push('/login')}
                 />
             </div>
         </div>
