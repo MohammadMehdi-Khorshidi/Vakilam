@@ -14,8 +14,12 @@ const normalizeDigits = (value) =>
 export default function LoginStep({
     phone,
     setPhone,
+    password,
+    setPassword,
     onSubmit,
     onGoToRegister,
+    loading = false,
+    externalError = '',
 }) {
     const [error, setError] = useState('');
 
@@ -26,6 +30,11 @@ export default function LoginStep({
 
         if (!/^09\d{9}$/.test(normalizedPhone)) {
             setError('شماره موبایل را به‌صورت صحیح وارد کنید.');
+            return;
+        }
+
+        if (!password) {
+            setError('رمز عبور خود را وارد کنید.');
             return;
         }
 
@@ -42,7 +51,7 @@ export default function LoginStep({
                 </h1>
 
                 <p className="mt-3 text-sm text-[#8a9591]">
-                    شماره موبایل خود را وارد کنید.
+                    شماره موبایل و رمز عبور خود را وارد کنید.
                 </p>
             </header>
 
@@ -75,20 +84,48 @@ export default function LoginStep({
                     />
                 </div>
 
-                {error && (
+                <div>
+                    <label
+                        htmlFor="login-password"
+                        className="mb-2 block text-sm font-bold text-[#17483f]"
+                    >
+                        رمز عبور
+                    </label>
+
+                    <input
+                        id="login-password"
+                        type="password"
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(event) => {
+                            setPassword(event.target.value);
+                            if (error) setError('');
+                        }}
+                        placeholder="رمز عبور"
+                        className="h-14 w-full rounded-2xl border border-[#dfe7e4] bg-[#f7f9ff] px-5 text-left text-sm text-[#123c35] outline-none transition placeholder:text-right placeholder:text-[#a3aca9] focus:border-[#28685c] focus:ring-4 focus:ring-[#28685c]/10"
+                        dir="ltr"
+                    />
+
+                    <p className="mt-2 text-right text-xs font-bold text-[#697570]">
+                        رمز عبورم را فراموش کرده‌ام
+                    </p>
+                </div>
+
+                {(error || externalError) && (
                     <p
                         role="alert"
                         className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
                     >
-                        {error}
+                        {error || externalError}
                     </p>
                 )}
 
                 <button
                     type="submit"
-                    className="h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99]"
+                    disabled={loading}
+                    className="h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    ورود
+                    {loading ? 'در حال ورود...' : 'ورود'}
                 </button>
             </form>
 

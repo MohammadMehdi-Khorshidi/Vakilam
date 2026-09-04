@@ -5,73 +5,67 @@ import { useRouter } from 'next/navigation';
 
 import AuthLayout from '@/components/auth/AuthLayout';
 import LoginStep from '@/components/auth/LoginStep';
-import OtpStep from '@/components/auth/OtpStep';
+import {
+    dashboardForUser,
+    loginWithPassword,
+    persistAuthSession,
+} from '@/lib/api/auth';
 
 export default function LoginFlow({ onGoToRegister }) {
     const router = useRouter();
-    const [step, setStep] = useState(1);
     const [phone, setPhone] = useState('');
-    const [registeredUser, setRegisteredUser] = useState(null);
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    const checkPhone = (normalizedPhone) => {
-        const savedUser = localStorage.getItem('demo_auth_user');
+    const login = async (normalizedPhone) => {
+        setLoading(true);
+        setError('');
 
-        if (savedUser) {
-            try {
-                const user = JSON.parse(savedUser);
+        try {
+            const result = await loginWithPassword(
+                normalizedPhone,
+                password,
+            );
+            setPhone(normalizedPhone);
+            persistAuthSession(result);
 
-                if (user.phone === normalizedPhone && user.role) {
-                    setPhone(normalizedPhone);
-                    setRegisteredUser(user);
-                    setStep(2);
-                    return;
-                }
-            } catch {
-                localStorage.removeItem('demo_auth_user');
-            }
+            const destination = dashboardForUser(result.user);
+            const redirectTo = new URLSearchParams(window.location.search).get(
+                'redirect',
+            );
+            const safeRedirect =
+                redirectTo?.startsWith(destination) &&
+                !redirectTo.startsWith('//')
+                    ? redirectTo
+                    : destination;
+
+            router.replace(safeRedirect);
+        } catch (requestError) {
+            setError(requestError.message);
+        } finally {
+            setLoading(false);
         }
-
-        router.push(
-            `/login/register?phone=${encodeURIComponent(normalizedPhone)}`,
-        );
-    };
-
-    const verifyOtp = () => {
-        const destination =
-            registeredUser?.role === 'lawyer' ? '/lawyer' : '/client';
-        const redirectTo = new URLSearchParams(window.location.search).get(
-            'redirect',
-        );
-        const safeRedirect =
-            redirectTo?.startsWith('/') && !redirectTo.startsWith('//')
-                ? redirectTo
-                : destination;
-
-        router.push(safeRedirect);
     };
 
     return (
         <AuthLayout>
-            {step === 1 && (
-                <LoginStep
-                    phone={phone}
-                    setPhone={setPhone}
-                    onSubmit={checkPhone}
-                    onGoToRegister={onGoToRegister}
-                />
-            )}
-
-            {step === 2 && (
-                <OtpStep
-                    phone={phone}
-                    onVerify={verifyOtp}
-                    onChangePhone={() => {
-                        setRegisteredUser(null);
-                        setStep(1);
-                    }}
-                    isLogin
-                />
-            )}
+            <LoginStep
+                phone={phone}
+                setPhone={(value) => {
+                    setPhone(value);
+                    if (error) setError('');
+                }}
+                password={password}
+                setPassword={(value) => {
+                    setPassword(value);
+                    if (error) setError('');
+                }}
+                onSubmit={login}
+                onGoToRegister={onGoToRegister}
+                loading={loading}
+                externalError={error}
+            />
         </AuthLayout>
     );
 }

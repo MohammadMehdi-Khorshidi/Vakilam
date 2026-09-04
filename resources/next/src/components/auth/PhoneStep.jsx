@@ -10,7 +10,14 @@ const normalizeDigits = (value) =>
         .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
         .replace(/\D/g, '');
 
-export default function PhoneStep({ phone, setPhone, onSubmit, onGoToLogin }) {
+export default function PhoneStep({
+    phone,
+    setPhone,
+    onSubmit,
+    onGoToLogin,
+    loading = false,
+    externalError = '',
+}) {
     const [error, setError] = useState('');
 
     const handleSubmit = (event) => {
@@ -37,7 +44,7 @@ export default function PhoneStep({ phone, setPhone, onSubmit, onGoToLogin }) {
                 <p className="mt-3 text-sm text-[#8a9591]">شماره موبایل</p>
             </header>
 
-            <AuthProgress currentStep={1} totalSteps={3} />
+            <AuthProgress currentStep={1} totalSteps={4} />
 
             <p className="mt-10 text-center text-sm leading-7 text-[#8a9591]">
                 برای شروع ثبت‌نام، شماره موبایل خود را وارد کنید.
@@ -62,17 +69,18 @@ export default function PhoneStep({ phone, setPhone, onSubmit, onGoToLogin }) {
                     dir="ltr"
                 />
 
-                {error && (
+                {(error || externalError) && (
                     <p role="alert" className="mt-3 text-sm font-medium text-red-700">
-                        {error}
+                        {error || externalError}
                     </p>
                 )}
 
                 <button
                     type="submit"
-                    className="mt-5 h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99]"
+                    disabled={loading}
+                    className="mt-5 h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    دریافت کد تأیید
+                    {loading ? 'در حال ارسال...' : 'دریافت کد تأیید'}
                 </button>
             </form>
 

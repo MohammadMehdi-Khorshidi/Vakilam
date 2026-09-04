@@ -17,7 +17,7 @@ export default function RegisterPage() {
 
     return (
         <div
-            className={`${vazir.className} flex min-h-screen flex-col bg-gray-100 md:flex-row`}
+            className={`${vazir.className} flex min-h-[calc(100vh-5rem)] flex-col bg-gray-100 md:flex-row`}
             dir="rtl"
         >
             <AuthAside />

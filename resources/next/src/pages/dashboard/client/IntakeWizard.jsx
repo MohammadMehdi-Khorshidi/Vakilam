@@ -5,7 +5,11 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Vazirmatn } from 'next/font/google';
 
 import { initialData, steps, titles, subtitles } from '@/lib/intake';
-import { getLegalRequest } from '@/lib/api/legalRequests';
+import {
+    createLegalRequestDraft,
+    getCurrentDraft,
+    getLegalRequest,
+} from '@/lib/api/legalRequests';
 import IntakeProgress from '@/features/client/suggestions/CaseProgress';
 import IntakeNotice from '../../../features/client/legal-request/IntakeNotice';
 import IntakeActions from '../../../features/client/legal-request/IntakeActions';
@@ -28,9 +32,6 @@ const vazir = Vazirmatn({
     subsets: ['arabic'],
     weight: ['400', '500', '600', '700', '800'],
 });
-
-const API_BASE_URL =
-    process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
 const STORAGE_KEY = 'vakilam-intake';
 
@@ -117,173 +118,6 @@ function useStoredIntake() {
         getStoredIntake,
         getServerSnapshot,
     );
-}
-
-/*
-|--------------------------------------------------------------------------
-| Authentication
-|--------------------------------------------------------------------------
-*/
-
-function getAuthToken() {
-    if (typeof window === 'undefined') {
-        return null;
-    }
-
-    const directTokenKeys = [
-        'auth_token',
-        'access_token',
-        'token',
-        'vakilam_token',
-    ];
-
-    for (const key of directTokenKeys) {
-        const value = window.localStorage.getItem(key);
-
-        if (value) {
-            return value.replace(/^Bearer\s+/i, '');
-        }
-    }
-
-    const jsonKeys = ['auth', 'vakilam-auth', 'user'];
-
-    for (const key of jsonKeys) {
-        const value = window.localStorage.getItem(key);
-
-        if (!value) {
-            continue;
-        }
-
-        try {
-            const parsed = JSON.parse(value);
-
-            const token =
-                parsed?.token ??
-                parsed?.access_token ??
-                parsed?.auth_token ??
-                parsed?.data?.token ??
-                parsed?.data?.access_token;
-
-            if (token) {
-                return String(token).replace(/^Bearer\s+/i, '');
-            }
-        } catch {
-            // مقدار موردنظر JSON نیست.
-        }
-    }
-
-    return null;
-}
-
-
-function createHeaders() {
-    const token = getAuthToken();
-
-    const headers = {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-    };
-
-    if (token) {
-        headers.Authorization = `Bearer ${token}`;
-    }
-
-    return headers;
-}
-
-/*
-|--------------------------------------------------------------------------
-| API helpers
-|--------------------------------------------------------------------------
-*/
-
-async function parseResponse(response) {
-    let result = null;
-
-    try {
-        result = await response.json();
-    } catch {
-        result = null;
-    }
-
-    if (response.status === 401) {
-        throw new Error(
-            'توکن ورود معتبر نیست یا منقضی شده است. دوباره وارد حساب کاربری شوید.',
-        );
-    }
-
-    return result;
-}
-
-async function getLegalRequestDraft() {
-    const token = getAuthToken();
-
-    if (!token) {
-        throw new Error('توکن ورود پیدا نشد. ابتدا وارد حساب کاربری شوید.');
-    }
-
-    const response = await fetch(`${API_BASE_URL}/legal-requests/draft`, {
-        method: 'GET',
-
-        headers: createHeaders(),
-
-        credentials: 'include',
-
-        cache: 'no-store',
-    });
-
-    const result = await parseResponse(response);
-
-    /*
-     * اگر پیش‌نویس وجود نداشته باشد، فرم خالی می‌ماند.
-     */
-    if (response.status === 404) {
-        return null;
-    }
-
-    if (!response.ok) {
-        throw new Error(result?.message || 'دریافت پیش‌نویس انجام نشد.');
-    }
-
-    return result?.data ?? result;
-}
-
-async function createLegalRequest(payload) {
-    const token = getAuthToken();
-
-    if (!token) {
-        throw new Error('توکن ورود پیدا نشد. ابتدا وارد حساب کاربری شوید.');
-    }
-
-    const response = await fetch(`${API_BASE_URL}/legal-requests`, {
-        method: 'POST',
-
-        headers: createHeaders(),
-
-        credentials: 'include',
-
-        body: JSON.stringify(payload),
-    });
-
-    const result = await parseResponse(response);
-
-    if (response.status === 422) {
-        const validationMessages = Object.values(result?.errors ?? {})
-            .flat()
-            .filter(Boolean);
-
-        const error = new Error(result?.message || 'اطلاعات فرم معتبر نیست.');
-
-        error.validationMessages = validationMessages;
-
-        throw error;
-    }
-
-    if (!response.ok) {
-        throw new Error(result?.message || 'ثبت درخواست انجام نشد.');
-    }
-
-    return result?.data ?? result;
 }
 
 /*
@@ -407,7 +241,7 @@ export default function IntakeWizard() {
             setError('');
 
             try {
-                const draft = await getLegalRequestDraft();
+                const draft = await getCurrentDraft();
 
                 if (!isActive || !draft) {
                     return;
@@ -522,7 +356,7 @@ export default function IntakeWizard() {
         try {
             const payload = createLegalRequestPayload(data);
 
-            const legalRequest = await createLegalRequest(payload);
+            const legalRequest = await createLegalRequestDraft(payload);
 
             const nextData = {
                 ...data,

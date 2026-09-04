@@ -11,7 +11,7 @@ export function AuthAside() {
     return (
         <aside
             dir="ltr"
-            className="relative hidden min-h-[300px] w-full shrink-0 flex-col overflow-hidden bg-[linear-gradient(150deg,var(--green-800),var(--green-1000))] px-6 py-6 text-white md:min-h-[360px] md:px-10 md:py-8 lg:flex lg:min-h-screen lg:w-1/2 lg:p-10"
+            className="relative hidden min-h-[300px] w-full shrink-0 flex-col overflow-hidden bg-[linear-gradient(150deg,var(--green-800),var(--green-1000))] px-6 py-6 text-white md:min-h-[360px] md:px-10 md:py-8 lg:flex lg:min-h-[calc(100vh-5rem)] lg:w-1/2 lg:p-10"
         >
             <div className="absolute -top-28 -left-20 h-48 w-48 rounded-full border border-[#d8b45a]/40 md:h-64 md:w-64 lg:-top-20 lg:-left-20 lg:h-72 lg:w-72" />
 

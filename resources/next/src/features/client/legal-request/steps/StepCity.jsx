@@ -4,12 +4,15 @@ import { useEffect, useState } from 'react';
 import { Vazirmatn } from 'next/font/google';
 import { Check, MapPin, ChevronDown, Loader2 } from 'lucide-react';
 
+import {
+    getCities as fetchCities,
+    getProvinces as fetchProvinces,
+} from '@/lib/api/references';
+
 const vazir = Vazirmatn({
     subsets: ['arabic'],
     weight: ['400', '500', '600', '700', '800'],
 });
-
-const API_URL = 'http://127.0.0.1:8000/api';
 
 const fallbackCities = [
     { id: 1, name: 'تهران' },
@@ -46,24 +49,15 @@ export default function StepCity({ data, update }) {
             try {
                 setLoadingProvinces(true);
 
-                const response = await fetch(`${API_URL}/reference/provinces`, {
-                    method: 'GET',
-                    headers: {
-                        Accept: 'application/json',
-                    },
-                });
-
-                const result = await response.json();
+                const result = await fetchProvinces();
 
                 console.log('Provinces API Response:', result);
 
-                if (!response.ok) {
-                    return;
-                }
-
-                const provinceData = Array.isArray(result.data)
-                    ? result.data
-                    : [];
+                const provinceData = Array.isArray(result)
+                    ? result
+                    : Array.isArray(result?.data)
+                      ? result.data
+                      : [];
 
                 const formattedProvinces = provinceData
                     .map((item) => ({
@@ -100,25 +94,15 @@ export default function StepCity({ data, update }) {
             try {
                 setLoadingCities(true);
 
-                const response = await fetch(
-                    `${API_URL}/reference/provinces/${selectedProvince}/cities`,
-                    {
-                        method: 'GET',
-                        headers: {
-                            Accept: 'application/json',
-                        },
-                    },
-                );
-
-                const result = await response.json();
+                const result = await fetchCities(selectedProvince);
 
                 console.log('Cities API Response:', result);
 
-                if (!response.ok) {
-                    return;
-                }
-
-                const cityData = Array.isArray(result.data) ? result.data : [];
+                const cityData = Array.isArray(result)
+                    ? result
+                    : Array.isArray(result?.data)
+                      ? result.data
+                      : [];
 
                 const formattedCities = cityData
                     .map((item) => ({

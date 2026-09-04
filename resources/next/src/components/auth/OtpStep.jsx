@@ -11,10 +11,20 @@ const normalizeDigits = (value) =>
         .replace(/\D/g, '')
         .slice(0, 6);
 
-export default function OtpStep({ phone, onVerify, onChangePhone, isLogin = false }) {
+export default function OtpStep({
+    phone,
+    onVerify,
+    onCodeChange,
+    onChangePhone,
+    onResend,
+    isLogin = false,
+    loading = false,
+    externalError = '',
+}) {
     const [code, setCode] = useState('');
     const [error, setError] = useState('');
     const [seconds, setSeconds] = useState(60);
+    const [resending, setResending] = useState(false);
 
     useEffect(() => {
         if (seconds <= 0) return undefined;
@@ -38,6 +48,20 @@ export default function OtpStep({ phone, onVerify, onChangePhone, isLogin = fals
         onVerify(code);
     };
 
+    const handleResend = async () => {
+        setResending(true);
+        setError('');
+
+        try {
+            await onResend?.();
+            setSeconds(60);
+        } catch (requestError) {
+            setError(requestError.message);
+        } finally {
+            setResending(false);
+        }
+    };
+
     return (
         <section className="rounded-[24px] border border-[#e4e9e7] bg-white px-5 py-8 shadow-[0_22px_60px_rgba(8,35,31,0.08)] sm:px-10 sm:py-10">
             <header className="text-center">
@@ -47,7 +71,7 @@ export default function OtpStep({ phone, onVerify, onChangePhone, isLogin = fals
                 <p className="mt-3 text-sm text-[#8a9591]">تأیید شماره موبایل</p>
             </header>
 
-            {!isLogin && <AuthProgress currentStep={2} />}
+            {!isLogin && <AuthProgress currentStep={2} totalSteps={4} />}
 
             <div className="mt-7 rounded-xl bg-[#effbf7] px-4 py-4 text-center text-sm font-bold text-[#2e8a70]">
                 کد تأیید ارسال شد
@@ -74,23 +98,28 @@ export default function OtpStep({ phone, onVerify, onChangePhone, isLogin = fals
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     value={code}
-                    onChange={(event) => setCode(normalizeDigits(event.target.value))}
+                    onChange={(event) => {
+                        setCode(normalizeDigits(event.target.value));
+                        setError('');
+                        onCodeChange?.();
+                    }}
                     placeholder="کد ۶ رقمی"
                     className="h-14 w-full rounded-2xl border border-[#dfe7e4] bg-[#fbfcfb] px-5 text-center text-lg tracking-[0.45em] text-[#123c35] outline-none transition placeholder:text-sm placeholder:tracking-normal placeholder:text-[#a3aca9] focus:border-[#28685c] focus:ring-4 focus:ring-[#28685c]/10"
                     dir="ltr"
                 />
 
-                {error && (
+                {(error || externalError) && (
                     <p role="alert" className="mt-3 text-sm font-medium text-red-700">
-                        {error}
+                        {error || externalError}
                     </p>
                 )}
 
                 <button
                     type="submit"
-                    className="mt-5 h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99]"
+                    disabled={loading}
+                    className="mt-5 h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    تأیید کد
+                    {loading ? 'در حال تأیید...' : 'تأیید کد'}
                 </button>
             </form>
 
@@ -100,10 +129,11 @@ export default function OtpStep({ phone, onVerify, onChangePhone, isLogin = fals
                 ) : (
                     <button
                         type="button"
-                        onClick={() => setSeconds(60)}
-                        className="font-bold text-[#28685c]"
+                        onClick={handleResend}
+                        disabled={resending}
+                        className="font-bold text-[#28685c] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        ارسال مجدد کد
+                        {resending ? 'در حال ارسال...' : 'ارسال مجدد کد'}
                     </button>
                 )}
                 <button

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Vazirmatn } from 'next/font/google';
 
+import { getLawyer } from '@/lib/api/references';
+
 import {
     ArrowRight,
     BriefcaseBusiness,
@@ -18,8 +20,6 @@ const vazirmatn = Vazirmatn({
     subsets: ['arabic'],
     display: 'swap',
 });
-
-const API_URL = 'http://127.0.0.1:8000/api/lawyers/{{lawyer_public_id}}';
 
 export default function LawyerProfilePage() {
     const params = useParams();
@@ -41,29 +41,11 @@ export default function LawyerProfilePage() {
                 setLoading(true);
                 setError('');
 
-                const response = await fetch(
-                    `${API_URL}/lawyers/${lawyerPublicId}`,
-                    {
-                        method: 'GET',
-                        headers: {
-                            Accept: 'application/json',
-                        },
-                    },
-                );
-
-                const result = await response.json();
+                const result = await getLawyer(lawyerPublicId);
 
                 console.log('Lawyer Profile API Response:', result);
 
-                if (!response.ok) {
-                    setError(
-                        result.message || 'دریافت پروفایل وکیل ناموفق بود.',
-                    );
-
-                    return;
-                }
-
-                const profile = result.data?.data ?? result.data ?? result;
+                const profile = result?.data ?? result;
 
                 setLawyer(profile);
             } catch (err) {

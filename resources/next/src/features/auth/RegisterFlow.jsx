@@ -4,18 +4,26 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import AuthLayout from '@/components/auth/AuthLayout';
+import OtpStep from '@/components/auth/OtpStep';
+import PasswordStep from '@/components/auth/PasswordStep';
 import PhoneStep from '@/components/auth/PhoneStep';
 import UserInfoStep from '@/components/auth/UserInfoStep';
-import LawyerLicenseStep from '@/components/auth/LawyerLicenseStep';
+import {
+    dashboardForUser,
+    persistAuthSession,
+    registerUser,
+    sendRegistrationOtp,
+    verifyRegistrationOtp,
+} from '@/lib/api/auth';
 
 export default function RegisterFlow({ onGoToLogin }) {
     const router = useRouter();
-
     const [step, setStep] = useState(1);
-
+    const [loading, setLoading] = useState(false);
+    const [apiError, setApiError] = useState('');
+    const [verificationToken, setVerificationToken] = useState('');
     const [form, setForm] = useState({
         phone: '',
-        otp: '',
         firstName: '',
         lastName: '',
         password: '',
@@ -31,65 +39,89 @@ export default function RegisterFlow({ onGoToLogin }) {
 
         if (/^09\d{9}$/.test(initialPhone || '')) {
             setForm((current) => ({ ...current, phone: initialPhone }));
-            setStep(2);
         }
     }, []);
 
     const updateForm = (key, value) => {
-        setForm((prev) => ({
-            ...prev,
-            [key]: value,
-        }));
+        if (apiError) setApiError('');
+        setForm((current) => ({ ...current, [key]: value }));
     };
 
-    /*
-     * شماره موبایل کاربر جدید؛ ثبت‌نام بدون OTP ادامه پیدا می‌کند.
-     */
-    const startRegistration = (phone) => {
+    const runRequest = async (callback) => {
+        setLoading(true);
+        setApiError('');
+
+        try {
+            return await callback();
+        } catch (error) {
+            setApiError(error.message);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const startRegistration = async (phone) => {
         updateForm('phone', phone);
-        setStep(2);
+        const result = await runRequest(() => sendRegistrationOtp(phone));
+        if (result) setStep(2);
     };
 
-    /*
-     * مرحله ۳
-     * نام + نام خانوادگی + نقش
-     */
-    const saveUserAndRedirect = (licenseNumber = null) => {
-        const userData = {
-            phone: form.phone,
-            firstName: form.firstName,
-            lastName: form.lastName,
-            role: form.role,
-            licenseNumber,
-        };
+    const verifyOtp = async (code) => {
+        const result = await runRequest(() =>
+            verifyRegistrationOtp(form.phone, code),
+        );
 
-        localStorage.setItem('demo_auth_user', JSON.stringify(userData));
+        if (!result) return;
 
-        if (form.role === 'lawyer') {
-            router.push('/lawyer');
+        if (!result.verification_token) {
+            setApiError('توکن تأیید ثبت‌نام از سرور دریافت نشد.');
             return;
         }
 
-        router.push('/client');
+        setVerificationToken(result.verification_token);
+        setStep(3);
     };
 
-    const handleUserInfo = () => {
+    const resendOtp = async () => {
+        const result = await sendRegistrationOtp(form.phone);
+        if (!result) throw new Error('ارسال مجدد کد ناموفق بود.');
+    };
+
+    const continueUserInfo = (normalizedLicense) => {
         if (form.role === 'lawyer') {
-            setStep(3);
-            return;
+            updateForm('licenseNumber', normalizedLicense);
         }
-
-        if (form.role === 'client') {
-            saveUserAndRedirect();
-        }
+        setStep(4);
     };
 
-    /*
-     * مرحله ۴
-     * شماره پروانه وکالت
-     */
-    const handleLicense = (licenseNumber) => {
-        saveUserAndRedirect(licenseNumber);
+    const finishRegistration = async () => {
+        const result = await runRequest(() =>
+            registerUser({
+                ...form,
+                verificationToken,
+            }),
+        );
+
+        if (!result) return;
+
+        persistAuthSession(result);
+        router.replace(dashboardForUser(result.user));
+    };
+
+    const restart = () => {
+        setStep(1);
+        setApiError('');
+        setVerificationToken('');
+        setForm({
+            phone: '',
+            firstName: '',
+            lastName: '',
+            password: '',
+            confirmPassword: '',
+            role: '',
+            licenseNumber: '',
+        });
     };
 
     return (
@@ -100,36 +132,59 @@ export default function RegisterFlow({ onGoToLogin }) {
                     setPhone={(value) => updateForm('phone', value)}
                     onSubmit={startRegistration}
                     onGoToLogin={onGoToLogin}
+                    loading={loading}
+                    externalError={apiError}
                 />
             )}
 
             {step === 2 && (
+                <OtpStep
+                    phone={form.phone}
+                    onVerify={verifyOtp}
+                    onCodeChange={() => setApiError('')}
+                    onChangePhone={() => {
+                        setApiError('');
+                        setStep(1);
+                    }}
+                    onResend={resendOtp}
+                    loading={loading}
+                    externalError={apiError}
+                />
+            )}
+
+            {step === 3 && (
                 <UserInfoStep
                     firstName={form.firstName}
                     setFirstName={(value) => updateForm('firstName', value)}
                     lastName={form.lastName}
                     setLastName={(value) => updateForm('lastName', value)}
+                    role={form.role}
+                    setRole={(value) => updateForm('role', value)}
+                    licenseNumber={form.licenseNumber}
+                    setLicenseNumber={(value) =>
+                        updateForm('licenseNumber', value)
+                    }
+                    onNext={continueUserInfo}
+                    onBack={() => setStep(2)}
+                    onGoToLogin={onGoToLogin}
+                    onRestart={restart}
+                    loading={loading}
+                    externalError={apiError}
+                />
+            )}
+
+            {step === 4 && (
+                <PasswordStep
                     password={form.password}
                     setPassword={(value) => updateForm('password', value)}
                     confirmPassword={form.confirmPassword}
                     setConfirmPassword={(value) =>
                         updateForm('confirmPassword', value)
                     }
-                    role={form.role}
-                    setRole={(value) => updateForm('role', value)}
-                    onNext={handleUserInfo}
-                    onBack={() => setStep(1)}
-                />
-            )}
-
-            {step === 3 && (
-                <LawyerLicenseStep
-                    licenseNumber={form.licenseNumber}
-                    setLicenseNumber={(value) =>
-                        updateForm('licenseNumber', value)
-                    }
-                    onNext={handleLicense}
-                    onBack={() => setStep(2)}
+                    onSubmit={finishRegistration}
+                    onBack={() => setStep(3)}
+                    loading={loading}
+                    externalError={apiError}
                 />
             )}
         </AuthLayout>

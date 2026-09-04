@@ -20,19 +20,27 @@ const roles = [
     },
 ];
 
+const normalizeDigits = (value) =>
+    value
+        .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+        .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+        .replace(/\D/g, '');
+
 export default function UserInfoStep({
     firstName,
     setFirstName,
     lastName,
     setLastName,
-    password,
-    setPassword,
-    confirmPassword,
-    setConfirmPassword,
     role,
     setRole,
+    licenseNumber,
+    setLicenseNumber,
     onNext,
     onBack,
+    onGoToLogin,
+    onRestart,
+    loading = false,
+    externalError = '',
 }) {
     const [error, setError] = useState('');
 
@@ -43,24 +51,22 @@ export default function UserInfoStep({
             setError('نام و نام خانوادگی خود را وارد کنید.');
             return;
         }
-
         if (!role) {
             setError('نقش کاربری خود را انتخاب کنید.');
             return;
         }
+        const normalizedLicense = normalizeDigits(licenseNumber);
 
-        if (password.length < 8) {
-            setError('رمز عبور باید حداقل ۸ کاراکتر باشد.');
+        if (role === 'lawyer' && normalizedLicense.length < 3) {
+            setError('شماره پروانه وکالت را به‌صورت صحیح وارد کنید.');
             return;
         }
 
-        if (password !== confirmPassword) {
-            setError('تکرار رمز عبور با رمز عبور یکسان نیست.');
-            return;
+        if (role === 'lawyer') {
+            setLicenseNumber(normalizedLicense);
         }
-
         setError('');
-        onNext();
+        onNext(normalizedLicense);
     };
 
     return (
@@ -72,14 +78,11 @@ export default function UserInfoStep({
                 <p className="mt-3 text-sm text-[#8a9591]">اطلاعات اولیه</p>
             </header>
 
-            <AuthProgress currentStep={2} totalSteps={3} />
+            <AuthProgress currentStep={3} totalSteps={4} />
 
             <form onSubmit={handleSubmit} className="mt-7 space-y-5" noValidate>
                 <div>
-                    <label
-                        htmlFor="first-name"
-                        className="mb-2 block text-sm font-bold text-[#17483f]"
-                    >
+                    <label htmlFor="first-name" className="mb-2 block text-sm font-bold text-[#17483f]">
                         نام
                     </label>
                     <input
@@ -87,17 +90,17 @@ export default function UserInfoStep({
                         type="text"
                         autoComplete="given-name"
                         value={firstName}
-                        onChange={(event) => setFirstName(event.target.value)}
+                        onChange={(event) => {
+                            setFirstName(event.target.value);
+                            setError('');
+                        }}
                         placeholder="نام خود را وارد کنید"
                         className="h-14 w-full rounded-2xl border border-[#dfe7e4] bg-[#fbfcfb] px-5 text-sm text-[#123c35] outline-none transition placeholder:text-[#a3aca9] focus:border-[#28685c] focus:ring-4 focus:ring-[#28685c]/10"
                     />
                 </div>
 
                 <div>
-                    <label
-                        htmlFor="last-name"
-                        className="mb-2 block text-sm font-bold text-[#17483f]"
-                    >
+                    <label htmlFor="last-name" className="mb-2 block text-sm font-bold text-[#17483f]">
                         نام خانوادگی
                     </label>
                     <input
@@ -105,52 +108,13 @@ export default function UserInfoStep({
                         type="text"
                         autoComplete="family-name"
                         value={lastName}
-                        onChange={(event) => setLastName(event.target.value)}
+                        onChange={(event) => {
+                            setLastName(event.target.value);
+                            setError('');
+                        }}
                         placeholder="نام خانوادگی خود را وارد کنید"
                         className="h-14 w-full rounded-2xl border border-[#dfe7e4] bg-[#fbfcfb] px-5 text-sm text-[#123c35] outline-none transition placeholder:text-[#a3aca9] focus:border-[#28685c] focus:ring-4 focus:ring-[#28685c]/10"
                     />
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <label
-                            htmlFor="register-password"
-                            className="mb-2 block text-sm font-bold text-[#17483f]"
-                        >
-                            رمز عبور
-                        </label>
-                        <input
-                            id="register-password"
-                            type="password"
-                            autoComplete="new-password"
-                            value={password}
-                            onChange={(event) => setPassword(event.target.value)}
-                            placeholder="حداقل ۸ کاراکتر"
-                            className="h-14 w-full rounded-2xl border border-[#dfe7e4] bg-[#fbfcfb] px-5 text-left text-sm text-[#123c35] outline-none transition placeholder:text-right placeholder:text-[#a3aca9] focus:border-[#28685c] focus:ring-4 focus:ring-[#28685c]/10"
-                            dir="ltr"
-                        />
-                    </div>
-
-                    <div>
-                        <label
-                            htmlFor="register-password-confirmation"
-                            className="mb-2 block text-sm font-bold text-[#17483f]"
-                        >
-                            تکرار رمز عبور
-                        </label>
-                        <input
-                            id="register-password-confirmation"
-                            type="password"
-                            autoComplete="new-password"
-                            value={confirmPassword}
-                            onChange={(event) =>
-                                setConfirmPassword(event.target.value)
-                            }
-                            placeholder="رمز عبور را تکرار کنید"
-                            className="h-14 w-full rounded-2xl border border-[#dfe7e4] bg-[#fbfcfb] px-5 text-left text-sm text-[#123c35] outline-none transition placeholder:text-right placeholder:text-[#a3aca9] focus:border-[#28685c] focus:ring-4 focus:ring-[#28685c]/10"
-                            dir="ltr"
-                        />
-                    </div>
                 </div>
 
                 <fieldset>
@@ -166,7 +130,10 @@ export default function UserInfoStep({
                                 <button
                                     key={item.id}
                                     type="button"
-                                    onClick={() => setRole(item.id)}
+                                    onClick={() => {
+                                        setRole(item.id);
+                                        setError('');
+                                    }}
                                     aria-pressed={selected}
                                     className={`rounded-2xl border px-4 py-5 text-center transition ${
                                         selected
@@ -174,11 +141,7 @@ export default function UserInfoStep({
                                             : 'border-[#dfe7e4] bg-white hover:border-[#c5a35a]'
                                     }`}
                                 >
-                                    <Icon
-                                        className="mx-auto text-[#17483f]"
-                                        size={30}
-                                        strokeWidth={1.7}
-                                    />
+                                    <Icon className="mx-auto text-[#17483f]" size={30} strokeWidth={1.7} />
                                     <strong className="mt-3 block text-base text-[#123c35]">
                                         {item.title}
                                     </strong>
@@ -191,29 +154,57 @@ export default function UserInfoStep({
                     </div>
                 </fieldset>
 
-                {error && (
-                    <p
-                        role="alert"
-                        className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-                    >
-                        {error}
+                {role === 'lawyer' && (
+                    <div>
+                        <label htmlFor="license-number" className="mb-2 block text-sm font-bold text-[#17483f]">
+                            شماره پروانه وکالت
+                        </label>
+                        <input
+                            id="license-number"
+                            type="text"
+                            inputMode="numeric"
+                            value={licenseNumber}
+                            onChange={(event) => {
+                                setLicenseNumber(event.target.value);
+                                setError('');
+                            }}
+                            placeholder="شماره پروانه را وارد کنید"
+                            className="h-14 w-full rounded-2xl border border-[#dfe7e4] bg-[#fbfcfb] px-5 text-left text-sm text-[#123c35] outline-none transition placeholder:text-right placeholder:text-[#a3aca9] focus:border-[#28685c] focus:ring-4 focus:ring-[#28685c]/10"
+                            dir="ltr"
+                        />
+                    </div>
+                )}
+
+                {(error || externalError) && (
+                    <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                        {error || externalError}
                     </p>
                 )}
 
                 <button
                     type="submit"
-                    className="h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99]"
+                    disabled={loading}
+                    className="h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    ادامه
+                    {loading ? 'در حال اعتبارسنجی...' : 'ادامه'}
                 </button>
-                <button
-                    type="button"
-                    onClick={onBack}
-                    className="w-full text-sm font-bold text-[#697570]"
-                >
-                    بازگشت
+
+                <button type="button" onClick={onBack} className="w-full text-sm font-bold text-[#697570]">
+                    بازگشت به مرحله قبل
                 </button>
             </form>
+
+            <div className="mt-5 space-y-3 text-center text-sm">
+                <p className="text-[#8a9591]">
+                    قبلاً ثبت‌نام کرده‌اید؟{' '}
+                    <button type="button" onClick={onGoToLogin} className="font-extrabold text-[#ad8b43]">
+                        ورود
+                    </button>
+                </p>
+                <button type="button" onClick={onRestart} className="font-bold text-[#9aa39f]">
+                    شروع دوباره ثبت‌نام
+                </button>
+            </div>
         </section>
     );
 }

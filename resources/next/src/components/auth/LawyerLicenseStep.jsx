@@ -16,6 +16,8 @@ export default function LawyerLicenseStep({
     setLicenseNumber,
     onNext,
     onBack,
+    loading = false,
+    externalError = '',
 }) {
     const [error, setError] = useState('');
 
@@ -70,22 +72,24 @@ export default function LawyerLicenseStep({
                     dir="ltr"
                 />
 
-                {error && (
+                {(error || externalError) && (
                     <p role="alert" className="mt-3 text-sm font-medium text-red-700">
-                        {error}
+                        {error || externalError}
                     </p>
                 )}
 
                 <button
                     type="submit"
-                    className="mt-5 h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99]"
+                    disabled={loading}
+                    className="mt-5 h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    تکمیل ثبت‌نام
+                    {loading ? 'در حال اعتبارسنجی...' : 'تکمیل ثبت‌نام'}
                 </button>
                 <button
                     type="button"
                     onClick={onBack}
-                    className="mt-5 w-full text-sm font-bold text-[#697570]"
+                    disabled={loading}
+                    className="mt-5 w-full text-sm font-bold text-[#697570] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                     بازگشت و تغییر نقش
                 </button>
