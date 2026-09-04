@@ -1,23 +1,19 @@
 'use client';
 
 import { Vazirmatn } from 'next/font/google';
-import { useAuth } from '@/auth/AuthProvider';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
     weight: ['400', '500', '600', '700', '800'],
 });
 const HomeIntro = () => {
-    const { user } = useAuth();
-    const fullName = [user?.name, user?.last_name].filter(Boolean).join(' ').trim();
-
     return (
         <div className={`${vazir.className} mt-10 text-right`}>
 
 
             {/* Greeting */}
             <h1 className="text-[28px] font-bold leading-[1.5] text-[#0d302a] lg:text-[34px]">
-                سلام{fullName ? ` ${fullName}` : ''}
+                سلام فرزام نخعی
             </h1>
 
             {/* Description */}

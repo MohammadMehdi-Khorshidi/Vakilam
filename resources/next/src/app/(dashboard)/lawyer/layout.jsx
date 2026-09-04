@@ -2,15 +2,13 @@
 
 import { useState } from 'react';
 
-import LawyerSidebar from '../../../components/dashboard/LawyerSidebar';
-import DashboardHeader from '@/components/dashboard/DashboardHeader';
-import AuthGuard from '@/auth/AuthGuard';
+import LawyerSidebar from '../../../components/sidebar/LawyerSidebar';
+import DashboardHeader from '../../../components/sidebar/DashboardHeader';
 
 const ClientDashboardLayout = ({ children }) => {
     const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
-        <AuthGuard roles={['lawyer']}>
         <div dir="rtl" className="min-h-screen bg-[#f8faf9]">
             {/* ================= Dashboard Layout ================= */}
             <div className="flex min-h-screen">
@@ -33,7 +31,6 @@ const ClientDashboardLayout = ({ children }) => {
                 </div>
             </div>
         </div>
-        </AuthGuard>
     );
 };
 

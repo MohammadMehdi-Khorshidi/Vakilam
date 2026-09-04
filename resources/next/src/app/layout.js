@@ -1,10 +1,10 @@
 import './globals.css';
 
-import Header from '@/layout/Header';
-import Footer from '@/layout/Footer';
-import { AuthProvider } from '@/auth/AuthProvider';
+
 
 import { Vazirmatn } from 'next/font/google';
+import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -24,11 +24,9 @@ export default function RootLayout({ children }) {
     return (
         <html lang="en">
             <body className={`flex min-h-screen flex-col ${vazir.variable}`}>
-                <AuthProvider>
-                    <Header />
-                    {children}
-                    <Footer />
-                </AuthProvider>
+                <Header />
+                {children}
+                <Footer />
             </body>
         </html>
     );

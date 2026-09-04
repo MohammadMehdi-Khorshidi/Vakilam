@@ -2,16 +2,11 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import ButtonHeader from '@/components/ui/button/ButtonHeader';
 import HeaderIcon from '@/assets/images/HeaderIcon.svg';
-import { useAuth } from '@/auth/AuthProvider';
-import { dashboardPathForUser } from '@/lib/api/client';
+import ButtonHeader from '@/components/common/ButtonHeader';
 
 export default function Header() {
     const [open, setOpen] = useState(false);
-    const { user, loading } = useAuth();
-    const accountHref = user ? dashboardPathForUser(user) : '/auth';
-    const accountLabel = user ? 'داشبورد من' : 'ورود / ثبت نام';
 
     const menuItems = [
         { label: 'تیم‌ما', path: '/teams' },
@@ -21,13 +16,11 @@ export default function Header() {
     ];
 
     return (
-        <header dir="ltr" className="sticky top-0 z-100 bg-white shadow-lg">
+        <header dir="ltr" className="z-100 sticky top-0 bg-white shadow-lg">
             <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 md:h-20 lg:px-0">
                 <div className="hidden items-center gap-2 lg:flex">
-
-
-                    <ButtonHeader variant="primary" href={accountHref}>
-                        {loading ? '...' : accountLabel}
+                    <ButtonHeader variant="primary" href="/login">
+                        ثبت نام / ورود
                     </ButtonHeader>
                 </div>
 
@@ -78,8 +71,8 @@ export default function Header() {
                             شرح مسئله حقوقی
                         </ButtonHeader>
 
-                        <ButtonHeader variant="ghost" full href={accountHref}>
-                            {loading ? '...' : accountLabel}
+                        <ButtonHeader variant="ghost" full href="/login">
+                            ثبت نام / ورود
                         </ButtonHeader>
                     </div>
                 </div>

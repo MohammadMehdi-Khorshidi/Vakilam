@@ -1,13 +1,10 @@
-'use client';
-
-import ProfessionalProfileCard from './(Home)/ProfessionalProfileCard';
-import DashboardStats from '@/components/pages/dashboard/client/(home)/DashboardStats';
-import SuggestedCaseCard from './(Home)/SuggestedCaseCard';
-import ActionCenter from './(Home)/ActionCenter';
-import FeedbackCard from './(Home)/FeedbackCard';
-import CooperationStatus from './(Home)/CooperationStatus';
+import ProfessionalProfileCard from '../../../features/lawyer/home/ProfessionalProfileCard';
+import DashboardStats from '../../../features/client/home/DashboardStats';
+import SuggestedCaseCard from '../../../features/lawyer/home/SuggestedCaseCard';
+import ActionCenter from '../../../features/lawyer/home/ActionCenter';
+import FeedbackCard from '../../../features/lawyer/home/FeedbackCard';
+import CooperationStatus from '../../../features/lawyer/home/CooperationStatus';
 import { Vazirmatn } from 'next/font/google';
-import { useAuth } from '@/auth/AuthProvider';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -15,9 +12,6 @@ const vazir = Vazirmatn({
 });
 
 export default function LawyerDashboard() {
-    const { user } = useAuth();
-    const fullName = [user?.name, user?.last_name].filter(Boolean).join(' ').trim();
-
     return (
         <main
             dir="ltr"
@@ -33,7 +27,7 @@ export default function LawyerDashboard() {
                     </button>
 
                     <div className="text-right">
-                        <h1 className="font-black text-2xl">سلام{fullName ? ` ${fullName}` : ''}</h1>
+                        <h1 className="font-black text-2xl">سلام نرگس سعادتی</h1>
 
                         <p className="mt-3 leading-7 text-[#7c8581]">
                             پرونده‌های متناسب، اقدام‌های ضروری و وضعیت

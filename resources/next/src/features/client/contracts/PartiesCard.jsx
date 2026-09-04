@@ -2,7 +2,6 @@
 
 import { Vazirmatn } from 'next/font/google';
 import { UserRound, BriefcaseBusiness, ArrowLeftRight } from 'lucide-react';
-import { useAuth } from '@/auth/AuthProvider';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -10,9 +9,6 @@ const vazir = Vazirmatn({
 });
 
 const PartiesCard = () => {
-    const { user } = useAuth();
-    const clientName = [user?.name, user?.last_name].filter(Boolean).join(' ').trim() || 'موکل';
-
     return (
         <section
             dir="rtl"
@@ -35,7 +31,7 @@ const PartiesCard = () => {
                         <p className=" text-[#8a9994]">وکیل</p>
 
                         <p className="mt-1 font-extrabold text-[#173f37]">
-                            وکیل منتخب
+                            نرگس سعادتی
                         </p>
 
                         <p className="mt-1 text-[#8a9994]">
@@ -59,7 +55,7 @@ const PartiesCard = () => {
                         <p className=" text-[#8a9994]">موکل</p>
 
                         <p className="mt-1 font-extrabold text-[#173f37]">
-                            {clientName}
+                            فرزام نخعی
                         </p>
 
                         <p className="mt-1 text-[#8a9994]">

@@ -16,7 +16,7 @@ const NewProposal = () => {
             {/* Header */}
             <div className="border-b border-[#edf1ef] pb-4">
                 <h2 className=" font-extrabold text-[#173f37]">
-                    پیشنهاد همکاری جدید
+                    پیشنهاد جدید از نرگس سعادتی
                 </h2>
             </div>
 
