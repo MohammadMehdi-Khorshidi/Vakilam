@@ -17,11 +17,8 @@ use Throwable;
 class PasswordResetController extends Controller
 {
     private const OTP_TTL_SECONDS = 120;
-
     private const OTP_RESEND_AFTER_SECONDS = 60;
-
     private const OTP_MAX_ATTEMPTS = 5;
-
     private const RESET_TOKEN_TTL_SECONDS = 600;
 
     /**
@@ -30,7 +27,10 @@ class PasswordResetController extends Controller
     public function sendOtp(Request $request, OtpSender $otpSender): JsonResponse
     {
         $data = $request->validate([
-            'phone' => 'required|string|regex:/^09\d{9}$/',
+            'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
+        ], [
+            'phone.required' => 'شماره موبایل الزامی است.',
+            'phone.regex' => 'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.',
         ]);
 
         $user = User::query()
@@ -38,19 +38,19 @@ class PasswordResetController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!Cache::add(
+        if (! Cache::add(
             $this->resendCacheKey($data['phone']),
             true,
             self::OTP_RESEND_AFTER_SECONDS,
         )) {
             return response()->json([
-                'message' => 'Please wait before requesting another code.',
+                'message' => 'لطفاً کمی صبر کنید و سپس دوباره درخواست کد تأیید بدهید.',
                 'retry_after' => self::OTP_RESEND_AFTER_SECONDS,
             ], 429);
         }
 
         $response = [
-            'message' => 'If an active account exists for this phone number, a password reset code was sent.',
+            'message' => 'اگر حساب فعالی با این شماره موبایل وجود داشته باشد، کد بازیابی رمز ارسال شد.',
             'expires_in' => self::OTP_TTL_SECONDS,
             'resend_after' => self::OTP_RESEND_AFTER_SECONDS,
         ];
@@ -77,7 +77,7 @@ class PasswordResetController extends Controller
             report($exception);
 
             return response()->json([
-                'message' => 'The password reset code could not be sent. Please try again.',
+                'message' => 'ارسال کد بازیابی ناموفق بود. لطفاً دوباره تلاش کنید.',
             ], 503);
         }
 
@@ -94,20 +94,27 @@ class PasswordResetController extends Controller
     public function verifyOtp(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'phone' => 'required|string|regex:/^09\d{9}$/',
-            'otp' => 'required|string|digits:6',
+            'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
+            'otp' => ['required', 'string', 'digits:6'],
+        ], [
+            'phone.required' => 'شماره موبایل الزامی است.',
+            'phone.regex' => 'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.',
+            'otp.required' => 'کد تأیید الزامی است.',
+            'otp.digits' => 'کد تأیید باید ۶ رقم باشد.',
         ]);
 
         $cacheKey = $this->otpCacheKey($data['phone']);
         $otpData = Cache::get($cacheKey);
 
-        if (!is_array($otpData)
+        if (
+            ! is_array($otpData)
             || ($otpData['phone'] ?? null) !== $data['phone']
-            || ($otpData['expires_at'] ?? 0) <= now()->timestamp) {
+            || ($otpData['expires_at'] ?? 0) <= now()->timestamp
+        ) {
             Cache::forget($cacheKey);
 
             throw ValidationException::withMessages([
-                'otp' => 'The verification code is invalid or has expired.',
+                'otp' => 'کد تأیید نامعتبر است یا منقضی شده است.',
             ]);
         }
 
@@ -115,11 +122,11 @@ class PasswordResetController extends Controller
             Cache::forget($cacheKey);
 
             throw ValidationException::withMessages([
-                'otp' => 'The maximum number of attempts has been reached. Request a new code.',
+                'otp' => 'تعداد تلاش‌های مجاز به پایان رسیده است. لطفاً کد جدید درخواست کنید.',
             ]);
         }
 
-        if (!Hash::check($data['otp'], $otpData['otp_hash'])) {
+        if (! Hash::check($data['otp'], $otpData['otp_hash'])) {
             $otpData['attempts']++;
             $remainingSeconds = max(1, $otpData['expires_at'] - now()->timestamp);
 
@@ -131,8 +138,8 @@ class PasswordResetController extends Controller
 
             throw ValidationException::withMessages([
                 'otp' => $otpData['attempts'] >= self::OTP_MAX_ATTEMPTS
-                    ? 'The maximum number of attempts has been reached. Request a new code.'
-                    : 'The verification code is invalid or has expired.',
+                    ? 'تعداد تلاش‌های مجاز به پایان رسیده است. لطفاً کد جدید درخواست کنید.'
+                    : 'کد تأیید نامعتبر است یا منقضی شده است.',
             ]);
         }
 
@@ -142,11 +149,11 @@ class PasswordResetController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$user) {
+        if (! $user) {
             Cache::forget($cacheKey);
 
             throw ValidationException::withMessages([
-                'phone' => 'No active user was found with this phone number.',
+                'phone' => 'حساب فعالی با این شماره موبایل یافت نشد.',
             ]);
         }
 
@@ -160,7 +167,7 @@ class PasswordResetController extends Controller
         ], self::RESET_TOKEN_TTL_SECONDS);
 
         return response()->json([
-            'message' => 'Phone number verified. Enter a new password.',
+            'message' => 'شماره موبایل تأیید شد. رمز عبور جدید را وارد کنید.',
             'reset_token' => $resetToken,
             'expires_in' => self::RESET_TOKEN_TTL_SECONDS,
         ]);
@@ -172,17 +179,23 @@ class PasswordResetController extends Controller
     public function reset(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'phone' => 'required|string|regex:/^09\d{9}$/',
-            'reset_token' => 'required|string|size:64',
-            'password' => 'required|string|confirmed|min:8|max:255',
+            'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
+            'reset_token' => ['required', 'string', 'size:64'],
+            'password' => ['required', 'string', 'confirmed', 'min:8', 'max:255'],
+        ], [
+            'phone.required' => 'شماره موبایل الزامی است.',
+            'password.required' => 'رمز عبور الزامی است.',
+            'password.confirmed' => 'تأیید رمز عبور مطابقت ندارد.',
+            'password.min' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.',
+            'reset_token.required' => 'توکن بازیابی الزامی است.',
         ]);
 
         $resetTokenKey = $this->resetTokenCacheKey($data['reset_token']);
         $resetData = Cache::get($resetTokenKey);
 
-        if (!is_array($resetData) || ($resetData['phone'] ?? null) !== $data['phone']) {
+        if (! is_array($resetData) || ($resetData['phone'] ?? null) !== $data['phone']) {
             throw ValidationException::withMessages([
-                'reset_token' => 'The reset token is invalid or has expired.',
+                'reset_token' => 'توکن بازیابی نامعتبر است یا منقضی شده است.',
             ]);
         }
 
@@ -192,25 +205,27 @@ class PasswordResetController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
-                'reset_token' => 'The reset token is invalid or has expired.',
+                'reset_token' => 'توکن بازیابی نامعتبر است یا منقضی شده است.',
             ]);
         }
 
         if (Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
-                'password' => 'The new password must be different from the current password.',
+                'password' => 'رمز عبور جدید باید با رمز فعلی متفاوت باشد.',
             ]);
         }
 
         $consumedResetData = Cache::pull($resetTokenKey);
 
-        if (!is_array($consumedResetData)
+        if (
+            ! is_array($consumedResetData)
             || ($consumedResetData['user_id'] ?? null) !== $user->id
-            || ($consumedResetData['phone'] ?? null) !== $data['phone']) {
+            || ($consumedResetData['phone'] ?? null) !== $data['phone']
+        ) {
             throw ValidationException::withMessages([
-                'reset_token' => 'The reset token has already been used or has expired.',
+                'reset_token' => 'توکن بازیابی قبلاً استفاده شده یا منقضی شده است.',
             ]);
         }
 
@@ -224,22 +239,22 @@ class PasswordResetController extends Controller
         });
 
         return response()->json([
-            'message' => 'Password reset successfully. Please log in again.',
+            'message' => 'رمز عبور با موفقیت تغییر کرد. لطفاً دوباره وارد شوید.',
         ]);
     }
 
     private function otpCacheKey(string $phone): string
     {
-        return 'password-reset:otp:' . hash('sha256', $phone);
+        return 'password-reset:otp:'.hash('sha256', $phone);
     }
 
     private function resendCacheKey(string $phone): string
     {
-        return 'password-reset:resend:' . hash('sha256', $phone);
+        return 'password-reset:resend:'.hash('sha256', $phone);
     }
 
     private function resetTokenCacheKey(string $token): string
     {
-        return 'password-reset:verified:' . hash('sha256', $token);
+        return 'password-reset:verified:'.hash('sha256', $token);
     }
 }

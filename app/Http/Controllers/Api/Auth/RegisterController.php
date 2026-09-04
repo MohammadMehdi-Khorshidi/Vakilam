@@ -152,10 +152,7 @@ class RegisterController extends Controller
     }
 
     /** @throws ValidationException */
-    public function validateLawyer(
-        Request $request,
-        LawyerRegistryVerifier $registryVerifier,
-    ): JsonResponse {
+    public function validateLawyer(Request $request, LawyerRegistryVerifier $registryVerifier,): JsonResponse {
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
@@ -200,10 +197,7 @@ class RegisterController extends Controller
     }
 
     /** @throws ValidationException */
-    public function store(
-        Request $request,
-        LawyerRegistryVerifier $registryVerifier,
-    ): JsonResponse
+    public function store(Request $request, LawyerRegistryVerifier $registryVerifier,): JsonResponse
     {
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],

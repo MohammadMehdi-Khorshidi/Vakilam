@@ -14,8 +14,6 @@ const normalizeDigits = (value) =>
 export default function LoginStep({
     phone,
     setPhone,
-    password,
-    setPassword,
     onSubmit,
     onGoToRegister,
     loading = false,
@@ -33,11 +31,6 @@ export default function LoginStep({
             return;
         }
 
-        if (!password) {
-            setError('رمز عبور خود را وارد کنید.');
-            return;
-        }
-
         setError('');
         setPhone(normalizedPhone);
         onSubmit(normalizedPhone);
@@ -51,7 +44,7 @@ export default function LoginStep({
                 </h1>
 
                 <p className="mt-3 text-sm text-[#8a9591]">
-                    شماره موبایل و رمز عبور خود را وارد کنید.
+                    شماره موبایل خود را وارد کنید تا کد ورود برای شما ارسال شود.
                 </p>
             </header>
 
@@ -84,33 +77,6 @@ export default function LoginStep({
                     />
                 </div>
 
-                <div>
-                    <label
-                        htmlFor="login-password"
-                        className="mb-2 block text-sm font-bold text-[#17483f]"
-                    >
-                        رمز عبور
-                    </label>
-
-                    <input
-                        id="login-password"
-                        type="password"
-                        autoComplete="current-password"
-                        value={password}
-                        onChange={(event) => {
-                            setPassword(event.target.value);
-                            if (error) setError('');
-                        }}
-                        placeholder="رمز عبور"
-                        className="h-14 w-full rounded-2xl border border-[#dfe7e4] bg-[#f7f9ff] px-5 text-left text-sm text-[#123c35] outline-none transition placeholder:text-right placeholder:text-[#a3aca9] focus:border-[#28685c] focus:ring-4 focus:ring-[#28685c]/10"
-                        dir="ltr"
-                    />
-
-                    <p className="mt-2 text-right text-xs font-bold text-[#697570]">
-                        رمز عبورم را فراموش کرده‌ام
-                    </p>
-                </div>
-
                 {(error || externalError) && (
                     <p
                         role="alert"
@@ -125,9 +91,13 @@ export default function LoginStep({
                     disabled={loading}
                     className="h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    {loading ? 'در حال ورود...' : 'ورود'}
+                    {loading ? 'در حال بررسی...' : 'دریافت کد ورود'}
                 </button>
             </form>
+
+            <p className="mt-5 text-center text-xs leading-6 text-[#9aa39f]">
+                اگر حساب نداشته باشید، وارد بخش ثبت‌نام می‌شوید.
+            </p>
 
             <p className="mt-6 text-center text-sm text-[#8a9591]">
                 حساب کاربری ندارید؟{' '}
@@ -141,4 +111,4 @@ export default function LoginStep({
             </p>
         </section>
     );
-};
+}
