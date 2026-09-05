@@ -3,7 +3,6 @@
 namespace App\Services\Lawyers;
 
 use App\Exceptions\LawyerRegistryUnavailableException;
-use Illuminate\Support\Arr;
 use JsonException;
 
 class LawyerRegistryVerifier
@@ -25,37 +24,35 @@ class LawyerRegistryVerifier
             throw LawyerRegistryVerificationException::invalidLicense();
         }
 
-        $records = $this->records();
+        $licenseFound = false;
+        $matchedRecord = null;
 
-        $licenseMatches = array_values(array_filter(
-            $records,
-            function (array $record) use ($normalizedLicense): bool {
-                $recordLicense = $this->normalizeLicenseNumber((string) $this->recordValue(
-                    $record,
-                    (string) config('lawyer_registry.license_key'),
-                    ['license_number', 'license_no', 'شماره پروانه'],
-                ));
+        foreach ($this->records() as $record) {
+            $recordLicense = $this->normalizeLicenseNumber((string) $this->recordValue(
+                $record,
+                (string) config('lawyer_registry.license_key'),
+                ['license_number', 'license_no', 'شماره پروانه'],
+            ));
 
-                return $recordLicense !== ''
-                    && hash_equals($normalizedLicense, $recordLicense);
-            },
-        ));
+            if ($recordLicense === '' || ! hash_equals($normalizedLicense, $recordLicense)) {
+                continue;
+            }
 
-        if ($licenseMatches === []) {
-            throw LawyerRegistryVerificationException::invalidLicense();
+            $licenseFound = true;
+            $recordPhone = $this->normalizePhone((string) $this->recordValue(
+                $record,
+                (string) config('lawyer_registry.phone_key'),
+                ['phone', 'mobile', 'mobile_number', 'شماره موبایل'],
+            ));
+
+            if ($matchedRecord === null && hash_equals($normalizedPhone, $recordPhone)) {
+                $matchedRecord = $record;
+            }
         }
 
-        $matchedRecord = Arr::first(
-            $licenseMatches,
-            fn (array $record): bool => hash_equals(
-                $normalizedPhone,
-                $this->normalizePhone((string) $this->recordValue(
-                    $record,
-                    (string) config('lawyer_registry.phone_key'),
-                    ['phone', 'mobile', 'mobile_number', 'شماره موبایل'],
-                )),
-            ),
-        );
+        if (! $licenseFound) {
+            throw LawyerRegistryVerificationException::invalidLicense();
+        }
 
         if (! is_array($matchedRecord)) {
             throw LawyerRegistryVerificationException::phoneMismatch();
@@ -93,20 +90,70 @@ class LawyerRegistryVerifier
         ];
     }
 
-    /** @return array<int, array<string, mixed>> */
-    private function records(): array
+    /** @return iterable<int, array<string, mixed>> */
+    private function records(): iterable
     {
-        $path = (string) config('lawyer_registry.path');
+        $path = $this->registryPath();
+        $recordsKey = config('lawyer_registry.records_key');
 
-        if ($path === '' || ! is_file($path) || ! is_readable($path)) {
-            throw new LawyerRegistryUnavailableException(
-                'The lawyer registry file is unavailable.',
-            );
+        if (is_string($recordsKey) && $recordsKey !== '') {
+            yield from $this->decodedRecords($path, $recordsKey);
+
+            return;
         }
 
+        yield from $this->streamArrayRecords($path);
+    }
+
+    private function registryPath(): string
+    {
+        $configuredPath = trim((string) config('lawyer_registry.path'));
+        $defaultPath = storage_path(
+            'app/private/lawyer-registry/lawyers_final.json',
+        );
+        $checkedPaths = [];
+
+        foreach (array_unique([$configuredPath, $defaultPath]) as $path) {
+            if ($path === '') {
+                continue;
+            }
+
+            $resolvedPath = $this->absolutePath($path);
+            $checkedPaths[] = $resolvedPath;
+
+            if (is_file($resolvedPath) && is_readable($resolvedPath)) {
+                return $resolvedPath;
+            }
+        }
+
+        throw new LawyerRegistryUnavailableException(
+            'The lawyer registry file is unavailable. Checked: '.implode(', ', $checkedPaths),
+        );
+    }
+
+    private function absolutePath(string $path): string
+    {
+        $isAbsolute = str_starts_with($path, '/')
+            || str_starts_with($path, '\\\\')
+            || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1;
+
+        return $isAbsolute ? $path : base_path($path);
+    }
+
+    /** @return iterable<int, array<string, mixed>> */
+    private function decodedRecords(string $path, string $recordsKey): iterable
+    {
         try {
+            $contents = file_get_contents($path);
+
+            if ($contents === false) {
+                throw new LawyerRegistryUnavailableException(
+                    'The lawyer registry file could not be read: '.$path,
+                );
+            }
+
             $decoded = json_decode(
-                (string) file_get_contents($path),
+                $contents,
                 true,
                 512,
                 JSON_THROW_ON_ERROR,
@@ -118,10 +165,7 @@ class LawyerRegistryVerifier
             );
         }
 
-        $recordsKey = config('lawyer_registry.records_key');
-        $records = is_string($recordsKey) && $recordsKey !== ''
-            ? data_get($decoded, $recordsKey)
-            : $decoded;
+        $records = data_get($decoded, $recordsKey);
 
         if (! is_array($records) || ! array_is_list($records)) {
             throw new LawyerRegistryUnavailableException(
@@ -129,10 +173,176 @@ class LawyerRegistryVerifier
             );
         }
 
-        return array_values(array_filter(
-            $records,
-            fn (mixed $record): bool => is_array($record),
-        ));
+        foreach ($records as $record) {
+            if (is_array($record)) {
+                yield $record;
+            }
+        }
+    }
+
+    /**
+     * Read a root JSON array one record at a time. The production registry is
+     * large enough that decoding it into one PHP array can exhaust PHP memory.
+     *
+     * @return iterable<int, array<string, mixed>>
+     */
+    private function streamArrayRecords(string $path): iterable
+    {
+        $handle = @fopen($path, 'rb');
+
+        if ($handle === false) {
+            throw new LawyerRegistryUnavailableException(
+                'The lawyer registry file could not be opened: '.$path,
+            );
+        }
+
+        $started = false;
+        $finished = false;
+        $firstChunk = true;
+        $outerState = 'value_or_end';
+        $buffer = '';
+        $depth = 0;
+        $inString = false;
+        $escaped = false;
+
+        try {
+            while (! feof($handle)) {
+                $chunk = fread($handle, 65536);
+
+                if ($chunk === false) {
+                    throw new LawyerRegistryUnavailableException(
+                        'The lawyer registry file could not be read: '.$path,
+                    );
+                }
+
+                if ($firstChunk) {
+                    $chunk = preg_replace('/^\xEF\xBB\xBF/', '', $chunk) ?? $chunk;
+                    $firstChunk = false;
+                }
+
+                $length = strlen($chunk);
+
+                for ($index = 0; $index < $length; $index++) {
+                    $character = $chunk[$index];
+
+                    if ($depth === 0) {
+                        if (ctype_space($character)) {
+                            continue;
+                        }
+
+                        if (! $started) {
+                            if ($character !== '[') {
+                                throw new LawyerRegistryUnavailableException(
+                                    'The lawyer registry JSON root must be an array.',
+                                );
+                            }
+
+                            $started = true;
+                            continue;
+                        }
+
+                        if ($finished) {
+                            throw new LawyerRegistryUnavailableException(
+                                'The lawyer registry JSON has trailing content.',
+                            );
+                        }
+
+                        if ($outerState === 'comma_or_end') {
+                            if ($character === ',') {
+                                $outerState = 'value';
+                                continue;
+                            }
+
+                            if ($character === ']') {
+                                $finished = true;
+                                continue;
+                            }
+
+                            throw new LawyerRegistryUnavailableException(
+                                'The lawyer registry JSON has an invalid record separator.',
+                            );
+                        }
+
+                        if ($character === ']' && $outerState === 'value_or_end') {
+                            $finished = true;
+                            continue;
+                        }
+
+                        if ($character !== '{') {
+                            throw new LawyerRegistryUnavailableException(
+                                'The lawyer registry must contain JSON objects.',
+                            );
+                        }
+
+                        $buffer = '{';
+                        $depth = 1;
+                        $inString = false;
+                        $escaped = false;
+
+                        continue;
+                    }
+
+                    $buffer .= $character;
+
+                    if ($inString) {
+                        if ($escaped) {
+                            $escaped = false;
+                        } elseif ($character === '\\') {
+                            $escaped = true;
+                        } elseif ($character === '"') {
+                            $inString = false;
+                        }
+
+                        continue;
+                    }
+
+                    if ($character === '"') {
+                        $inString = true;
+                    } elseif ($character === '{' || $character === '[') {
+                        $depth++;
+                    } elseif ($character === '}' || $character === ']') {
+                        $depth--;
+                    }
+
+                    if ($depth !== 0) {
+                        continue;
+                    }
+
+                    try {
+                        $record = json_decode(
+                            $buffer,
+                            true,
+                            512,
+                            JSON_THROW_ON_ERROR,
+                        );
+                    } catch (JsonException $exception) {
+                        throw new LawyerRegistryUnavailableException(
+                            'The lawyer registry contains an invalid JSON record.',
+                            previous: $exception,
+                        );
+                    }
+
+                    if (! is_array($record)) {
+                        throw new LawyerRegistryUnavailableException(
+                            'The lawyer registry contains a non-object record.',
+                        );
+                    }
+
+                    $buffer = '';
+                    $outerState = 'comma_or_end';
+
+                    yield $record;
+                }
+            }
+
+            if (! $started || ! $finished || $depth !== 0 || $inString) {
+                throw new LawyerRegistryUnavailableException(
+                    'The lawyer registry JSON is incomplete.',
+                );
+            }
+        } finally {
+            fclose($handle);
+        }
     }
 
     /**

@@ -15,7 +15,6 @@ export default function LoginStep({
     phone,
     setPhone,
     onSubmit,
-    onGoToRegister,
     loading = false,
     externalError = '',
 }) {
@@ -40,11 +39,11 @@ export default function LoginStep({
         <section className="rounded-[24px] border border-[#e4e9e7] bg-white px-5 py-8 shadow-[0_22px_60px_rgba(8,35,31,0.08)] sm:px-10 sm:py-10">
             <header className="text-center">
                 <h1 className="text-2xl font-extrabold text-[#123c35] sm:text-[28px]">
-                    ورود به حساب کاربری
+                    ورود یا ثبت‌نام
                 </h1>
 
                 <p className="mt-3 text-sm text-[#8a9591]">
-                    شماره موبایل خود را وارد کنید تا کد ورود برای شما ارسال شود.
+                    شماره موبایل خود را وارد کنید تا کد تأیید برای شما ارسال شود.
                 </p>
             </header>
 
@@ -91,23 +90,13 @@ export default function LoginStep({
                     disabled={loading}
                     className="h-14 w-full rounded-2xl bg-[#155447] text-sm font-extrabold text-white transition hover:bg-[#1c6557] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    {loading ? 'در حال بررسی...' : 'دریافت کد ورود'}
+                    {loading ? 'در حال بررسی...' : 'دریافت کد تأیید'}
                 </button>
             </form>
 
             <p className="mt-5 text-center text-xs leading-6 text-[#9aa39f]">
-                اگر حساب نداشته باشید، وارد بخش ثبت‌نام می‌شوید.
-            </p>
-
-            <p className="mt-6 text-center text-sm text-[#8a9591]">
-                حساب کاربری ندارید؟{' '}
-                <button
-                    type="button"
-                    onClick={onGoToRegister}
-                    className="font-extrabold text-[#28685c] underline decoration-[#c5a35a] decoration-2 underline-offset-4"
-                >
-                    ثبت‌نام کنید
-                </button>
+                اگر حساب داشته باشید وارد می‌شوید؛ در غیر این صورت ثبت‌نام
+                را همین‌جا ادامه می‌دهید.
             </p>
         </section>
     );

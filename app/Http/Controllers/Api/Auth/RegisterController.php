@@ -181,7 +181,9 @@ class RegisterController extends Controller
             throw ValidationException::withMessages([
                 $exception->field => $exception->getMessage(),
             ]);
-        } catch (LawyerRegistryUnavailableException) {
+        } catch (LawyerRegistryUnavailableException $exception) {
+            report($exception);
+
             return response()->json([
                 'message' => 'سرویس اعتبارسنجی وکیل موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید.',
             ], 503);
@@ -244,7 +246,9 @@ class RegisterController extends Controller
                 throw ValidationException::withMessages([
                     $exception->field => $exception->getMessage(),
                 ]);
-            } catch (LawyerRegistryUnavailableException) {
+            } catch (LawyerRegistryUnavailableException $exception) {
+                report($exception);
+
                 return response()->json([
                     'message' => 'سرویس اعتبارسنجی وکیل موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید.',
                 ], 503);

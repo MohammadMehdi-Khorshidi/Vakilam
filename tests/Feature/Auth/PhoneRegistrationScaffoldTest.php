@@ -109,7 +109,7 @@ test('a verified client can register and receives an access token', function () 
     ]);
 
     $response->assertCreated()
-        ->assertJsonPath('message', 'Registered successfully.')
+        ->assertJsonPath('message', 'ثبت‌نام با موفقیت انجام شد.')
         ->assertJsonPath('user.role', 'client')
         ->assertJsonStructure(['token_type', 'access_token', 'user']);
 
