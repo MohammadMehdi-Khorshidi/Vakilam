@@ -195,15 +195,19 @@ export default function UserInfoStep({
             </form>
 
             <div className="mt-5 space-y-3 text-center text-sm">
-                <p className="text-[#8a9591]">
-                    قبلاً ثبت‌نام کرده‌اید؟{' '}
-                    <button type="button" onClick={onGoToLogin} className="font-extrabold text-[#ad8b43]">
-                        ورود
+                {onGoToLogin && (
+                    <p className="text-[#8a9591]">
+                        قبلاً ثبت‌نام کرده‌اید؟{' '}
+                        <button type="button" onClick={onGoToLogin} className="font-extrabold text-[#ad8b43]">
+                            ورود
+                        </button>
+                    </p>
+                )}
+                {onRestart && (
+                    <button type="button" onClick={onRestart} className="font-bold text-[#9aa39f]">
+                        شروع دوباره ثبت‌نام
                     </button>
-                </p>
-                <button type="button" onClick={onRestart} className="font-bold text-[#9aa39f]">
-                    شروع دوباره ثبت‌نام
-                </button>
+                )}
             </div>
         </section>
     );

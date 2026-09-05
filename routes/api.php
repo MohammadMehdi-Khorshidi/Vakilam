@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
+use App\Http\Controllers\Api\Auth\PhoneAuthController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\ClientCaseController;
 use App\Http\Controllers\Api\ClientDashboardController;
@@ -37,6 +38,11 @@ use Illuminate\Support\Facades\Route;
 | Auth (Public + Protected)
 |--------------------------------------------------------------------------
 */
+
+Route::prefix('auth/phone')->name('apiPhoneAuth.')->controller(PhoneAuthController::class)->group(function () {
+    Route::post('/send-otp', 'sendOtp')->middleware('throttle:3,1')->name('sendOtp');
+    Route::post('/verify-otp', 'verifyOtp')->middleware('throttle:10,1')->name('verifyOtp');
+});
 
 Route::prefix('auth/register')->name('apiRegister.')->controller(RegisterController::class)->group(function () {
     Route::post('/send-otp', 'sendOtp')->middleware('throttle:3,1')->name('sendOtp');

@@ -18,6 +18,7 @@ export default function OtpStep({
     onChangePhone,
     onResend,
     isLogin = false,
+    title = '',
     loading = false,
     externalError = '',
 }) {
@@ -66,7 +67,10 @@ export default function OtpStep({
         <section className="rounded-[24px] border border-[#e4e9e7] bg-white px-5 py-8 shadow-[0_22px_60px_rgba(8,35,31,0.08)] sm:px-10 sm:py-10">
             <header className="text-center">
                 <h1 className="text-2xl font-extrabold text-[#123c35] sm:text-[28px]">
-                    {isLogin ? 'ورود به حساب کاربری' : 'ایجاد حساب کاربری'}
+                    {title ||
+                        (isLogin
+                            ? 'ورود به حساب کاربری'
+                            : 'ایجاد حساب کاربری')}
                 </h1>
                 <p className="mt-3 text-sm text-[#8a9591]">تأیید شماره موبایل</p>
             </header>

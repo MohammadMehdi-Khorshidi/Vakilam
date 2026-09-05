@@ -134,6 +134,36 @@ export async function restoreAuthSession() {
 }
 
 /**
+ * Start the single phone-first authentication flow.
+ * The server uses the same response whether the phone is already registered.
+ */
+export async function sendPhoneAuthOtp(phone) {
+    const normalized = normalizePhone(phone);
+    return apiRequest('auth/phone/send-otp', {
+        method: 'POST',
+        data: { phone: normalized },
+        auth: false,
+    });
+}
+
+/**
+ * Existing phones receive a login session. New phones receive the
+ * verification token needed to finish registration in the same page.
+ */
+export async function verifyPhoneAuthOtp(phone, otp) {
+    const normalized = normalizePhone(phone);
+    return apiRequest('auth/phone/verify-otp', {
+        method: 'POST',
+        data: {
+            phone: normalized,
+            otp: String(otp).trim(),
+            device_name: 'web',
+        },
+        auth: false,
+    });
+}
+
+/**
  * Step 1 of passwordless login: check the active account and send an OTP.
  * POST /api/auth/login/send-otp
  */
@@ -204,6 +234,21 @@ export async function verifyRegistrationOtp(phone, otp) {
         data: {
             phone: normalized,
             otp: String(otp).trim(),
+        },
+        auth: false,
+    });
+}
+
+/** Validate lawyer identity before asking the user to finish registration. */
+export async function validateLawyerRegistration(form) {
+    return apiRequest('auth/register/validate-lawyer', {
+        method: 'POST',
+        data: {
+            first_name: String(form.firstName || '').trim(),
+            last_name: String(form.lastName || '').trim(),
+            phone: normalizePhone(form.phone),
+            license_number: String(form.licenseNumber || '').trim(),
+            verification_token: form.verificationToken,
         },
         auth: false,
     });

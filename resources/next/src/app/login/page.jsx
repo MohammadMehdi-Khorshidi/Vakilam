@@ -1,7 +1,6 @@
 'use client';
 
 import { Vazirmatn } from 'next/font/google';
-import { useRouter } from 'next/navigation';
 
 import { AuthAside } from '@/components/ui/auth/AuthAside';
 import LoginFlow from '@/features/auth/LoginFlow';
@@ -13,8 +12,6 @@ const vazir = Vazirmatn({
 });
 
 export default function LoginPage() {
-    const router = useRouter();
-
     return (
         <div
             className={`${vazir.className} flex min-h-[calc(100vh-5rem)] flex-col bg-gray-100 md:flex-row`}
@@ -23,9 +20,7 @@ export default function LoginPage() {
             <AuthAside />
 
             <div className="flex w-full items-center justify-center p-6 lg:w-1/2">
-                <LoginFlow
-                    onGoToRegister={() => router.push('/login/register')}
-                />
+                <LoginFlow />
             </div>
         </div>
     );
