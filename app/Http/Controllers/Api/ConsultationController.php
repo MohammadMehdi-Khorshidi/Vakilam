@@ -9,6 +9,7 @@ use App\Models\LawyerAvailability;
 use App\Models\LegalRequest;
 use App\Models\User;
 use App\Services\LawyerMatching\LawyerMatchingService;
+use App\Services\Conversations\ConversationProvisioner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -22,6 +23,7 @@ class ConsultationController extends Controller
         LegalRequest $legalRequest,
         LawyerAvailability $slot,
         LawyerMatchingService $matchingService,
+        ConversationProvisioner $conversationProvisioner,
     ): JsonResponse {
         $user = $request->user();
 
@@ -45,6 +47,7 @@ class ConsultationController extends Controller
             $user,
             $slot,
             $matchingService,
+            $conversationProvisioner,
         ): array {
             $lockedSlot = LawyerAvailability::query()
                 ->whereKey($slot->id)
@@ -75,6 +78,10 @@ class ConsultationController extends Controller
                         $expiredConsultation->update([
                             'status' => 'cancelled',
                         ]);
+
+                        $conversationProvisioner->closeForConsultation(
+                            $expiredConsultation,
+                        );
                     }
 
                     $lockedSlot->update([
@@ -107,6 +114,10 @@ class ConsultationController extends Controller
                     && $existingConsultation->client_user_id === $user->id
                     && $existingConsultation->status === 'requested'
                 ) {
+                    $conversationProvisioner->forConsultation(
+                        $existingConsultation,
+                    );
+
                     return [
                         'consultation' => $existingConsultation,
                         'slot' => $lockedSlot,
@@ -156,6 +167,8 @@ class ConsultationController extends Controller
                 'reserved_until' => now()->addMinutes(10),
                 'consultation_id' => $consultation->id,
             ]);
+
+            $conversationProvisioner->forConsultation($consultation);
 
             return [
                 'consultation' => $consultation,

@@ -1,5 +1,5 @@
 export const clientNav = [
-    { href: '/client/home', label: 'خانه' },
+    { href: '/client', label: 'خانه' },
     { href: '/client/actions', label: 'مرکز اقدامات' },
     { href: '/client/inbox', label: 'صندوق هوشمند' },
     { href: '/client/assistant', label: 'دستیار حقوقی' },
@@ -14,7 +14,7 @@ export const clientNav = [
 ];
 
 export const lawyerNav = [
-    { href: '/lawyer/home', label: 'خانه' },
+    { href: '/lawyer', label: 'خانه' },
     { href: '/lawyer/actions', label: 'مرکز اقدامات' },
     { href: '/lawyer/opportunities', label: 'فرصت‌ها' },
     { href: '/lawyer/proposals', label: 'پیشنهادها' },
@@ -27,7 +27,7 @@ export const lawyerNav = [
 ];
 
 export const adminNav = [
-    { href: '/admin/home', label: 'خانه' },
+    { href: '/admin', label: 'خانه' },
     { href: '/admin/users', label: 'کاربران' },
     { href: '/admin/lawyersAdmin', label: 'وکلا' },
     { href: '/admin/verifications', label: 'احراز هویت' },
@@ -39,9 +39,9 @@ export const adminNav = [
 ];
 
 export const roleHome = {
-    client: '/client/home',
-    lawyer: '/lawyer/home',
-    admin: '/admin/home',
+    client: '/client',
+    lawyer: '/lawyer',
+    admin: '/admin',
 };
 
 export const roleLabels = {

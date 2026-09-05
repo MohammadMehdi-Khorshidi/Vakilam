@@ -6,8 +6,8 @@ use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\ClientCaseController;
 use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\ConsultationController;
+use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\ContractController;
-use App\Http\Controllers\Api\ContractWorkflowController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EngagementController;
 use App\Http\Controllers\Api\FinalLawyerSelectionController;
@@ -23,10 +23,10 @@ use App\Http\Controllers\Api\LawyerSpecialtyController;
 use App\Http\Controllers\Api\LawyerWorkspaceController;
 use App\Http\Controllers\Api\LegalRequestController;
 use App\Http\Controllers\Api\LegalRequestServiceIntentController;
+use App\Http\Controllers\Api\LegalGuidanceController;
 use App\Http\Controllers\Api\LocationReferenceController;
 use App\Http\Controllers\Api\NegotiationController;
 use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\PaymentWorkflowController;
 use App\Http\Controllers\Api\SpecialtyReferenceController;
 use App\Http\Resources\AuthenticatedUserResource;
 use Illuminate\Http\Request;
@@ -41,11 +41,14 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth/register')->name('apiRegister.')->controller(RegisterController::class)->group(function () {
     Route::post('/send-otp', 'sendOtp')->middleware('throttle:3,1')->name('sendOtp');
     Route::post('/verify-otp', 'verifyOtp')->middleware('throttle:10,1')->name('verifyOtp');
+    Route::post('/validate-lawyer', 'validateLawyer')->middleware('throttle:10,1')->name('validateLawyer');
     Route::post('/', 'store')->middleware('throttle:10,1')->name('store');
 });
 
 Route::prefix('auth')->name('apiAuth.')->controller(LoginController::class)->group(function () {
     Route::post('/login', 'store')->middleware('throttle:5,1')->name('login');
+    Route::post('/login/send-otp', 'sendOtp')->middleware('throttle:3,1')->name('login.sendOtp');
+    Route::post('/login/verify-otp', 'verifyOtp')->middleware('throttle:10,1')->name('login.verifyOtp');
     Route::post('/logout', 'destroy')->middleware('auth:sanctum')->name('logout');
 });
 
@@ -100,6 +103,21 @@ Route::middleware(['auth:sanctum', 'active'])->get('/user', function (Request $r
 */
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
+
+    // Persisted client/lawyer conversations. Access is restricted to active participants.
+    Route::controller(ConversationController::class)->group(function () {
+        Route::get('/conversations', 'index');
+        Route::get('/conversations/{conversation:public_id}', 'show');
+        Route::post('/conversations/{conversation:public_id}/messages', 'storeMessage')
+            ->middleware('throttle:30,1');
+    });
+
+    // Persistent, provider-backed legal assistant history.
+    Route::controller(LegalGuidanceController::class)->group(function () {
+        Route::get('/ai/legal-assistant/messages', 'index');
+        Route::post('/ai/legal-assistant/messages', 'store')
+            ->middleware('throttle:10,1');
+    });
 
     // Client Dashboard & Cases
     Route::controller(ClientDashboardController::class)->group(function () {
@@ -217,21 +235,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/contracts/{contract:public_id}/sign', 'sign');
     });
 
-    // Contract Workflow (engagement-linked)
-    Route::controller(ContractWorkflowController::class)->group(function () {
-        Route::post('/engagements/{engagement}/contract', 'store');
-        Route::get('/engagements/{engagement}/contract', 'show');
-        Route::post('/contracts/{contract}/sign', 'sign');
-    });
-
     // Payments
     Route::controller(PaymentController::class)->group(function () {
         Route::post('/invoices/{invoice:public_id}/payments', 'store');
         Route::get('/payments/{payment:public_id}', 'show');
     });
-
-    // Payment Workflow (alternative / legacy path)
-    Route::post('/invoices/{invoice}/payments', [PaymentWorkflowController::class, 'store']);
 
     // Lawyer Availability
     Route::prefix('lawyer/availabilities')->group(function () {
@@ -266,9 +274,5 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::post('/payments/webhook', [PaymentWorkflowController::class, 'webhook'])
-    ->middleware('throttle:30,1');
-
 Route::post('/payments/{payment:public_id}/webhook', [PaymentController::class, 'webhook'])
     ->middleware('throttle:30,1');
-

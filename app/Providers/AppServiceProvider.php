@@ -17,9 +17,18 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(OtpSender::class, function (Application $app): OtpSender {
-            return $app->environment('testing')
-                ? $app->make(NullOtpSender::class)
-                : $app->make(IppanelOtpSender::class);
+            // Prefer Null sender in testing; otherwise real IPPanel sender.
+            // Also fall back to Null when API key is missing so local/dev does not crash.
+            if ($app->environment('testing')) {
+                return $app->make(NullOtpSender::class);
+            }
+
+            $apiKey = (string) config('services.ippanel.api_key');
+            if ($apiKey === '') {
+                return $app->make(NullOtpSender::class);
+            }
+
+            return $app->make(IppanelOtpSender::class);
         });
     }
 
@@ -29,7 +38,11 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
-            return config('app.frontend_url')."/password-reset/$token?email={$notifiable->getEmailForPasswordReset()}";
+            $frontend = config('app.frontend_url', config('app.url'));
+
+            return rtrim((string) $frontend, '/')."/password-reset/{$token}?email=".urlencode(
+                    $notifiable->getEmailForPasswordReset()
+                );
         });
     }
 }

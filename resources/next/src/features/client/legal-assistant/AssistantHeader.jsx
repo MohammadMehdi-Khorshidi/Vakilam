@@ -24,7 +24,7 @@ const AssistantHeader = () => {
                 </div>
 
                 <Link
-                    href="/client/lawyers"
+                    href="/client/lawyersAdmin"
                     className="w-fit rounded-xl border border-[#c9a96e] bg-white px-5 py-3 font-bold text-[#315e52] transition hover:bg-[#faf7ee]"
                 >
                     در صورت نیاز، مشاهده وکلا

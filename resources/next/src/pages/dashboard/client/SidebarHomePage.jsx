@@ -1,309 +1,216 @@
-// 'use client';
-//
-// import { useEffect, useState } from 'react';
-// import { useRouter } from 'next/navigation';
-//
-// import HomeIntro from './(home)/HomeIntro';
-// import LegalProblemBox from './(home)/LegalProblemBox';
-// import ActiveCase from './(home)/ActiveCase';
-// import DashboardStats from './(home)/DashboardStats';
-// import QuickActions from './(home)/QuickActions';
-// import NextSteps from './(home)/NextSteps';
-// import CaseStatus from './(home)/CaseStatus';
-// import SmartBox from './(home)/SmartBox';
-// import ActionsCenter from './(home)/ActionsCenter';
-//
-// const ClientHomePage = () => {
-//     const router = useRouter();
-//
-//     const [dashboard, setDashboard] = useState(null);
-//     const [loading, setLoading] = useState(true);
-//     const [error, setError] = useState('');
-//
-//     useEffect(() => {
-//         const getDashboard = async () => {
-//             try {
-//                 setLoading(true);
-//                 setError('');
-//
-//                 // =========================
-//                 // گرفتن Token
-//                 // =========================
-//
-//                 const token = localStorage.getItem('auth_token');
-//
-//                 // اگر Token نداریم
-//                 if (!token) {
-//                     setError(
-//                         'برای مشاهده داشبورد ابتدا وارد حساب کاربری شوید.',
-//                     );
-//
-//                     setTimeout(() => {
-//                         router.push('/login');
-//                     }, 1200);
-//
-//                     return;
-//                 }
-//
-//                 // =========================
-//                 // Dashboard API
-//                 // =========================
-//
-//                 const response = await fetch(
-//                     'http://127.0.0.1:8000/api/client/dashboard',
-//                     {
-//                         method: 'GET',
-//
-//                         headers: {
-//                             Accept: 'application/json',
-//                             Authorization: `Bearer ${token}`,
-//                         },
-//                     },
-//                 );
-//
-//                 const data = await response.json();
-//
-//                 console.log('Client Dashboard Response:', data);
-//
-//                 // =========================
-//                 // Unauthorized
-//                 // =========================
-//
-//                 if (response.status === 401) {
-//                     localStorage.removeItem('auth_token');
-//
-//                     setError('نشست شما منقضی شده است. لطفاً دوباره وارد شوید.');
-//
-//                     setTimeout(() => {
-//                         router.push('/login');
-//                     }, 1200);
-//
-//                     return;
-//                 }
-//
-//                 // =========================
-//                 // Other Errors
-//                 // =========================
-//
-//                 if (!response.ok) {
-//                     setError(
-//                         data.message || 'دریافت اطلاعات داشبورد ناموفق بود.',
-//                     );
-//
-//                     return;
-//                 }
-//
-//                 // =========================
-//                 // Success
-//                 // =========================
-//
-//                 setDashboard(data);
-//             } catch (err) {
-//                 console.error('Client Dashboard Error:', err);
-//
-//                 setError('ارتباط با سرور برقرار نشد.');
-//             } finally {
-//                 setLoading(false);
-//             }
-//         };
-//
-//         getDashboard();
-//     }, [router]);
-//
-//     // =========================
-//     // Loading
-//     // =========================
-//
-//     if (loading) {
-//         return (
-//             <div
-//                 dir="rtl"
-//                 className="flex min-h-[calc(100vh-80px)] items-center justify-center bg-[#f8faf9]"
-//             >
-//                 <div className="text-center">
-//                     <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dfe7e4] border-t-[#123c35]" />
-//
-//                     <p className="mt-4 text-[14px] font-semibold text-[#123c35]">
-//                         در حال دریافت اطلاعات داشبورد...
-//                     </p>
-//                 </div>
-//             </div>
-//         );
-//     }
-//
-//     // =========================
-//     // Error
-//     // =========================
-//
-//     if (error) {
-//         return (
-//             <div
-//                 dir="rtl"
-//                 className="flex min-h-[calc(100vh-80px)] items-center justify-center bg-[#f8faf9] px-5"
-//             >
-//                 <div className="w-full max-w-[500px] rounded-[20px] border border-[#ead9d9] bg-white p-8 text-center shadow-sm">
-//                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500">
-//                         !
-//                     </div>
-//
-//                     <h2 className="mt-4 text-[18px] font-extrabold text-[#123c35]">
-//                         خطا در دریافت اطلاعات
-//                     </h2>
-//
-//                     <p className="mt-3 text-[13px] leading-7 text-[#7c8985]">
-//                         {error}
-//                     </p>
-//
-//                     <button
-//                         type="button"
-//                         onClick={() => router.push('/login')}
-//                         className="mt-6 h-[48px] w-full rounded-[12px] bg-[#123c35] text-[13px] font-bold text-white transition hover:bg-[#1c554a]"
-//                     >
-//                         ورود به حساب کاربری
-//                     </button>
-//                 </div>
-//             </div>
-//         );
-//     }
-//
-//     // =========================
-//     // Dashboard
-//     // =========================
-//
-//     return (
-//         <div dir="rtl" className="min-h-[calc(100vh-80px)] bg-[#f8faf9]">
-//             <div className="py-15 mx-auto max-w-[1400px] px-5 lg:px-8">
-//                 {/* =========================
-//                     Page Intro
-//                 ========================== */}
-//
-//                 <HomeIntro dashboard={dashboard} />
-//
-//                 {/* =========================
-//                     Legal Problem
-//                 ========================== */}
-//
-//                 <LegalProblemBox dashboard={dashboard} />
-//
-//                 {/* =========================
-//                     Active Case
-//                 ========================== */}
-//
-//                 <ActiveCase dashboard={dashboard} />
-//
-//                 {/* =========================
-//                     Stats
-//                 ========================== */}
-//
-//                 <div className="mt-4">
-//                     <DashboardStats dashboard={dashboard} />
-//                 </div>
-//
-//                 {/* =========================
-//                     Quick Actions
-//                 ========================== */}
-//
-//                 <div className="mt-4">
-//                     <QuickActions dashboard={dashboard} />
-//                 </div>
-//
-//                 {/* =========================
-//                     Next Steps + Case Status
-//                 ========================== */}
-//
-//                 <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-//                     <NextSteps dashboard={dashboard} />
-//
-//                     <CaseStatus dashboard={dashboard} />
-//                 </div>
-//
-//                 {/* =========================
-//                     Smart Box + Actions Center
-//                 ========================== */}
-//
-//                 <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-//                     <SmartBox dashboard={dashboard} />
-//
-//                     <ActionsCenter dashboard={dashboard} />
-//                 </div>
-//             </div>
-//         </div>
-//     );
-// };
-//
-// export default ClientHomePage;
-
-
 'use client';
 
-import HomeIntro from '../../../features/client/home/HomeIntro';
-import LegalProblemBox from '../../../features/client/home/LegalProblemBox';
-import ActiveCase from '../../../features/client/home/ActiveCase';
-import DashboardStats from '../../../features/client/home/DashboardStats';
-import QuickActions from '../../../features/client/home/QuickActions';
-import NextSteps from '../../../features/client/home/NextSteps';
-import CaseStatus from '../../../features/client/home/CaseStatus';
-import SmartBox from '../../../features/client/home/SmartBox';
-import ActionsCenter from '../../../features/client/home/ActionsCenter';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import {
+    Bot,
+    BriefcaseBusiness,
+    FilePlus2,
+    FileText,
+    MessageSquareText,
+} from 'lucide-react';
 
-const ClientHomePage = () => {
+import HomeIntro from '@/features/client/home/HomeIntro';
+import { apiRequest, unwrapData } from '@/lib/api/client';
+
+const statusLabels = {
+    draft: 'پیش‌نویس',
+    submitted: 'ثبت‌شده',
+    matched: 'وکلا پیشنهاد شده‌اند',
+    in_progress: 'در حال پیگیری',
+    active: 'فعال',
+    closed: 'بسته‌شده',
+    cancelled: 'لغوشده',
+};
+
+const numberFormatter = new Intl.NumberFormat('fa-IR');
+
+function RecordList({ title, emptyText, items }) {
+    return (
+        <section className="rounded-2xl border border-[#dfe8e3] bg-white p-5 shadow-[0_4px_20px_rgba(13,48,42,0.035)]">
+            <h2 className="border-b border-[#edf1ef] pb-4 font-bold text-[#173f37]">
+                {title}
+            </h2>
+
+            {items.length === 0 ? (
+                <p className="py-8 text-center text-sm text-[#8a9994]">
+                    {emptyText}
+                </p>
+            ) : (
+                <div className="divide-y divide-[#edf1ef]">
+                    {items.map((item) => (
+                        <div
+                            key={item.public_id || item.id}
+                            className="flex items-center justify-between gap-4 py-4"
+                        >
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-[#294d46]">
+                                    {item.title || 'موضوع حقوقی بدون عنوان'}
+                                </p>
+                                <p className="mt-1 text-xs text-[#8a9994]">
+                                    شناسه: {item.public_id}
+                                </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-[#f4f0e5] px-3 py-1.5 text-xs font-semibold text-[#6f5b2e]">
+                                {statusLabels[item.status] || item.status}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </section>
+    );
+}
+
+export default function ClientHomePage() {
+    const [dashboard, setDashboard] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        let mounted = true;
+
+        apiRequest('client/dashboard')
+            .then((response) => {
+                if (mounted) setDashboard(unwrapData(response));
+            })
+            .catch((requestError) => {
+                if (mounted) setError(requestError.message);
+            })
+            .finally(() => {
+                if (mounted) setLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const drafts = dashboard?.draft_cases || [];
+    const submitted = dashboard?.submitted_requests || [];
+    const activeCases = dashboard?.active_cases || [];
+
+    const stats = [
+        {
+            label: 'پرونده فعال',
+            value: activeCases.length,
+            icon: BriefcaseBusiness,
+        },
+        {
+            label: 'درخواست ثبت‌شده',
+            value: submitted.length,
+            icon: FileText,
+        },
+        {
+            label: 'پیش‌نویس',
+            value: drafts.length,
+            icon: FilePlus2,
+        },
+    ];
+
     return (
         <div dir="rtl" className="min-h-[calc(100vh-80px)] bg-[#f8faf9]">
-            <div className="py-15 mx-auto max-w-[1400px] px-5 lg:px-8">
-                {/* =========================
-                    Page Intro
-                ========================== */}
-
+            <div className="mx-auto max-w-[1400px] px-5 py-15 lg:px-8">
                 <HomeIntro />
 
-                {/* =========================
-                    Legal Problem
-                ========================== */}
-
-                <LegalProblemBox />
-
-                {/* =========================
-                    Active Case
-                ========================== */}
-
-                <ActiveCase />
-
-                {/* =========================
-                    Stats
-                ========================== */}
-
-                <div className="mt-4">
-                    <DashboardStats />
+                <div className="my-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <Link
+                        href="/client/legal-assistant"
+                        className="flex items-center gap-4 rounded-2xl bg-[#0d4a40] p-5 text-white transition hover:-translate-y-0.5"
+                    >
+                        <Bot className="text-[#dfc58f]" />
+                        <div>
+                            <p className="font-bold">گفتگو با دستیار وکیلم</p>
+                            <p className="mt-1 text-xs text-white/65">
+                                دریافت راهنمایی اولیه و ذخیره تاریخچه
+                            </p>
+                        </div>
+                    </Link>
+                    <Link
+                        href="/client/legal-request"
+                        className="flex items-center gap-4 rounded-2xl border border-[#dfe8e3] bg-white p-5 text-[#173f37] transition hover:-translate-y-0.5"
+                    >
+                        <FilePlus2 className="text-[#b28b43]" />
+                        <div>
+                            <p className="font-bold">ثبت موضوع حقوقی</p>
+                            <p className="mt-1 text-xs text-[#8a9994]">
+                                ایجاد یا ادامه پیش‌نویس درخواست
+                            </p>
+                        </div>
+                    </Link>
+                    <Link
+                        href="/client/messages"
+                        className="flex items-center gap-4 rounded-2xl border border-[#dfe8e3] bg-white p-5 text-[#173f37] transition hover:-translate-y-0.5"
+                    >
+                        <MessageSquareText className="text-[#b28b43]" />
+                        <div>
+                            <p className="font-bold">گفتگو با وکیل</p>
+                            <p className="mt-1 text-xs text-[#8a9994]">
+                                پس از رزرو یا شروع همکاری
+                            </p>
+                        </div>
+                    </Link>
                 </div>
 
-                {/* =========================
-                    Quick Actions
-                ========================== */}
+                {loading && (
+                    <div className="rounded-2xl border border-[#dfe8e3] bg-white py-16 text-center text-[#71817c]">
+                        در حال دریافت اطلاعات داشبورد...
+                    </div>
+                )}
 
-                <div className="mt-4">
-                    <QuickActions />
-                </div>
+                {error && (
+                    <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700">
+                        {error}
+                    </div>
+                )}
 
-                {/* =========================
-                    Next Steps + Case Status
-                ========================== */}
+                {!loading && !error && (
+                    <>
+                        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            {stats.map((item) => {
+                                const Icon = item.icon;
 
-                <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    <NextSteps />
-                    <CaseStatus />
-                </div>
+                                return (
+                                    <div
+                                        key={item.label}
+                                        className="flex items-center justify-between rounded-2xl border border-[#dfe8e3] bg-white p-5"
+                                    >
+                                        <div>
+                                            <p className="text-sm text-[#60736d]">
+                                                {item.label}
+                                            </p>
+                                            <p className="mt-2 text-2xl font-bold text-[#0d302a]">
+                                                {numberFormatter.format(item.value)}
+                                            </p>
+                                        </div>
+                                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f4f0e5] text-[#0d302a]">
+                                            <Icon size={20} />
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </section>
 
-                {/* =========================
-                    Smart Box + Actions Center
-                ========================== */}
-
-                <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    <SmartBox />
-                    <ActionsCenter />
-                </div>
+                        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+                            <RecordList
+                                title="پرونده‌های فعال"
+                                emptyText="در حال حاضر پرونده فعالی ندارید."
+                                items={activeCases}
+                            />
+                            <RecordList
+                                title="درخواست‌های ثبت‌شده"
+                                emptyText="درخواست ثبت‌شده‌ای وجود ندارد."
+                                items={submitted}
+                            />
+                            <RecordList
+                                title="پیش‌نویس‌ها"
+                                emptyText="پیش‌نویسی ذخیره نشده است."
+                                items={drafts}
+                            />
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
-};
-
-export default ClientHomePage;
+}

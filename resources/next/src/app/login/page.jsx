@@ -24,7 +24,7 @@ export default function LoginPage() {
 
             <div className="flex w-full items-center justify-center p-6 lg:w-1/2">
                 <LoginFlow
-                    onGoToRegister={() => router.push('/register')}
+                    onGoToRegister={() => router.push('/login/register')}
                 />
             </div>
         </div>

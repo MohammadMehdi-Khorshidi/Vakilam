@@ -3,35 +3,49 @@
 namespace App\Services\Sms;
 
 use App\Contracts\OtpSender;
-use Ippanel\Client;
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class IppanelOtpSender implements OtpSender
 {
-    public function __construct(
-        private readonly Client $client,
-    ) {
-    }
-
     public function send(string $phone, string $code): void
     {
+        $apiKey = (string) config('services.ippanel.api_key');
+        $baseUrl = rtrim((string) config('services.ippanel.base_url', 'https://edge.ippanel.com/v1/api'), '/');
         $pattern = (string) config('services.ippanel.otp_pattern');
         $from = (string) config('services.ippanel.from');
 
-        if ($pattern === '' || $from === '') {
-            throw new RuntimeException('IPPanel sender or OTP pattern is not configured.');
+        if ($apiKey === '' || $pattern === '' || $from === '') {
+            throw new RuntimeException('IPPanel credentials or OTP pattern is not configured.');
         }
 
-        $response = $this->client->sendPattern(
-            $pattern,
-            $from,
-            $this->normalizePhone($phone),
-            ['code' => $code],
-        );
+        $normalizedPhone = $this->normalizePhone($phone);
 
-        if (! $response->isSuccessful()) {
+        // IPPanel Edge pattern send endpoint
+        $response = Http::withHeaders([
+            'Authorization' => $apiKey,
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ])
+            ->timeout(15)
+            ->post("{$baseUrl}/send", [
+                'sending_type' => 'pattern',
+                'from_number' => $from,
+                'code' => $pattern,
+                'recipients' => [$normalizedPhone],
+                'params' => [
+                    'code' => $code,
+                ],
+            ]);
+
+        if (! $response->successful()) {
+            $message = $response->json('message')
+                ?? $response->json('error')
+                ?? $response->body()
+                ?? 'Unknown IPPanel error';
+
             throw new RuntimeException(
-                'IPPanel rejected the OTP message: '.$response->getMessage(),
+                'IPPanel rejected the OTP message: '.$message,
             );
         }
     }
@@ -46,6 +60,10 @@ class IppanelOtpSender implements OtpSender
 
         if (str_starts_with($phone, '98')) {
             return '+'.$phone;
+        }
+
+        if (str_starts_with($phone, '9') && strlen($phone) === 10) {
+            return '+98'.$phone;
         }
 
         return $phone;

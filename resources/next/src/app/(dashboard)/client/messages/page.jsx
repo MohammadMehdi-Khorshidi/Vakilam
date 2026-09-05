@@ -1,7 +1,6 @@
 import MessagesHeader from '../../../../features/client/messages/MessagesHeader';
 import MessagesTabs from '../../../../features/client/messages/MessagesTabs';
-import ContactSidebar from '../../../../features/client/messages/ContactSidebar';
-import ChatBox from '../../../../features/client/messages/ChatBox';
+import ConversationWorkspace from '../../../../features/conversations/ConversationWorkspace';
 
 
 
@@ -12,11 +11,7 @@ const MessagesPage = () => {
 
             <MessagesTabs />
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
-                <ContactSidebar />
-
-                <ChatBox />
-            </div>
+            <ConversationWorkspace />
         </main>
     );
 };

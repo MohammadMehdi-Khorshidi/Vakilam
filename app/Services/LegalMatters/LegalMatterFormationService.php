@@ -5,11 +5,17 @@ namespace App\Services\LegalMatters;
 use App\Models\LegalMatter;
 use App\Models\MatterMember;
 use App\Models\Payment;
+use App\Services\Conversations\ConversationProvisioner;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class LegalMatterFormationService
 {
+    public function __construct(
+        private readonly ConversationProvisioner $conversationProvisioner,
+    ) {
+    }
+
     /**
      * Form the LegalMatter only from a successful contract payment.
      * This is the only supported formation entry point for lawyer-selection matters.
@@ -49,6 +55,8 @@ class LegalMatterFormationService
                 ->first();
 
             if ($existingMatter !== null) {
+                $this->conversationProvisioner->forLegalMatter($existingMatter);
+
                 return $existingMatter;
             }
 
@@ -79,6 +87,8 @@ class LegalMatterFormationService
             }
 
             $legalRequest->forceFill(['status' => 'in_progress'])->save();
+
+            $this->conversationProvisioner->forLegalMatter($matter);
 
             return $matter;
         });

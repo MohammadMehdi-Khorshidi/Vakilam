@@ -1,9 +1,4 @@
-import {
-    Phone,
-    Video,
-    ShieldCheck,
-    Info,
-} from 'lucide-react';
+import { ShieldCheck, Info } from 'lucide-react';
 
 import { Vazirmatn } from 'next/font/google';
 
@@ -12,7 +7,11 @@ const vazirmatn = Vazirmatn({
     display: 'swap',
 });
 
-const ContactSidebar = () => {
+const ContactSidebar = ({ conversation }) => {
+    const counterpart = conversation?.counterpart;
+    const name = counterpart?.name || 'وکیل پرونده';
+    const initial = Array.from(name)[0] || 'و';
+
     return (
         <aside
             dir="rtl"
@@ -22,36 +21,18 @@ const ContactSidebar = () => {
             <div className="rounded-[18px] border border-[#dfe7e3] bg-white p-5 shadow-[0_5px_20px_rgba(18,63,55,0.035)]">
                 <div className="mb-4 flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#123f37] font-extrabold text-white">
-                        و
+                        {initial}
                     </div>
 
                     <div>
                         <h2 className="font-extrabold text-[#173f38]">
-                            وکیل پرونده
+                            {name}
                         </h2>
 
                         <p className="mt-1 text-[#899691]">
-                            وکیل پایه یک دادگستری
+                            {conversation?.context?.title || 'گفتگوی حقوقی'}
                         </p>
                     </div>
-                </div>
-
-                <div className="space-y-2">
-                    <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#dce6e2] px-4 py-3 font-bold text-[#123f37] transition hover:bg-[#f1f6f3]"
-                    >
-                        <Phone size={17} />
-                        تماس صوتی
-                    </button>
-
-                    <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#123f37] px-4 py-3 font-bold text-white transition hover:bg-[#0d302a]"
-                    >
-                        <Video size={17} />
-                        تماس تصویری
-                    </button>
                 </div>
             </div>
 

@@ -1,8 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Vazirmatn } from 'next/font/google';
 import { Sparkles, Send, User } from 'lucide-react';
+import {
+    listLegalAssistantMessages,
+    sendLegalAssistantMessage,
+} from '@/lib/api/legalAssistant';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -11,43 +15,57 @@ const vazir = Vazirmatn({
 
 const LegalChat = () => {
     const [message, setMessage] = useState('');
+    const [messages, setMessages] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState('');
+    const bottomRef = useRef(null);
 
-    const [messages, setMessages] = useState([
-        {
-            id: 1,
-            type: 'assistant',
-            text: 'برای شروع، وضعیت گواهی عدم پرداخت، ثبت صیادی، اصل چک و مدارک منشأ طلب را بررسی کردم. می‌توانم مراحل احتمالی و مدارک لازم را به زبان ساده توضیح دهم.',
-        },
-    ]);
+    useEffect(() => {
+        let mounted = true;
 
-    const handleSend = () => {
+        listLegalAssistantMessages()
+            .then((items) => {
+                if (mounted) setMessages(items);
+            })
+            .catch((requestError) => {
+                if (mounted) setError(requestError.message);
+            })
+            .finally(() => {
+                if (mounted) setLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    const handleSend = async () => {
         const text = message.trim();
 
-        if (!text) return;
+        if (!text || sending) return;
 
-        // اضافه کردن پیام کاربر
-        setMessages((prev) => [
-            ...prev,
-            {
-                id: Date.now(),
-                type: 'user',
-                text,
-            },
-        ]);
-
+        setSending(true);
+        setError('');
         setMessage('');
 
-        // پاسخ موقت دستیار
-        setTimeout(() => {
-            setMessages((prev) => [
-                ...prev,
-                {
-                    id: Date.now() + 1,
-                    type: 'assistant',
-                    text: 'سؤال شما دریافت شد. بر اساس اطلاعات پرونده، ابتدا مدارک مرتبط را بررسی کنید. برای اقدام دقیق‌تر، جزئیات پرونده باید بررسی شود.',
-                },
+        try {
+            const result = await sendLegalAssistantMessage(text);
+            setMessages((current) => [
+                ...current,
+                result.user_message,
+                result.assistant_message,
             ]);
-        }, 700);
+        } catch (requestError) {
+            setMessage(text);
+            setError(requestError.message);
+        } finally {
+            setSending(false);
+        }
     };
 
     const handleKeyDown = (e) => {
@@ -68,14 +86,29 @@ const LegalChat = () => {
                     گفت‌وگوی پرونده
                 </h2>
 
-                <p className="mt-1 text-[11px] text-[#8a9994]">مطالبه وجه چک</p>
+                <p className="mt-1 text-[11px] text-[#8a9994]">
+                    راهنمای اولیه و محرمانه
+                </p>
             </div>
 
             {/* Chat messages */}
             <div className="flex-1 overflow-y-auto py-4">
                 <div className="flex flex-col gap-4">
+                    {loading && (
+                        <p className="py-10 text-center text-sm text-[#8a9994]">
+                            در حال بازیابی تاریخچه گفتگو...
+                        </p>
+                    )}
+
+                    {!loading && messages.length === 0 && (
+                        <p className="py-10 text-center text-sm leading-7 text-[#8a9994]">
+                            هنوز گفتگویی ثبت نشده است. پرسش حقوقی خود را بنویسید
+                            تا پاسخ در حساب شما ذخیره شود.
+                        </p>
+                    )}
+
                     {messages.map((item) => {
-                        const isUser = item.type === 'user';
+                        const isUser = item.role === 'user';
 
                         return (
                             <div
@@ -116,15 +149,23 @@ const LegalChat = () => {
                                     </div>
 
                                     {/* Message */}
-                                    <p className="text-[13px] leading-8">
-                                        {item.text}
+                                    <p className="whitespace-pre-wrap text-[13px] leading-8">
+                                        {item.content}
                                     </p>
                                 </div>
                             </div>
                         );
                     })}
+
+                    <div ref={bottomRef} />
                 </div>
             </div>
+
+            {error && (
+                <p className="mb-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                </p>
+            )}
 
             {/* Input */}
             <div className="shrink-0 rounded-[18px] border-2 border-[#eadfc4] p-2">
@@ -145,10 +186,10 @@ const LegalChat = () => {
                     <button
                         type="button"
                         onClick={handleSend}
-                        disabled={!message.trim()}
+                    disabled={!message.trim() || sending}
                         className="inline-flex appearance-none items-center gap-2 rounded-xl border-0 bg-[#C9A96E] px-5 py-3 text-[11px] font-bold text-white shadow-none outline-none ring-0 transition-transform duration-200 hover:-translate-y-0.5 hover:bg-[#C9A96E] hover:shadow-none focus:border-0 focus:outline-none focus:ring-0 focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0 active:border-0 active:bg-[#C9A96E] active:shadow-none "
                     >
-                        دریافت راهنمایی
+                        {sending ? 'در حال دریافت پاسخ...' : 'دریافت راهنمایی'}
                         <Send size={14} />
                     </button>
                 </div>

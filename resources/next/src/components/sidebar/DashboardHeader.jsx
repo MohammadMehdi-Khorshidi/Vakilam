@@ -16,6 +16,11 @@ import {
 } from 'lucide-react';
 
 import { roleLabels } from '@/config/Navigation';
+import useAuthenticatedUser, {
+    getUserDisplayName,
+    getUserInitial,
+} from '@/hooks/useAuthenticatedUser';
+import { getUserRoles } from '@/lib/api/auth';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -24,6 +29,7 @@ const vazir = Vazirmatn({
 
 const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
     const pathname = usePathname();
+    const authenticatedUser = useAuthenticatedUser();
 
     const [roleMenuOpen, setRoleMenuOpen] = useState(false);
     const [notificationsOn, setNotificationsOn] = useState(true);
@@ -47,32 +53,15 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
 
     const currentRole = roleLabels?.[role] || 'موکل';
 
-    // =========================
-    // اطلاعات کاربر هر نقش
-    // =========================
-    const userInfo = {
-        client: {
-            name: 'فرزام نفعی',
-            initial: 'ف',
-        },
-
-        lawyer: {
-            name: 'وکیل',
-            initial: 'و',
-        },
-
-        admin: {
-            name: 'ادمین',
-            initial: 'ا',
-        },
+    const currentUser = {
+        name: getUserDisplayName(authenticatedUser),
+        initial: getUserInitial(authenticatedUser),
     };
-
-    const currentUser = userInfo[role] || userInfo.client;
 
     // =========================
     // نقش‌ها
     // =========================
-    const roles = [
+    const roleOptions = [
         {
             key: 'client',
             label: 'موکل',
@@ -96,6 +85,14 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
         },
     ];
 
+    const userRoles = getUserRoles(authenticatedUser);
+    const roles = roleOptions.filter(
+        (item) =>
+            userRoles.includes(item.key) ||
+            (item.key === 'admin' && userRoles.includes('super_admin')),
+    );
+    const canSwitchRole = roles.length > 1;
+
     return (
         <header
             dir="rtl"
@@ -117,7 +114,12 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
                     <div className="relative">
                         <button
                             type="button"
-                            onClick={() => setRoleMenuOpen((prev) => !prev)}
+                            onClick={() => {
+                                if (canSwitchRole) {
+                                    setRoleMenuOpen((prev) => !prev);
+                                }
+                            }}
+                            aria-expanded={canSwitchRole && roleMenuOpen}
                             className="inline-flex shrink-0 items-center gap-3 rounded-2xl bg-[#c9a96e] px-5 py-3 text-sm font-bold text-[#0d302a] transition-all duration-300 hover:-translate-y-1 hover:bg-[#d8bb82] hover:shadow-lg"
                         >
                             <div className="flex items-center gap-2 text-right leading-none">
@@ -125,18 +127,20 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
                                     نقش: {currentRole}
                                 </p>
 
-                                <ChevronDown
-                                    size={16}
-                                    strokeWidth={2}
-                                    className={`text-[#123f37] transition-transform duration-200 ${
-                                        roleMenuOpen ? 'rotate-180' : ''
-                                    }`}
-                                />
+                                {canSwitchRole && (
+                                    <ChevronDown
+                                        size={16}
+                                        strokeWidth={2}
+                                        className={`text-[#123f37] transition-transform duration-200 ${
+                                            roleMenuOpen ? 'rotate-180' : ''
+                                        }`}
+                                    />
+                                )}
                             </div>
                         </button>
 
                         {/* Role Dropdown */}
-                        {roleMenuOpen && (
+                        {canSwitchRole && roleMenuOpen && (
                             <div className="absolute right-0 top-[calc(100%+12px)] z-50 w-[255px] overflow-hidden rounded-2xl border border-[#e3e9e5] bg-white p-2 shadow-[0_15px_45px_rgba(18,63,55,0.13)]">
                                 <div className="px-3 pb-3 pt-2">
                                     <p className="text-[12px] font-bold text-[#123f37]">

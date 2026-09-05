@@ -1,90 +1,87 @@
 'use client';
 
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { BriefcaseBusiness, FilePlus2 } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
-import CaseHeader from '@/features/client/cases/CaseHeader';
-import CaseStatus from '@/features/client/home/CaseStatus';
-import CaseTabs from '@/features/client/cases/CaseTabs';
-import CaseSummary from '@/features/client/cases/CaseSummary';
-import CaseTimeline from '@/features/client/cases/CaseTimeline';
-import RecentDocuments from '@/features/client/cases/RecentDocuments';
-import UpcomingMeeting from '@/features/client/cases/UpcomingMeeting';
 
+import { apiRequest, unwrapData } from '@/lib/api/client';
 
+const vazirmatn = Vazirmatn({ subsets: ['arabic'], display: 'swap' });
 
-const vazirmatn = Vazirmatn({
-    subsets: ['arabic'],
-    display: 'swap',
-});
+const statusLabels = {
+    draft: 'پیش‌نویس',
+    submitted: 'ثبت‌شده',
+    matched: 'در حال بررسی پیشنهادها',
+    active: 'فعال',
+    in_progress: 'در حال پیگیری',
+    closed: 'بسته‌شده',
+    cancelled: 'لغوشده',
+};
 
-const CasePage = () => {
-    // فعلاً اطلاعات تستی برای نمایش UI
-    const caseData = {
-        title: 'مطالبه وجه چک',
-        code: 'VK-1405-00128',
-        type: 'پرونده حقوقی',
-        status: 'در حال انتخاب وکیل',
+function CaseSection({ title, items, emptyText }) {
+    return (
+        <section className="rounded-[18px] border border-[#dfe7e3] bg-white p-5">
+            <h2 className="border-b border-[#e8eeeb] pb-4 font-extrabold text-[#173f38]">
+                {title}
+            </h2>
+            {items.length === 0 ? (
+                <p className="py-8 text-center text-sm text-[#899691]">
+                    {emptyText}
+                </p>
+            ) : (
+                <div className="divide-y divide-[#e8eeeb]">
+                    {items.map((item) => (
+                        <article
+                            key={item.public_id || item.id}
+                            className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div>
+                                <h3 className="font-bold text-[#294e46]">
+                                    {item.title || 'موضوع حقوقی بدون عنوان'}
+                                </h3>
+                                <p className="mt-1 text-xs text-[#899691]">
+                                    شناسه: {item.public_id}
+                                </p>
+                            </div>
+                            <span className="w-fit rounded-full bg-[#f4f0e5] px-3 py-1.5 text-xs font-semibold text-[#6f5b2e]">
+                                {statusLabels[item.status] || item.status}
+                            </span>
+                        </article>
+                    ))}
+                </div>
+            )}
+        </section>
+    );
+}
 
-        managementHealth: 78,
+export default function CasePage() {
+    const [dashboard, setDashboard] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-        stage: 'شروع همکاری',
+    useEffect(() => {
+        let mounted = true;
 
-        lawyerName: 'نگرس سعادتی',
+        apiRequest('client/dashboard')
+            .then((response) => {
+                if (mounted) setDashboard(unwrapData(response));
+            })
+            .catch((requestError) => {
+                if (mounted) setError(requestError.message);
+            })
+            .finally(() => {
+                if (mounted) setLoading(false);
+            });
 
-        paymentStatus: 'پیش‌پرداخت ثبت‌نشده',
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
-        summary:
-            'موکل یک فقره چک به مبلغ ۸۲۰ میلیون تومان در اختیار دارد که در سررسید پرداخت نشده است. گواهی عدم پرداخت دریافت شده و موکل قصد مطالبه وجه و جبران خسارت تأخیر را دارد.',
-
-        timeline: [
-            {
-                id: 1,
-                title: 'پرونده تشکیل شد',
-                date: '۲۱ تیر ۱۴۰۵',
-            },
-            {
-                id: 2,
-                title: 'وکیل انتخاب شد',
-                date: '۲۲ تیر ۱۴۰۵',
-            },
-            {
-                id: 3,
-                title: 'پیش‌پرداخت ثبت شد',
-                date: '۲۲ تیر ۱۴۰۵',
-            },
-            {
-                id: 4,
-                title: 'قرارداد تأیید شد',
-                date: 'امروز',
-            },
-            {
-                id: 5,
-                title: 'شروع همکاری',
-                date: 'در حال انجام',
-            },
-        ],
-
-        documents: [
-            {
-                id: 1,
-                title: 'قرارداد-ثبت‌شده.pdf',
-                category: 'محرمانه · تأییدشده',
-                status: 'نهایی',
-            },
-            {
-                id: 2,
-                title: 'گواهی عدم پرداخت.jpg',
-                category: 'مدرک بانکی',
-                status: 'بررسی‌شده',
-            },
-        ],
-
-        nextMeeting: {
-            day: '۲۶',
-            title: 'جلسه بررسی راهبرد پرونده',
-            time: '۱۷:۰۰',
-            date: 'سه‌شنبه، ۲۶ تیر',
-        },
-    };
+    const activeCases = dashboard?.active_cases || [];
+    const submitted = dashboard?.submitted_requests || [];
+    const drafts = dashboard?.draft_cases || [];
 
     return (
         <main
@@ -92,24 +89,65 @@ const CasePage = () => {
             className={`${vazirmatn.className} min-h-screen bg-[#f7faf8]`}
         >
             <div className="mx-auto mt-12 max-w-[1280px] px-5 py-7">
-                <CaseHeader caseData={caseData} />
+                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-extrabold text-[#173f38]">
+                            پرونده‌ها و درخواست‌های من
+                        </h1>
+                        <p className="mt-2 text-sm text-[#71817c]">
+                            اطلاعات این بخش مستقیماً از حساب کاربری شما دریافت می‌شود.
+                        </p>
+                    </div>
+                    <Link
+                        href="/client/legal-request"
+                        className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#123f37] px-5 py-3 font-bold text-white"
+                    >
+                        <FilePlus2 size={18} />
+                        ثبت موضوع جدید
+                    </Link>
+                </header>
 
-                <CaseStatus caseData={caseData} />
+                {loading && (
+                    <div className="rounded-[18px] border border-[#dfe7e3] bg-white py-16 text-center text-[#899691]">
+                        در حال دریافت پرونده‌ها...
+                    </div>
+                )}
 
-                <CaseTabs />
+                {error && (
+                    <div className="rounded-[18px] bg-red-50 p-5 text-red-700">
+                        {error}
+                    </div>
+                )}
 
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <CaseSummary summary={caseData.summary} />
-
-                    <CaseTimeline items={caseData.timeline} />
-
-                    <RecentDocuments documents={caseData.documents} />
-
-                    <UpcomingMeeting meeting={caseData.nextMeeting} />
-                </div>
+                {!loading && !error && (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3 rounded-[18px] bg-[#0d4a40] p-5 text-white">
+                            <BriefcaseBusiness className="text-[#dfc58f]" />
+                            <p>
+                                {new Intl.NumberFormat('fa-IR').format(
+                                    activeCases.length,
+                                )}{' '}
+                                پرونده فعال در حساب شما وجود دارد.
+                            </p>
+                        </div>
+                        <CaseSection
+                            title="پرونده‌های فعال"
+                            items={activeCases}
+                            emptyText="در حال حاضر پرونده فعالی ندارید."
+                        />
+                        <CaseSection
+                            title="درخواست‌های ثبت‌شده"
+                            items={submitted}
+                            emptyText="درخواست ثبت‌شده‌ای وجود ندارد."
+                        />
+                        <CaseSection
+                            title="پیش‌نویس‌ها"
+                            items={drafts}
+                            emptyText="پیش‌نویسی ذخیره نشده است."
+                        />
+                    </div>
+                )}
             </div>
         </main>
     );
-};
-
-export default CasePage;
+}
