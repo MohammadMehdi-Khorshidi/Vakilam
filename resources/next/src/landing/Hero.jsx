@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Vazirmatn } from 'next/font/google';
 import HeroChart from '@/components/chart/ProgressChart';
+import { dashboardForUser, getAccessToken, getStoredUser } from '@/lib/api/auth';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -17,13 +18,9 @@ const Hero = () => {
             return;
         }
 
-        const token = window.localStorage.getItem('auth_token');
-
-        if (token) {
-            router.push('/dashbord/client');
-        } else {
-            router.push('/auth');
-        }
+        router.push(
+            getAccessToken() ? dashboardForUser(getStoredUser()) : '/login',
+        );
     };
 
     return (

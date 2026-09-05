@@ -1,6 +1,12 @@
-const API_BASE =
-    (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) ||
-    'http://vakilam.test/api';
+const CONFIGURED_API_BASE =
+    typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_API_URL : '';
+
+function apiBaseUrl() {
+    if (CONFIGURED_API_BASE) return CONFIGURED_API_BASE;
+    if (typeof window !== 'undefined') return `${window.location.origin}/api`;
+
+    throw new Error('NEXT_PUBLIC_API_URL is required for server-side API calls.');
+}
 
 export class ApiError extends Error {
     constructor(message, status, body = null) {
@@ -36,7 +42,7 @@ export async function apiRequest(path, options = {}) {
 
     const url = new URL(
         path.replace(/^\//, ''),
-        API_BASE.endsWith('/') ? API_BASE : `${API_BASE}/`,
+        apiBaseUrl().endsWith('/') ? apiBaseUrl() : `${apiBaseUrl()}/`,
     );
 
     if (query && typeof query === 'object') {
@@ -86,6 +92,17 @@ export async function apiRequest(path, options = {}) {
             (body?.errors &&
                 Object.values(body.errors).flat().filter(Boolean)[0]) ||
             `خطا در ارتباط با سرور (${response.status})`;
+
+        if (auth && response.status === 401 && typeof window !== 'undefined') {
+            try {
+                window.localStorage.removeItem('vakilam_access_token');
+                window.localStorage.removeItem('vakilam_user');
+            } catch {
+                // Storage may be unavailable, but the UI still needs the event.
+            }
+
+            window.dispatchEvent(new Event('vakilam:auth-session-changed'));
+        }
 
         throw new ApiError(String(message), response.status, body);
     }

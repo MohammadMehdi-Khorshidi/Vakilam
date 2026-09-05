@@ -2,8 +2,7 @@
 
 import { Vazirmatn } from 'next/font/google';
 
-import MessagesList from '../../../features/lawyer/messages/MessagesList';
-import { messages } from '../../../features/lawyer/messages/messagesData';
+import ConversationWorkspace from '../../../features/conversations/ConversationWorkspace';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -37,8 +36,7 @@ const MessagesLawyerPage = () => {
                     </p>
                 </header>
 
-                {/* لیست پیام‌ها */}
-                <MessagesList messages={messages} />
+                <ConversationWorkspace />
             </div>
         </main>
     );

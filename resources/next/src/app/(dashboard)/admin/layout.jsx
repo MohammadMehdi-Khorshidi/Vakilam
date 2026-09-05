@@ -4,11 +4,13 @@ import { useState } from 'react';
 
 import DashboardHeader from '../../../components/sidebar/DashboardHeader';
 import AdminSidebar from '../../../components/sidebar/AdminSidebar';
+import DashboardAuthGuard from '../../../components/auth/DashboardAuthGuard';
 
 const ClientDashboardLayout = ({ children }) => {
     const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
+        <DashboardAuthGuard requiredRole="admin">
         <div dir="rtl" className="min-h-screen bg-[#f8faf9]">
             {/* ================= Dashboard Layout ================= */}
             <div className="flex min-h-screen">
@@ -31,6 +33,7 @@ const ClientDashboardLayout = ({ children }) => {
                 </div>
             </div>
         </div>
+        </DashboardAuthGuard>
     );
 };
 

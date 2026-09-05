@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from 'react';
 
-import { getStoredUser } from '@/lib/api/auth';
+import {
+    AUTH_SESSION_EVENT,
+    getAccessToken,
+    getStoredUser,
+    restoreAuthSession,
+} from '@/lib/api/auth';
 
 export function getUserDisplayName(user) {
     const firstName = String(
@@ -29,17 +34,49 @@ export function getUserInitial(user) {
     return Array.from(getUserDisplayName(user))[0] || 'ک';
 }
 
-export default function useAuthenticatedUser() {
-    const [user, setUser] = useState(null);
+export function useAuthSession() {
+    const [session, setSession] = useState({
+        user: null,
+        authenticated: false,
+        ready: false,
+    });
 
     useEffect(() => {
-        const syncUser = () => setUser(getStoredUser());
+        let mounted = true;
 
-        syncUser();
-        window.addEventListener('storage', syncUser);
+        const syncSession = (ready = true) => {
+            if (!mounted) return;
 
-        return () => window.removeEventListener('storage', syncUser);
+            setSession({
+                user: getStoredUser(),
+                authenticated: Boolean(getAccessToken()),
+                ready,
+            });
+        };
+
+        syncSession(false);
+
+        const handleSessionChange = () => syncSession(true);
+
+        restoreAuthSession().finally(handleSessionChange);
+        window.addEventListener('storage', handleSessionChange);
+        window.addEventListener(AUTH_SESSION_EVENT, handleSessionChange);
+
+        return () => {
+            mounted = false;
+            window.removeEventListener('storage', handleSessionChange);
+            window.removeEventListener(
+                AUTH_SESSION_EVENT,
+                handleSessionChange,
+            );
+        };
     }, []);
+
+    return session;
+}
+
+export default function useAuthenticatedUser() {
+    const { user } = useAuthSession();
 
     return user;
 }

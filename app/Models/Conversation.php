@@ -73,4 +73,12 @@ class Conversation extends Model
         return $this->hasMany(Message::class);
     }
 
+    /** Most recent non-deleted message for conversation lists. */
+    public function lastMessage()
+    {
+        return $this->hasOne(Message::class)
+            ->where('status', '!=', 'deleted')
+            ->latestOfMany('sent_at');
+    }
+
 }

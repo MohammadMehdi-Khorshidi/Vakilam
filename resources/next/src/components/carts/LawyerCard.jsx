@@ -1,12 +1,4 @@
-import {
-    BriefcaseBusiness,
-    Clock3,
-    Star,
-    ShieldCheck,
-    BarChart3,
-    CheckCircle2,
-} from 'lucide-react';
-
+import { CheckCircle2, MapPin, Star } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
 const vazirmatn = Vazirmatn({
@@ -14,199 +6,78 @@ const vazirmatn = Vazirmatn({
     display: 'swap',
 });
 
-const LawyerCard = ({
-    name,
-    initial,
-    title,
-    location,
-    description,
-    trustScore,
-    cooperationScore,
-    reviewedCases,
-    responseTime,
-    experience,
-    match,
-    lawyer_public_id,
-    onProfileClick,
-}) => {
+export default function LawyerCard({ lawyer, onProfileClick }) {
+    const name = lawyer.full_name || lawyer.name || 'وکیل وکیلم';
+    const initial = Array.from(name)[0] || 'و';
+    const specialties = lawyer.specialties || [];
+    const serviceAreas = lawyer.service_areas || [];
+    const locations = serviceAreas
+        .map((area) => area.city?.name || area.province?.name)
+        .filter(Boolean);
+
     return (
         <article
             dir="rtl"
-            className={`${vazirmatn.className} relative overflow-hidden rounded-[18px] border border-[#dfbd6c] bg-white shadow-[0_5px_20px_rgba(18,63,55,0.04)]`}
+            className={`${vazirmatn.className} rounded-[18px] border border-[#dfbd6c] bg-white p-5 shadow-[0_5px_20px_rgba(18,63,55,0.04)]`}
         >
-            {/* برچسب */}
-            <div className="absolute left-0 top-0 rounded-br-[14px] bg-[#c9a96e] px-4 py-2 text-sm font-extrabold text-[#173f38]">
-                تماس بیشتر با پرونده
-            </div>
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 items-start gap-4">
+                    <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[17px] bg-[#123f37] font-extrabold text-white">
+                        {initial}
+                        <span className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#3a9b6e]">
+                            <CheckCircle2 size={12} />
+                        </span>
+                    </div>
 
-            <div className="grid grid-cols-1 gap-5 p-5 lg:grid-cols-[1fr_260px]">
-                {/* =========================
-                    اطلاعات وکیل
-                ========================== */}
-
-                <div className="min-w-0">
-                    <div className="flex items-start justify-end gap-3">
-                        <div className="min-w-0 flex-1 text-right">
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <span className="rounded-full border border-[#cce9dc] bg-[#effaf4] px-3 py-1 text-xs font-bold text-[#27805a]">
-                                    احراز هویت تأییدشده
-                                </span>
-
-                                <h2 className="font-extrabold text-[#173f38]">
-                                    {name}
-                                </h2>
-                            </div>
-
-                            <p className="mt-2 text-sm text-[#71817c]">
-                                {title} · {location}
-                            </p>
-                        </div>
-
-                        {/* Avatar */}
-                        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[17px] bg-[#123f37] font-extrabold text-white shadow-[0_7px_16px_rgba(18,63,55,0.14)]">
-                            {initial}
-
-                            <span className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#3a9b6e] text-white">
-                                <CheckCircle2 size={12} />
+                    <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h2 className="font-extrabold text-[#173f38]">{name}</h2>
+                            <span className="rounded-full bg-[#effaf4] px-3 py-1 text-xs font-bold text-[#27805a]">
+                                احراز هویت تأییدشده
                             </span>
                         </div>
-                    </div>
 
-                    {/* توضیحات */}
-                    <p className="mt-4 text-right leading-7 text-[#62736e]">
-                        {description}
-                    </p>
+                        {lawyer.bio && (
+                            <p className="mt-3 max-w-3xl leading-7 text-[#62736e]">
+                                {lawyer.bio}
+                            </p>
+                        )}
 
-                    {/* =========================
-                        امتیازها
-                    ========================== */}
-
-                    <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                        <div className="flex items-center gap-2 rounded-[10px] border border-[#e3e9e6] bg-white px-3 py-2 text-xs text-[#52645f]">
-                            <ShieldCheck size={15} />
-
-                            <span>امتیاز اعتماد {trustScore}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2 rounded-[10px] border border-[#e3e9e6] bg-white px-3 py-2 text-xs text-[#52645f]">
-                            <Star size={15} />
-
-                            <span>{cooperationScore} از تجربه همکاری</span>
-                        </div>
-
-                        <div className="flex items-center gap-2 rounded-[10px] border border-[#e3e9e6] bg-white px-3 py-2 text-xs text-[#52645f]">
-                            <CheckCircle2 size={15} />
-
-                            <span>{reviewedCases} بازخورد بررسی‌شده</span>
-                        </div>
-                    </div>
-
-                    {/* =========================
-                        تخصص‌ها
-                    ========================== */}
-
-                    <div className="mt-3 flex flex-wrap justify-end gap-2">
-                        <span className="rounded-full bg-[#f2f7f5] px-3 py-1.5 text-xs text-[#52645f]">
-                            مطالبات مالی
-                        </span>
-
-                        <span className="rounded-full bg-[#f2f7f5] px-3 py-1.5 text-xs text-[#52645f]">
-                            اسناد تجاری
-                        </span>
-
-                        <span className="rounded-full bg-[#f2f7f5] px-3 py-1.5 text-xs text-[#52645f]">
-                            قراردادها
-                        </span>
-                    </div>
-
-                    {/* =========================
-                        آمار
-                    ========================== */}
-
-                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                        <div className="rounded-[12px] bg-[#f3f8f6] p-3 text-right">
-                            <div className="flex items-center justify-end gap-2 text-xs text-[#71817c]">
-                                <span>سابقه حرفه‌ای</span>
-                                <BriefcaseBusiness size={15} />
-                            </div>
-
-                            <strong className="mt-2 block font-extrabold text-[#173f38]">
-                                {experience}
-                            </strong>
-                        </div>
-
-                        <div className="rounded-[12px] bg-[#f3f8f6] p-3 text-right">
-                            <div className="flex items-center justify-end gap-2 text-xs text-[#71817c]">
-                                <span>زمان پاسخ</span>
-                                <Clock3 size={15} />
-                            </div>
-
-                            <strong className="mt-2 block font-extrabold text-[#173f38]">
-                                {responseTime}
-                            </strong>
-                        </div>
-
-                        <div className="rounded-[12px] bg-[#f3f8f6] p-3 text-right">
-                            <div className="flex items-center justify-end gap-2 text-xs text-[#71817c]">
-                                <span>برآورد زمان</span>
-                                <BarChart3 size={15} />
-                            </div>
-
-                            <strong className="mt-2 block font-extrabold text-[#173f38]">
-                                ۴ تا ۶ ماه
-                            </strong>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#52645f]">
+                            {lawyer.average_rating !== null &&
+                                lawyer.average_rating !== undefined && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-[#f4f0e5] px-3 py-1.5">
+                                        <Star size={14} />
+                                        {lawyer.average_rating} از{' '}
+                                        {lawyer.rating_count || 0} نظر
+                                    </span>
+                                )}
+                            {locations.length > 0 && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#f2f7f5] px-3 py-1.5">
+                                    <MapPin size={14} />
+                                    {locations.join('، ')}
+                                </span>
+                            )}
+                            {specialties.map((item) => (
+                                <span
+                                    key={item.id || item.specialty?.id || item.name}
+                                    className="rounded-full bg-[#f2f7f5] px-3 py-1.5"
+                                >
+                                    {item.specialty?.name || item.name}
+                                </span>
+                            ))}
                         </div>
                     </div>
                 </div>
 
-                {/* =========================
-                    بخش سمت چپ
-                ========================== */}
-
-                <div className="flex flex-col justify-between border-[#e8ecea] lg:border-r lg:pr-5">
-                    {/* Match */}
-                    <div className="rounded-[14px] border border-[#e2c982] bg-[#fffdf8] p-4 text-center">
-                        <span className="block text-sm text-[#7b8783]">
-                            تناسب با پرونده
-                        </span>
-
-                        <strong className="mt-2 block text-3xl font-extrabold text-[#b28627]">
-                            {match}
-                            {match !== '—' && '%'}
-                        </strong>
-
-                        <span className="mt-1 block text-xs text-[#899591]">
-                            بر اساس اطلاعات پرونده
-                        </span>
-                    </div>
-
-                    {/* Buttons */}
-                    <div className="mt-4 space-y-2">
-                        <button
-                            type="button"
-                            onClick={onProfileClick}
-                            disabled={!lawyer_public_id}
-                            className="w-full rounded-[11px] border border-[#d6e0dc] bg-white px-4 py-3 text-sm font-bold text-[#294e46] transition hover:border-[#123f37] hover:bg-[#f5f8f7] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            مشاهده پروفایل
-                        </button>
-
-                        <button
-                            type="button"
-                            className="w-full rounded-[11px] bg-[#123f37] px-4 py-3 text-sm font-bold text-white shadow-[0_6px_15px_rgba(18,63,55,0.14)] transition hover:bg-[#0d302a]"
-                        >
-                            مشاهده پیشنهاد
-                        </button>
-
-                        <p className="text-center text-xs leading-6 text-[#899591]">
-                            پیشنهاد مالی فقط پس از بررسی پرونده توسط این وکیل،
-                            در بخش پیشنهادها نمایش داده می‌شود.
-                        </p>
-                    </div>
-                </div>
+                <button
+                    type="button"
+                    onClick={onProfileClick}
+                    className="shrink-0 rounded-[11px] bg-[#123f37] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#0d302a]"
+                >
+                    مشاهده پروفایل
+                </button>
             </div>
         </article>
     );
-};
-
-export default LawyerCard;
+}

@@ -3,7 +3,6 @@
 import { Vazirmatn } from 'next/font/google';
 import AssistantHeader from '../../../features/client/legal-assistant/AssistantHeader';
 import LegalChat from '../../../features/client/legal-assistant/LegalChat';
-import ActionPlan from '../../../features/client/legal-assistant/ActionPlan';
 import AssistantNotice from '../../../features/client/legal-assistant/AssistantNotice';
 
 
@@ -27,7 +26,6 @@ const ClientAssistantPage = () => {
                     <LegalChat />
 
                     <div className="flex flex-col gap-6">
-                        <ActionPlan />
                         <AssistantNotice />
                     </div>
                 </div>

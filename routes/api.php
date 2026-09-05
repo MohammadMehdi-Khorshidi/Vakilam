@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\ClientCaseController;
 use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\ConsultationController;
+use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EngagementController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\Api\LawyerSpecialtyController;
 use App\Http\Controllers\Api\LawyerWorkspaceController;
 use App\Http\Controllers\Api\LegalRequestController;
 use App\Http\Controllers\Api\LegalRequestServiceIntentController;
+use App\Http\Controllers\Api\LegalGuidanceController;
 use App\Http\Controllers\Api\LocationReferenceController;
 use App\Http\Controllers\Api\NegotiationController;
 use App\Http\Controllers\Api\PaymentController;
@@ -101,6 +103,21 @@ Route::middleware(['auth:sanctum', 'active'])->get('/user', function (Request $r
 */
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
+
+    // Persisted client/lawyer conversations. Access is restricted to active participants.
+    Route::controller(ConversationController::class)->group(function () {
+        Route::get('/conversations', 'index');
+        Route::get('/conversations/{conversation:public_id}', 'show');
+        Route::post('/conversations/{conversation:public_id}/messages', 'storeMessage')
+            ->middleware('throttle:30,1');
+    });
+
+    // Persistent, provider-backed legal assistant history.
+    Route::controller(LegalGuidanceController::class)->group(function () {
+        Route::get('/ai/legal-assistant/messages', 'index');
+        Route::post('/ai/legal-assistant/messages', 'store')
+            ->middleware('throttle:10,1');
+    });
 
     // Client Dashboard & Cases
     Route::controller(ClientDashboardController::class)->group(function () {

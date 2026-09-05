@@ -4,9 +4,14 @@ import { useState } from 'react';
 import Image from 'next/image';
 import HeaderIcon from '@/assets/images/HeaderIcon.svg';
 import ButtonHeader from '@/components/common/ButtonHeader';
+import { useAuthSession } from '@/hooks/useAuthenticatedUser';
+import { dashboardForUser } from '@/lib/api/auth';
 
 export default function Header() {
     const [open, setOpen] = useState(false);
+    const { authenticated, user } = useAuthSession();
+    const accountHref = authenticated ? dashboardForUser(user) : '/login';
+    const accountLabel = authenticated ? 'داشبورد من' : 'ثبت نام / ورود';
 
     const menuItems = [
         { label: 'تیم‌ما', path: '/teams' },
@@ -19,8 +24,8 @@ export default function Header() {
         <header dir="ltr" className="z-100 sticky top-0 bg-white shadow-lg">
             <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 md:h-20 lg:px-0">
                 <div className="hidden items-center gap-2 lg:flex">
-                    <ButtonHeader variant="primary" href="/login">
-                        ثبت نام / ورود
+                    <ButtonHeader variant="primary" href={accountHref}>
+                        {accountLabel}
                     </ButtonHeader>
                 </div>
 
@@ -67,12 +72,20 @@ export default function Header() {
                     ))}
 
                     <div className="flex flex-col gap-2 pt-2">
-                        <ButtonHeader variant="primary" full href="/submit">
+                        <ButtonHeader
+                            variant="primary"
+                            full
+                            href={authenticated ? accountHref : '/login'}
+                        >
                             شرح مسئله حقوقی
                         </ButtonHeader>
 
-                        <ButtonHeader variant="ghost" full href="/login">
-                            ثبت نام / ورود
+                        <ButtonHeader
+                            variant="ghost"
+                            full
+                            href={accountHref}
+                        >
+                            {accountLabel}
                         </ButtonHeader>
                     </div>
                 </div>

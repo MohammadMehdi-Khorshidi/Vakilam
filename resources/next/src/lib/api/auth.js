@@ -2,6 +2,9 @@ import { ApiError, apiRequest, unwrapData } from './client';
 
 const TOKEN_KEY = 'vakilam_access_token';
 const USER_KEY = 'vakilam_user';
+export const AUTH_SESSION_EVENT = 'vakilam:auth-session-changed';
+
+let restoreRequest = null;
 
 function normalizePhone(phone) {
     return String(phone || '')
@@ -15,24 +18,36 @@ export function persistAuthSession(result) {
     if (typeof window === 'undefined' || !result) return;
 
     const token = result.access_token || result.token;
-    if (token) {
-        localStorage.setItem(TOKEN_KEY, token);
+    try {
+        if (token) {
+            window.localStorage.setItem(TOKEN_KEY, token);
+        }
+        if (result.user) {
+            window.localStorage.setItem(USER_KEY, JSON.stringify(result.user));
+        }
+    } catch {
+        return;
     }
-    if (result.user) {
-        localStorage.setItem(USER_KEY, JSON.stringify(result.user));
-    }
+
+    window.dispatchEvent(new Event(AUTH_SESSION_EVENT));
 }
 
 export function clearAuthSession() {
     if (typeof window === 'undefined') return;
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    try {
+        window.localStorage.removeItem(TOKEN_KEY);
+        window.localStorage.removeItem(USER_KEY);
+    } catch {
+        // The in-memory UI still needs to be notified when storage is blocked.
+    }
+
+    window.dispatchEvent(new Event(AUTH_SESSION_EVENT));
 }
 
 export function getStoredUser() {
     if (typeof window === 'undefined') return null;
     try {
-        const raw = localStorage.getItem(USER_KEY);
+        const raw = window.localStorage.getItem(USER_KEY);
         return raw ? JSON.parse(raw) : null;
     } catch {
         return null;
@@ -41,13 +56,25 @@ export function getStoredUser() {
 
 export function getAccessToken() {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(TOKEN_KEY);
+    try {
+        return window.localStorage.getItem(TOKEN_KEY);
+    } catch {
+        return null;
+    }
+}
+
+export function getUserRoles(user) {
+    const roles = Array.isArray(user?.roles) ? user.roles : [];
+    const primaryRole = user?.role;
+
+    return [...new Set([primaryRole, ...roles].filter(Boolean))];
 }
 
 /** Map role → dashboard path. */
 export function dashboardForUser(user) {
-    if (!user) return '/login';
-    const role = user.role || (Array.isArray(user.roles) ? user.roles[0] : null);
+    const roles = getUserRoles(user);
+    const role = user?.role || roles[0];
+
     switch (role) {
         case 'lawyer':
             return '/lawyer';
@@ -55,9 +82,55 @@ export function dashboardForUser(user) {
         case 'super_admin':
             return '/admin';
         case 'client':
-        default:
             return '/client';
+        default:
+            return getAccessToken() ? '/client' : '/login';
     }
+}
+
+function storeCurrentUser(user) {
+    if (typeof window === 'undefined' || !user) return;
+
+    try {
+        window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    } catch {
+        return;
+    }
+
+    window.dispatchEvent(new Event(AUTH_SESSION_EVENT));
+}
+
+/**
+ * Rehydrate the durable Sanctum token after a reload or a reopened tab.
+ * A temporary network/server problem keeps the last known local session;
+ * only an explicit 401/403 response invalidates it.
+ */
+export async function restoreAuthSession() {
+    if (!getAccessToken()) return null;
+
+    if (!restoreRequest) {
+        restoreRequest = fetchCurrentUser()
+            .then((user) => {
+                storeCurrentUser(user);
+                return user;
+            })
+            .catch((error) => {
+                if (
+                    error instanceof ApiError &&
+                    (error.status === 401 || error.status === 403)
+                ) {
+                    clearAuthSession();
+                    return null;
+                }
+
+                return getStoredUser();
+            })
+            .finally(() => {
+                restoreRequest = null;
+            });
+    }
+
+    return restoreRequest;
 }
 
 /**
