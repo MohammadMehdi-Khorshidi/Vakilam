@@ -50,13 +50,13 @@ export function dashboardForUser(user) {
     const role = user.role || (Array.isArray(user.roles) ? user.roles[0] : null);
     switch (role) {
         case 'lawyer':
-            return '/lawyer/home';
+            return '/lawyer';
         case 'admin':
         case 'super_admin':
-            return '/admin/home';
+            return '/admin';
         case 'client':
         default:
-            return '/client/home';
+            return '/client';
     }
 }
 

@@ -2,18 +2,25 @@
 
 import { Vazirmatn } from 'next/font/google';
 
+import useAuthenticatedUser, {
+    getUserDisplayName,
+} from '@/hooks/useAuthenticatedUser';
+
 const vazir = Vazirmatn({
     subsets: ['arabic'],
     weight: ['400', '500', '600', '700', '800'],
 });
 const HomeIntro = () => {
+    const user = useAuthenticatedUser();
+    const displayName = getUserDisplayName(user);
+
     return (
         <div className={`${vazir.className} mt-10 text-right`}>
 
 
             {/* Greeting */}
             <h1 className="text-[28px] font-bold leading-[1.5] text-[#0d302a] lg:text-[34px]">
-                سلام فرزام نخعی
+                سلام {displayName}
             </h1>
 
             {/* Description */}

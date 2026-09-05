@@ -28,7 +28,7 @@ import {
 
 export const clientNav = [
     {
-        href: '/client/home',
+        href: '/client',
         label: 'خانه',
         icon: Home,
     },
@@ -93,7 +93,7 @@ export const clientNav = [
 //lawyer
 export const lawyerNav = [
     {
-        href: '/lawyer/home',
+        href: '/lawyer',
         label: 'خانه',
         icon: Home,
     },
@@ -148,7 +148,7 @@ export const lawyerNav = [
 
 export const adminNav = [
     {
-        href: '/admin/home',
+        href: '/admin',
         label: 'خانه',
         icon: Home,
     },
@@ -202,9 +202,9 @@ export const adminNav = [
 
 // admin
 export const roleHome = {
-    client: '/client/home',
-    lawyer: '/lawyer/home',
-    admin: '/admin/home',
+    client: '/client',
+    lawyer: '/lawyer',
+    admin: '/admin',
 };
 
 export const roleLabels = {

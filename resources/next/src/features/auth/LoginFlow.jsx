@@ -51,10 +51,19 @@ export default function LoginFlow({ onGoToRegister }) {
         const redirectTo = new URLSearchParams(window.location.search).get(
             'redirect',
         );
+        const legacyDashboardRoutes = [
+            '/client/home',
+            '/lawyer/home',
+            '/admin/home',
+        ];
+        const normalizedRedirect = legacyDashboardRoutes.includes(redirectTo)
+            ? destination
+            : redirectTo;
         const safeRedirect =
-            redirectTo?.startsWith(destination) &&
-            !redirectTo.startsWith('//')
-                ? redirectTo
+            !normalizedRedirect?.startsWith('//') &&
+            (normalizedRedirect === destination ||
+                normalizedRedirect?.startsWith(`${destination}/`))
+                ? normalizedRedirect
                 : destination;
 
         router.replace(safeRedirect);

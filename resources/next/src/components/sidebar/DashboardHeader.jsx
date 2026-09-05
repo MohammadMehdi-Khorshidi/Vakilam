@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 
 import { roleLabels } from '@/config/Navigation';
+import useAuthenticatedUser, {
+    getUserDisplayName,
+    getUserInitial,
+} from '@/hooks/useAuthenticatedUser';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -24,6 +28,7 @@ const vazir = Vazirmatn({
 
 const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
     const pathname = usePathname();
+    const authenticatedUser = useAuthenticatedUser();
 
     const [roleMenuOpen, setRoleMenuOpen] = useState(false);
     const [notificationsOn, setNotificationsOn] = useState(true);
@@ -47,27 +52,10 @@ const DashboardHeader = ({ mobileOpen, setMobileOpen }) => {
 
     const currentRole = roleLabels?.[role] || 'موکل';
 
-    // =========================
-    // اطلاعات کاربر هر نقش
-    // =========================
-    const userInfo = {
-        client: {
-            name: 'فرزام نفعی',
-            initial: 'ف',
-        },
-
-        lawyer: {
-            name: 'وکیل',
-            initial: 'و',
-        },
-
-        admin: {
-            name: 'ادمین',
-            initial: 'ا',
-        },
+    const currentUser = {
+        name: getUserDisplayName(authenticatedUser),
+        initial: getUserInitial(authenticatedUser),
     };
-
-    const currentUser = userInfo[role] || userInfo.client;
 
     // =========================
     // نقش‌ها
