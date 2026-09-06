@@ -36,4 +36,12 @@ class LawyerRegistryVerificationException extends RuntimeException
             'نام و نام خانوادگی واردشده با اطلاعات ثبت‌شده برای این پروانه مطابقت ندارد.',
         );
     }
+
+    public static function licenseAlreadyClaimed(): self
+    {
+        return new self(
+            'license_number',
+            'این شماره پروانه قبلاً برای یک حساب کاربری دیگر ثبت شده است.',
+        );
+    }
 }
