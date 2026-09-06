@@ -3,12 +3,23 @@
 namespace App\Services\Lawyers;
 
 use App\Exceptions\LawyerRegistryUnavailableException;
-use JsonException;
+use App\Models\LawyerProfile;
+use Illuminate\Database\Eloquent\Builder;
+use Throwable;
 
 class LawyerRegistryVerifier
 {
     /**
-     * @return array{license_number: string, full_name: string, organization: mixed, source_hash: string}
+     * Confirmed against lawyer_profiles.sql (real schema).
+     */
+    private const LICENSE_COLUMN = 'license_number';
+    private const NAME_COLUMN = 'full_name';
+    private const MOBILE_PHONE_COLUMN = 'mobile';
+    private const OFFICE_PHONE_COLUMN = 'office_phone';
+    private const IMPORTED_AT_COLUMN = 'imported_at';
+
+    /**
+     * @return array{license_number: string, full_name: string, organization: mixed, source_hash: string, lawyer_profile_id: string}
      */
     public function verify(
         string $licenseNumber,
@@ -24,45 +35,27 @@ class LawyerRegistryVerifier
             throw LawyerRegistryVerificationException::invalidLicense();
         }
 
-        $licenseFound = false;
-        $matchedRecord = null;
+        $record = $this->findByLicenseNumber($normalizedLicense);
 
-        foreach ($this->records() as $record) {
-            $recordLicense = $this->normalizeLicenseNumber((string) $this->recordValue(
-                $record,
-                (string) config('lawyer_registry.license_key'),
-                ['license_number', 'license_no', 'شماره پروانه'],
-            ));
-
-            if ($recordLicense === '' || ! hash_equals($normalizedLicense, $recordLicense)) {
-                continue;
-            }
-
-            $licenseFound = true;
-            $recordPhone = $this->normalizePhone((string) $this->recordValue(
-                $record,
-                (string) config('lawyer_registry.phone_key'),
-                ['phone', 'mobile', 'mobile_number', 'شماره موبایل'],
-            ));
-
-            if ($matchedRecord === null && hash_equals($normalizedPhone, $recordPhone)) {
-                $matchedRecord = $record;
-            }
-        }
-
-        if (! $licenseFound) {
+        if ($record === null) {
             throw LawyerRegistryVerificationException::invalidLicense();
         }
 
-        if (! is_array($matchedRecord)) {
+        if ($record->{self::IMPORTED_AT_COLUMN} === null) {
+            // No imported_at means this row is no longer a raw import
+            // placeholder -- it was already claimed by a real registered
+            // account (user_id is NOT NULL/unique in this schema, so it
+            // can't be used as the "unclaimed" signal on its own).
+            throw LawyerRegistryVerificationException::licenseAlreadyClaimed();
+        }
+
+        $recordPhone = $this->normalizePhone((string) $record->{self::MOBILE_PHONE_COLUMN});
+
+        if (! hash_equals($normalizedPhone, $recordPhone)) {
             throw LawyerRegistryVerificationException::phoneMismatch();
         }
 
-        $registryFullName = (string) $this->recordValue(
-            $matchedRecord,
-            (string) config('lawyer_registry.name_key'),
-            ['full_name', 'name', 'lawyer_name', 'نام و نام خانوادگی', 'نام'],
-        );
+        $registryFullName = (string) $record->{self::NAME_COLUMN};
 
         if (
             $normalizedFullName === ''
@@ -78,289 +71,38 @@ class LawyerRegistryVerifier
         return [
             'license_number' => $normalizedLicense,
             'full_name' => trim($registryFullName),
-            'organization' => $this->recordValue(
-                $matchedRecord,
-                (string) config('lawyer_registry.organization_key'),
-                ['organization', 'issuer', 'organization_name', 'نام سازمان'],
-            ),
-            'source_hash' => hash('sha256', json_encode(
-                $matchedRecord,
-                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
-            ) ?: ''),
+            'organization' => null, // wire this up if/when you add an organization column
+            'source_hash' => hash('sha256', $record->id . '|' . $normalizedLicense),
+            'lawyer_profile_id' => $record->id,
         ];
     }
 
-    /** @return iterable<int, array<string, mixed>> */
-    private function records(): iterable
-    {
-        $path = $this->registryPath();
-        $recordsKey = config('lawyer_registry.records_key');
-
-        if (is_string($recordsKey) && $recordsKey !== '') {
-            yield from $this->decodedRecords($path, $recordsKey);
-
-            return;
-        }
-
-        yield from $this->streamArrayRecords($path);
-    }
-
-    private function registryPath(): string
-    {
-        $configuredPath = trim((string) config('lawyer_registry.path'));
-        $defaultPath = storage_path(
-            'app/private/lawyer-registry/lawyers_final.json',
-        );
-        $checkedPaths = [];
-
-        foreach (array_unique([$configuredPath, $defaultPath]) as $path) {
-            if ($path === '') {
-                continue;
-            }
-
-            $resolvedPath = $this->absolutePath($path);
-            $checkedPaths[] = $resolvedPath;
-
-            if (is_file($resolvedPath) && is_readable($resolvedPath)) {
-                return $resolvedPath;
-            }
-        }
-
-        throw new LawyerRegistryUnavailableException(
-            'The lawyer registry file is unavailable. Checked: '.implode(', ', $checkedPaths),
-        );
-    }
-
-    private function absolutePath(string $path): string
-    {
-        $isAbsolute = str_starts_with($path, '/')
-            || str_starts_with($path, '\\\\')
-            || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1;
-
-        return $isAbsolute ? $path : base_path($path);
-    }
-
-    /** @return iterable<int, array<string, mixed>> */
-    private function decodedRecords(string $path, string $recordsKey): iterable
+    private function findByLicenseNumber(string $normalizedLicense): ?LawyerProfile
     {
         try {
-            $contents = file_get_contents($path);
-
-            if ($contents === false) {
-                throw new LawyerRegistryUnavailableException(
-                    'The lawyer registry file could not be read: '.$path,
-                );
-            }
-
-            $decoded = json_decode(
-                $contents,
-                true,
-                512,
-                JSON_THROW_ON_ERROR,
-            );
-        } catch (JsonException $exception) {
+            /** @var LawyerProfile|null $record */
+            $record = LawyerProfile::query()
+                ->select(['id', 'user_id', self::LICENSE_COLUMN, self::NAME_COLUMN, self::MOBILE_PHONE_COLUMN, self::IMPORTED_AT_COLUMN])
+                ->where(function (Builder $query) use ($normalizedLicense): void {
+                    // Strips the same separators normalizeLicenseNumber() strips, so
+                    // "12345", "123-45" and "123 45" in the DB all match the same input.
+                    $query->whereRaw(
+                        "REPLACE(REPLACE(REPLACE(REPLACE(`" . self::LICENSE_COLUMN . "`, ' ', ''), '-', ''), '/', ''), '_', '') = ?",
+                        [$normalizedLicense],
+                    );
+                })
+                ->first();
+        } catch (Throwable $exception) {
+            // A DB outage/misconfiguration should surface the same "temporarily
+            // unavailable" response the controller already knows how to handle,
+            // instead of a raw 500.
             throw new LawyerRegistryUnavailableException(
-                'The lawyer registry file is invalid.',
+                'The lawyer registry table could not be queried.',
                 previous: $exception,
             );
         }
 
-        $records = data_get($decoded, $recordsKey);
-
-        if (! is_array($records) || ! array_is_list($records)) {
-            throw new LawyerRegistryUnavailableException(
-                'The lawyer registry records are invalid.',
-            );
-        }
-
-        foreach ($records as $record) {
-            if (is_array($record)) {
-                yield $record;
-            }
-        }
-    }
-
-    /**
-     * Read a root JSON array one record at a time. The production registry is
-     * large enough that decoding it into one PHP array can exhaust PHP memory.
-     *
-     * @return iterable<int, array<string, mixed>>
-     */
-    private function streamArrayRecords(string $path): iterable
-    {
-        $handle = @fopen($path, 'rb');
-
-        if ($handle === false) {
-            throw new LawyerRegistryUnavailableException(
-                'The lawyer registry file could not be opened: '.$path,
-            );
-        }
-
-        $started = false;
-        $finished = false;
-        $firstChunk = true;
-        $outerState = 'value_or_end';
-        $buffer = '';
-        $depth = 0;
-        $inString = false;
-        $escaped = false;
-
-        try {
-            while (! feof($handle)) {
-                $chunk = fread($handle, 65536);
-
-                if ($chunk === false) {
-                    throw new LawyerRegistryUnavailableException(
-                        'The lawyer registry file could not be read: '.$path,
-                    );
-                }
-
-                if ($firstChunk) {
-                    $chunk = preg_replace('/^\xEF\xBB\xBF/', '', $chunk) ?? $chunk;
-                    $firstChunk = false;
-                }
-
-                $length = strlen($chunk);
-
-                for ($index = 0; $index < $length; $index++) {
-                    $character = $chunk[$index];
-
-                    if ($depth === 0) {
-                        if (ctype_space($character)) {
-                            continue;
-                        }
-
-                        if (! $started) {
-                            if ($character !== '[') {
-                                throw new LawyerRegistryUnavailableException(
-                                    'The lawyer registry JSON root must be an array.',
-                                );
-                            }
-
-                            $started = true;
-                            continue;
-                        }
-
-                        if ($finished) {
-                            throw new LawyerRegistryUnavailableException(
-                                'The lawyer registry JSON has trailing content.',
-                            );
-                        }
-
-                        if ($outerState === 'comma_or_end') {
-                            if ($character === ',') {
-                                $outerState = 'value';
-                                continue;
-                            }
-
-                            if ($character === ']') {
-                                $finished = true;
-                                continue;
-                            }
-
-                            throw new LawyerRegistryUnavailableException(
-                                'The lawyer registry JSON has an invalid record separator.',
-                            );
-                        }
-
-                        if ($character === ']' && $outerState === 'value_or_end') {
-                            $finished = true;
-                            continue;
-                        }
-
-                        if ($character !== '{') {
-                            throw new LawyerRegistryUnavailableException(
-                                'The lawyer registry must contain JSON objects.',
-                            );
-                        }
-
-                        $buffer = '{';
-                        $depth = 1;
-                        $inString = false;
-                        $escaped = false;
-
-                        continue;
-                    }
-
-                    $buffer .= $character;
-
-                    if ($inString) {
-                        if ($escaped) {
-                            $escaped = false;
-                        } elseif ($character === '\\') {
-                            $escaped = true;
-                        } elseif ($character === '"') {
-                            $inString = false;
-                        }
-
-                        continue;
-                    }
-
-                    if ($character === '"') {
-                        $inString = true;
-                    } elseif ($character === '{' || $character === '[') {
-                        $depth++;
-                    } elseif ($character === '}' || $character === ']') {
-                        $depth--;
-                    }
-
-                    if ($depth !== 0) {
-                        continue;
-                    }
-
-                    try {
-                        $record = json_decode(
-                            $buffer,
-                            true,
-                            512,
-                            JSON_THROW_ON_ERROR,
-                        );
-                    } catch (JsonException $exception) {
-                        throw new LawyerRegistryUnavailableException(
-                            'The lawyer registry contains an invalid JSON record.',
-                            previous: $exception,
-                        );
-                    }
-
-                    if (! is_array($record)) {
-                        throw new LawyerRegistryUnavailableException(
-                            'The lawyer registry contains a non-object record.',
-                        );
-                    }
-
-                    $buffer = '';
-                    $outerState = 'comma_or_end';
-
-                    yield $record;
-                }
-            }
-
-            if (! $started || ! $finished || $depth !== 0 || $inString) {
-                throw new LawyerRegistryUnavailableException(
-                    'The lawyer registry JSON is incomplete.',
-                );
-            }
-        } finally {
-            fclose($handle);
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $record
-     * @param array<int, string> $fallbackKeys
-     */
-    private function recordValue(
-        array $record,
-        string $configuredKey,
-        array $fallbackKeys,
-    ): mixed {
-        foreach (array_unique([$configuredKey, ...$fallbackKeys]) as $key) {
-            if ($key !== '' && data_get($record, $key) !== null) {
-                return data_get($record, $key);
-            }
-        }
-
-        return null;
+        return $record;
     }
 
     private function normalizeLicenseNumber(string $licenseNumber): string
@@ -390,7 +132,6 @@ class LawyerRegistryVerifier
 
         return $phone;
     }
-
 
     private function normalizePersonName(string $name): string
     {

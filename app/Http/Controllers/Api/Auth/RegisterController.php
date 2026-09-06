@@ -285,12 +285,30 @@ class RegisterController extends Controller
             $fullName = $data['first_name'] . ' ' . $data['last_name'];
 
             if ($data['role'] === 'lawyer') {
-                $profile = LawyerProfile::query()->create([
+                // The registry row was already located and validated in
+                // validateLawyer()/verify() above. Claim that same row instead
+                // of inserting a new one, otherwise this would either violate
+                // a unique constraint on license_number or leave the original
+                // imported row orphaned.
+                $profile = LawyerProfile::query()
+                    ->whereKey($registryMatch['lawyer_profile_id'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($profile === null || $profile->imported_at === null) {
+                    // Someone else claimed this license number between
+                    // validate-lawyer and this final submit.
+                    throw ValidationException::withMessages([
+                        'license_number' => 'این شماره پروانه قبلاً برای یک حساب کاربری دیگر ثبت شده است.',
+                    ]);
+                }
+
+                $profile->forceFill([
                     'user_id' => $user->id,
                     'full_name' => $fullName,
-                    'license_number' => $registryMatch['license_number'],
                     'verification_status' => 'approved',
-                ]);
+                    'imported_at' => null,
+                ])->save();
 
                 $profile->verifications()->create([
                     'status' => 'approved',
