@@ -424,7 +424,7 @@ export default function IntakeWizard() {
     return (
         <div
             dir="ltr"
-            className={`${vazir.className} mt-15 min-h-screen bg-[#f8faf9] lg:pr-72`}
+            className={`${vazir.className} mt-15 min-h-screen bg-[#f8faf9]`}
         >
             <main className="mx-auto max-w-7xl px-4 py-7 lg:px-8">
                 <div dir="rtl" className="mb-6 text-sm text-slate-500">
