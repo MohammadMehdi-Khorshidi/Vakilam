@@ -2,6 +2,18 @@
 
 use Illuminate\Support\Str;
 
+$configuredCacheStore = env('CACHE_STORE');
+$isLocalEnvironment = env('APP_ENV', 'production') === 'local';
+
+// Laravel's default database cache is useful in production, but it makes a
+// fresh local checkout depend on the database cache tables before even the
+// rate-limit middleware can run. Keep explicit non-database local stores
+// (Redis, Memcached, etc.), otherwise use the file cache for local development.
+$defaultCacheStore = $isLocalEnvironment
+    && ($configuredCacheStore === null || $configuredCacheStore === '' || $configuredCacheStore === 'database')
+        ? 'file'
+        : ($configuredCacheStore ?: 'database');
+
 return [
 
     /*
@@ -15,7 +27,20 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    'default' => $defaultCacheStore,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rate Limiter Cache Store
+    |--------------------------------------------------------------------------
+    |
+    | Laravel's throttle middleware uses the cache. Keeping the limiter on the
+    | working local store prevents auth endpoints from failing before their
+    | controller is reached when a local database cache is not ready yet.
+    |
+    */
+
+    'limiter' => env('CACHE_LIMITER', $defaultCacheStore),
 
     /*
     |--------------------------------------------------------------------------

@@ -28,11 +28,43 @@ function readLaravelEnv(name) {
     }
 }
 
-const configuredApiUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+function withoutApiSuffix(value) {
+    return String(value || '')
+        .trim()
+        .replace(/\/api\/?$/, '')
+        .replace(/\/$/, '');
+}
+
+function isBareLocalHttpUrl(value) {
+    try {
+        const url = new URL(value);
+        return (
+            url.protocol === 'http:' &&
+            (url.hostname === 'localhost' || url.hostname === '127.0.0.1') &&
+            url.port === ''
+        );
+    } catch {
+        return false;
+    }
+}
+
+const configuredApiUrl = withoutApiSuffix(process.env.NEXT_PUBLIC_API_URL);
+const explicitLaravelUrl = withoutApiSuffix(process.env.LARAVEL_APP_URL);
+const laravelEnvUrl = withoutApiSuffix(readLaravelEnv('APP_URL'));
+
+// A fresh Laravel .env commonly contains APP_URL=http://localhost while
+// `php artisan serve` actually listens on 127.0.0.1:8000. Using the bare
+// APP_URL as a Next.js rewrite destination proxies requests to port 80 and
+// produces a misleading 500 in the browser. Explicit frontend/Laravel env
+// values still win when a different backend origin is intended.
+const inferredLaravelUrl = isBareLocalHttpUrl(laravelEnvUrl)
+    ? 'http://127.0.0.1:8000'
+    : laravelEnvUrl;
+
 const apiOrigin = (
-    (process.env.LARAVEL_APP_URL || '').trim() ||
-    configuredApiUrl.replace(/\/api\/?$/, '') ||
-    readLaravelEnv('APP_URL') ||
+    explicitLaravelUrl ||
+    configuredApiUrl ||
+    inferredLaravelUrl ||
     'http://127.0.0.1:8000'
 ).replace(/\/$/, '');
 
@@ -40,9 +72,8 @@ const apiOrigin = (
 const nextConfig = {
     reactCompiler: true,
 
-    // The frontend runs on :3000 while Laravel is a separate app. Browser API
-    // calls use /api/*; proxy them to the Laravel APP_URL so a missing
-    // NEXT_PUBLIC_API_URL never turns into a Next.js 404.
+    // Browser calls stay same-origin (/api/*) while Next proxies them to
+    // Laravel. Set LARAVEL_APP_URL when Laravel is not on 127.0.0.1:8000.
     async rewrites() {
         return [
             {

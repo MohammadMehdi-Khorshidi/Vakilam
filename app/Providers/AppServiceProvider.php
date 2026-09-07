@@ -17,17 +17,21 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(OtpSender::class, function (Application $app): OtpSender {
-            // Prefer Null sender in testing; otherwise real IPPanel sender.
-            // Also fall back to Null when API key is missing so local/dev does not crash.
+            $apiKey = trim((string) config('services.ippanel.api_key'));
+
+            // Tests never call an external SMS provider. Local development may
+            // also run without IPPanel credentials and use the debug OTP.
             if ($app->environment('testing')) {
                 return $app->make(NullOtpSender::class);
             }
 
-            $apiKey = (string) config('services.ippanel.api_key');
-            if ($apiKey === '') {
+            if ($app->environment('local') && $apiKey === '') {
                 return $app->make(NullOtpSender::class);
             }
 
+            // Outside local/testing, always resolve the real sender. Missing or
+            // incomplete credentials are then reported as a controlled 503 by
+            // the auth controller instead of silently pretending an SMS sent.
             return $app->make(IppanelOtpSender::class);
         });
     }

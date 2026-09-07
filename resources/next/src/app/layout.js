@@ -1,15 +1,15 @@
 import './globals.css';
 
-
-
 import { Vazirmatn } from 'next/font/google';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
-    weight: ['400', '500', '700'],
+    weight: ['400', '500', '600', '700', '800'],
     variable: '--font-vazir',
+    display: 'swap',
+    preload: false,
 });
 
 export const metadata = {
@@ -22,8 +22,10 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
     return (
-        <html lang="en">
-            <body className={`flex min-h-screen flex-col ${vazir.variable}`}>
+        <html lang="fa">
+            <body
+                className={`flex min-h-screen flex-col ${vazir.className} ${vazir.variable}`}
+            >
                 <Header />
                 {children}
                 <Footer />

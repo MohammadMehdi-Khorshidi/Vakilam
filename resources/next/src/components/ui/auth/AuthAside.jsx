@@ -1,11 +1,5 @@
 import Image from 'next/image';
 import logoLogin from '@/assets/images/LoginLogo.svg';
-import { Vazirmatn } from 'next/font/google';
-
-const vazir = Vazirmatn({
-    subsets: ['arabic'],
-    weight: ['400', '500', '600', '700', '800'],
-});
 
 export function AuthAside() {
     return (
@@ -23,23 +17,21 @@ export function AuthAside() {
                     alt="وکیلم"
                     width={150}
                     height={55}
-                    priority
                     className="h-auto w-[115px] sm:w-[130px] md:w-[145px] lg:w-[200px]"
                 />
             </div>
 
             <div className="relative z-10 mt-auto w-full pt-12 text-right md:pt-16 lg:mb-80 lg:pt-0">
                 <div className="ml-auto w-full max-w-[580px]">
-                    <h2
-                        className={` ${vazir.className} text-xl leading-[1.8] font-bold sm:text-2xl md:text-3xl lg:text-2xl`}
-                    >
+                    <h2 className="text-xl leading-[1.8] font-bold sm:text-2xl md:text-3xl lg:text-2xl">
                         محیطی امن برای شروع و مدیریت
                         <br />
                         همکاری حقوقی
                     </h2>
 
-                    <p dir="rtl"
-                        className={` ${vazir.className} mt-4 ml-auto max-w-[560px] text-xs leading-7 text-green-100/80 sm:text-sm md:mt-5 md:text-[15px] md:leading-8`}
+                    <p
+                        dir="rtl"
+                        className="mt-4 ml-auto max-w-[560px] text-xs leading-7 text-green-100/80 sm:text-sm md:mt-5 md:text-[15px] md:leading-8"
                     >
                         اطلاعات پرونده فقط برای کمک در همان پرونده استفاده
                         می‌شود و برای آموزش عمومی مدل به کار نمی‌رود.

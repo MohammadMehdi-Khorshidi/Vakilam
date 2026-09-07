@@ -43,8 +43,6 @@ export default function Header() {
                         alt="Vakili Logo"
                         width={95}
                         height={40}
-                        className="h-10 w-auto"
-                        priority
                     />
                 </div>
 

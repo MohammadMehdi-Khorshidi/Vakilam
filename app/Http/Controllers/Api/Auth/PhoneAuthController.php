@@ -39,37 +39,47 @@ class PhoneAuthController extends Controller
             'phone.regex' => 'شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.',
         ]);
 
-        if (! Cache::add(
-            $this->resendCacheKey($data['phone']),
-            true,
-            self::OTP_RESEND_AFTER_SECONDS,
-        )) {
-            return response()->json([
-                'message' => 'لطفاً کمی صبر کنید و سپس دوباره درخواست کد تأیید بدهید.',
-                'retry_after' => self::OTP_RESEND_AFTER_SECONDS,
-            ], 429);
-        }
-
-        $user = User::query()->where('phone', $data['phone'])->first();
+        $resendKey = $this->resendCacheKey($data['phone']);
+        $otpKey = $this->otpCacheKey($data['phone']);
         $otp = (string) random_int(100000, 999999);
 
-        Cache::put($this->otpCacheKey($data['phone']), [
-            'phone' => $data['phone'],
-            'user_id' => $user?->id,
-            'otp_hash' => Hash::make($otp),
-            'attempts' => 0,
-            'expires_at' => now()->addSeconds(self::OTP_TTL_SECONDS)->timestamp,
-        ], self::OTP_TTL_SECONDS);
-
         try {
+            if (! Cache::add(
+                $resendKey,
+                true,
+                self::OTP_RESEND_AFTER_SECONDS,
+            )) {
+                return response()->json([
+                    'message' => 'لطفاً کمی صبر کنید و سپس دوباره درخواست کد تأیید بدهید.',
+                    'retry_after' => self::OTP_RESEND_AFTER_SECONDS,
+                ], 429);
+            }
+
+            // No database lookup is needed while sending the code. The account
+            // is intentionally resolved only after OTP verification. This also
+            // keeps the first step independent from user-table availability.
+            Cache::put($otpKey, [
+                'phone' => $data['phone'],
+                'otp_hash' => Hash::make($otp),
+                'attempts' => 0,
+                'expires_at' => now()->addSeconds(self::OTP_TTL_SECONDS)->timestamp,
+            ], self::OTP_TTL_SECONDS);
+
             $otpSender->send($data['phone'], $otp);
         } catch (Throwable $exception) {
-            Cache::forget($this->otpCacheKey($data['phone']));
-            Cache::forget($this->resendCacheKey($data['phone']));
+            // Cleanup must never replace the original exception with another
+            // cache exception; cleanup is best-effort only.
+            try {
+                Cache::forget($otpKey);
+                Cache::forget($resendKey);
+            } catch (Throwable) {
+                // The cache itself may be the failing dependency.
+            }
+
             report($exception);
 
             return response()->json([
-                'message' => 'ارسال کد تأیید ناموفق بود. لطفاً دوباره تلاش کنید.',
+                'message' => 'سرویس ارسال کد تأیید موقتاً در دسترس نیست. لطفاً دوباره تلاش کنید.',
             ], 503);
         }
 
@@ -79,7 +89,10 @@ class PhoneAuthController extends Controller
             'resend_after' => self::OTP_RESEND_AFTER_SECONDS,
         ];
 
-        if (app()->environment('testing')) {
+        // Local development may intentionally use NullOtpSender. Returning the
+        // code only in local/testing makes the flow testable without leaking an
+        // OTP from a production response.
+        if (app()->environment(['local', 'testing'])) {
             $response['debug_otp'] = $otp;
         }
 
