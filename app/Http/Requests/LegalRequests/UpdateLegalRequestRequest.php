@@ -3,9 +3,11 @@
 namespace App\Http\Requests\LegalRequests;
 
 use App\Enums\LegalRequestServiceIntent;
+use App\Models\LegalCategory;
 use App\Models\LegalRequest;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -36,6 +38,21 @@ class UpdateLegalRequestRequest extends FormRequest
 
         if ($this->has('title') && is_string($this->input('title'))) {
             $values['title'] = trim($this->input('title'));
+        }
+
+        if ($this->has('legal_category_id') && is_string($this->input('legal_category_id'))) {
+            $categoryValue = trim($this->input('legal_category_id'));
+
+            if ($categoryValue !== '' && ! Str::isUuid($categoryValue)) {
+                $categoryId = LegalCategory::query()
+                    ->where('code', $categoryValue)
+                    ->where('status', true)
+                    ->value('id');
+
+                if (is_string($categoryId) && $categoryId !== '') {
+                    $values['legal_category_id'] = $categoryId;
+                }
+            }
         }
 
         $this->merge($values);

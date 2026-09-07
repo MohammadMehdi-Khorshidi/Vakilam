@@ -14,6 +14,12 @@ export class ApiError extends Error {
         this.name = 'ApiError';
         this.status = status;
         this.body = body;
+        this.validationMessages = body?.errors
+            ? Object.values(body.errors)
+                  .flat()
+                  .filter(Boolean)
+                  .map(String)
+            : [];
     }
 }
 

@@ -1,14 +1,23 @@
 'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
-
 import { Vazirmatn } from 'next/font/google';
 
-import { initialData, steps, titles, subtitles } from '@/lib/intake';
+import {
+    categories,
+    initialData,
+    normalizeCategoryCode,
+    normalizeServiceIntent,
+    normalizeUrgencyValue,
+    steps,
+    subtitles,
+    titles,
+} from '@/lib/intake';
 import {
     createLegalRequestDraft,
     getCurrentDraft,
-    getLegalRequest,
+    submitLegalRequest,
+    updateLegalRequestDraft,
 } from '@/lib/api/legalRequests';
 import IntakeProgress from '@/features/client/suggestions/CaseProgress';
 import IntakeNotice from '../../../features/client/legal-request/IntakeNotice';
@@ -26,14 +35,15 @@ import StepSummary from '../../../features/client/legal-request/steps/StepSummar
 import StepConfirmation from '../../../features/client/legal-request/steps/StepConfirmation';
 import StepPath from '../../../features/client/legal-request/steps/StepPath';
 
-
-
 const vazir = Vazirmatn({
     subsets: ['arabic'],
     weight: ['400', '500', '600', '700', '800'],
 });
 
 const STORAGE_KEY = 'vakilam-intake';
+const VALID_URGENCIES = new Set(['low', 'normal', 'high', 'urgent']);
+const VALID_SERVICE_INTENTS = new Set(['consultation', 'lawyer_selection']);
+const VALID_CATEGORY_CODES = new Set(categories.map((item) => item.id));
 
 const DEFAULT_INTAKE = {
     data: initialData,
@@ -42,12 +52,6 @@ const DEFAULT_INTAKE = {
 
 let cachedStorageValue = null;
 let cachedIntakeSnapshot = DEFAULT_INTAKE;
-
-/*
-|--------------------------------------------------------------------------
-| Local storage
-|--------------------------------------------------------------------------
-*/
 
 function getStoredIntake() {
     if (typeof window === 'undefined') {
@@ -60,7 +64,6 @@ function getStoredIntake() {
         if (!saved) {
             cachedStorageValue = null;
             cachedIntakeSnapshot = DEFAULT_INTAKE;
-
             return cachedIntakeSnapshot;
         }
 
@@ -69,13 +72,10 @@ function getStoredIntake() {
         }
 
         const parsed = JSON.parse(saved);
-
         const parsedStep = typeof parsed?.step === 'number' ? parsed.step : 0;
-
         const safeStep = Math.min(Math.max(parsedStep, 0), steps.length - 1);
 
         cachedStorageValue = saved;
-
         cachedIntakeSnapshot = {
             data: {
                 ...initialData,
@@ -106,10 +106,7 @@ function subscribeToStorage(callback) {
     };
 
     window.addEventListener('storage', handleStorage);
-
-    return () => {
-        window.removeEventListener('storage', handleStorage);
-    };
+    return () => window.removeEventListener('storage', handleStorage);
 }
 
 function useStoredIntake() {
@@ -119,12 +116,6 @@ function useStoredIntake() {
         getServerSnapshot,
     );
 }
-
-/*
-|--------------------------------------------------------------------------
-| Payload helpers
-|--------------------------------------------------------------------------
-*/
 
 function getItemId(value) {
     if (value === null || value === undefined || value === '') {
@@ -139,100 +130,125 @@ function getItemId(value) {
 }
 
 function createLegalRequestPayload(data) {
+    const categoryCode = normalizeCategoryCode(data.category);
+    const legalCategory =
+        getItemId(data.legal_category_id ?? data.categoryId) ||
+        categoryCode ||
+        null;
+
+    const pathValue = normalizeServiceIntent(
+        data.path || data.service_intent || data.serviceIntent,
+    );
+
     return {
         title:
-            data.title ||
-            data.subject ||
-            data.caseTitle ||
+            String(data.title || data.subject || data.caseTitle || '').trim() ||
             'درخواست حقوقی موکل',
-
-        description:
+        description: String(
             data.description || data.problemDescription || data.details || '',
-
-        legal_category_id: getItemId(
-            data.legal_category_id ?? data.categoryId ?? data.category,
-        ),
-
-        province_id: getItemId(
-            data.province_id ?? data.provinceId ?? data.province,
-        ),
-
-        city_id: getItemId(data.city_id ?? data.cityId ?? data.city),
-
-        urgency: data.urgency?.value ?? data.urgency ?? 'normal',
-
-        service_intent:
-            data.service_intent ??
-            data.serviceIntent ??
-            data.path?.value ??
-            data.path ??
-            null,
+        ).trim(),
+        legal_category_id: legalCategory,
+        province_id: getItemId(data.province_id ?? data.provinceId),
+        city_id: getItemId(data.city_id ?? data.cityId),
+        urgency: normalizeUrgencyValue(data.urgency),
+        service_intent: pathValue || 'undecided',
     };
 }
 
 function mapDraftToIntake(draft) {
-    if (!draft) {
-        return {};
-    }
+    if (!draft) return {};
 
-    return {
+    const serviceIntent = normalizeServiceIntent(draft.service_intent);
+    const mapped = {
         title: draft.title ?? '',
         subject: draft.title ?? '',
-
         description: draft.description ?? '',
-
         problemDescription: draft.description ?? '',
-
         legal_category_id: draft.legal_category_id ?? null,
-
-        category:
-            draft.legal_category ??
-            draft.category ??
-            draft.legal_category_id ??
-            null,
-
         province_id: draft.province_id ?? null,
-
-        province: draft.province ?? draft.province_id ?? null,
-
         city_id: draft.city_id ?? null,
-
-        city: draft.city ?? draft.city_id ?? null,
-
-        urgency: draft.urgency ?? 'normal',
-
-        service_intent: draft.service_intent ?? null,
-
-        path: draft.service_intent ?? null,
+        urgency: normalizeUrgencyValue(draft.urgency ?? 'normal'),
+        service_intent: serviceIntent || null,
+        path: VALID_SERVICE_INTENTS.has(serviceIntent) ? serviceIntent : '',
     };
+
+    if (draft.legal_category?.code) {
+        mapped.category = normalizeCategoryCode(draft.legal_category.code);
+    }
+
+    if (draft.province?.name) {
+        mapped.province = draft.province.name;
+    }
+
+    if (draft.city?.name) {
+        mapped.city = draft.city.name;
+    }
+
+    return mapped;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Component
-|--------------------------------------------------------------------------
-*/
+function validationMessagesForStep(step, data) {
+    const errors = [];
+
+    if (step === 0 && !String(data.description || '').trim()) {
+        errors.push('شرح مسئله را وارد کنید.');
+    }
+
+    if (step === 1) {
+        const categoryCode = normalizeCategoryCode(data.category);
+        if (!data.legal_category_id && !VALID_CATEGORY_CODES.has(categoryCode)) {
+            errors.push('یک دسته‌بندی حقوقی انتخاب کنید.');
+        }
+    }
+
+    if (step === 4) {
+        if (!data.province_id) {
+            errors.push('استان پرونده را انتخاب کنید.');
+        }
+        // Requiring the display city as well prevents a stale city_id after
+        // the user changes province and has not selected a new city yet.
+        if (!data.city_id || !data.city) {
+            errors.push('شهر پرونده را انتخاب کنید.');
+        }
+    }
+
+    if (
+        step === 5 &&
+        !VALID_URGENCIES.has(normalizeUrgencyValue(data.urgency))
+    ) {
+        errors.push('میزان فوریت را انتخاب کنید.');
+    }
+
+    if (step === 9 && !data.confirmed) {
+        errors.push('برای ادامه، تأیید نهایی اطلاعات را فعال کنید.');
+    }
+
+    if (
+        step === 10 &&
+        !VALID_SERVICE_INTENTS.has(normalizeServiceIntent(data.path))
+    ) {
+        errors.push('یکی از مسیرهای فعال ادامه پرونده را انتخاب کنید.');
+    }
+
+    return errors;
+}
+
+function finalValidationMessages(data) {
+    return [0, 1, 4, 5, 9, 10].flatMap((step) =>
+        validationMessagesForStep(step, data),
+    );
+}
 
 export default function IntakeWizard() {
     const storedIntake = useStoredIntake();
-
     const [data, setData] = useState(() => storedIntake.data);
-
     const [step, setStep] = useState(() => storedIntake.step);
-
     const [isLoadingDraft, setIsLoadingDraft] = useState(true);
-
     const [isSubmitting, setIsSubmitting] = useState(false);
-
     const [message, setMessage] = useState('');
-
     const [error, setError] = useState('');
-
     const [validationErrors, setValidationErrors] = useState([]);
 
-    /*
-     * دریافت پیش‌نویس از Laravel
-     */
     useEffect(() => {
         let isActive = true;
 
@@ -243,9 +259,7 @@ export default function IntakeWizard() {
             try {
                 const draft = await getCurrentDraft();
 
-                if (!isActive || !draft) {
-                    return;
-                }
+                if (!isActive || !draft) return;
 
                 setData((previousData) => {
                     const nextData = {
@@ -253,40 +267,32 @@ export default function IntakeWizard() {
                         ...mapDraftToIntake(draft),
                         legalRequestId: draft.id ?? previousData.legalRequestId,
                         legalRequestPublicId:
-                            draft.public_id ??
-                            previousData.legalRequestPublicId,
+                            draft.public_id ?? previousData.legalRequestPublicId,
                     };
 
                     saveIntakeToStorage(nextData, step);
-
                     return nextData;
                 });
             } catch (requestError) {
-                if (!isActive) {
-                    return;
-                }
-
-                setError(
-                    requestError?.message || 'دریافت پیش‌نویس با خطا مواجه شد.',
-                );
-            } finally {
                 if (isActive) {
-                    setIsLoadingDraft(false);
+                    setError(
+                        requestError?.message ||
+                            'دریافت پیش‌نویس با خطا مواجه شد.',
+                    );
                 }
+            } finally {
+                if (isActive) setIsLoadingDraft(false);
             }
         }
 
         loadDraft();
-
         return () => {
             isActive = false;
         };
     }, []);
 
     function saveIntakeToStorage(nextData, nextStep) {
-        if (typeof window === 'undefined') {
-            return;
-        }
+        if (typeof window === 'undefined') return;
 
         try {
             const serialized = JSON.stringify({
@@ -295,15 +301,13 @@ export default function IntakeWizard() {
             });
 
             window.localStorage.setItem(STORAGE_KEY, serialized);
-
             cachedStorageValue = serialized;
-
             cachedIntakeSnapshot = {
                 data: nextData,
                 step: nextStep,
             };
         } catch {
-            // خطای localStorage نادیده گرفته می‌شود.
+            // localStorage can be unavailable in restricted browsers.
         }
     }
 
@@ -319,32 +323,61 @@ export default function IntakeWizard() {
             };
 
             saveIntakeToStorage(nextData, step);
-
             return nextData;
         });
     };
 
     const changeStep = (nextStep) => {
         const safeStep = Math.min(Math.max(nextStep, 0), steps.length - 1);
-
         setStep(safeStep);
-
         saveIntakeToStorage(data, safeStep);
     };
 
+    const showStepErrors = (messages) => {
+        setError('لطفاً اطلاعات این مرحله را کامل کنید.');
+        setValidationErrors(messages);
+    };
+
     const next = () => {
+        const errors = validationMessagesForStep(step, data);
+        if (errors.length > 0) {
+            showStepErrors(errors);
+            return;
+        }
+
+        setError('');
+        setValidationErrors([]);
         changeStep(step + 1);
     };
 
     const back = () => {
+        setError('');
+        setValidationErrors([]);
         changeStep(step - 1);
     };
 
-    /*
-     * ثبت درخواست
-     */
+    const navigateToStep = (nextStep) => {
+        if (nextStep <= step) {
+            changeStep(nextStep);
+            return;
+        }
+
+        if (nextStep === step + 1) {
+            next();
+            return;
+        }
+
+        setError('مراحل را به ترتیب تکمیل کنید.');
+        setValidationErrors([]);
+    };
+
     const submitIntake = async () => {
-        if (isSubmitting) {
+        if (isSubmitting) return;
+
+        const clientErrors = finalValidationMessages(data);
+        if (clientErrors.length > 0) {
+            setError('برای ثبت درخواست، موارد ناقص را تکمیل کنید.');
+            setValidationErrors(clientErrors);
             return;
         }
 
@@ -355,72 +388,61 @@ export default function IntakeWizard() {
 
         try {
             const payload = createLegalRequestPayload(data);
+            let draft;
 
-            const legalRequest = await createLegalRequestDraft(payload);
+            if (data.legalRequestId) {
+                draft = await updateLegalRequestDraft(
+                    data.legalRequestId,
+                    payload,
+                );
+            } else {
+                draft = await createLegalRequestDraft(payload);
 
+                if (!draft?.id) {
+                    throw new Error('شناسه پیش‌نویس از سرور دریافت نشد.');
+                }
+
+                // store() may return an already-existing draft. PATCH once to
+                // guarantee the completed wizard payload is persisted.
+                draft = await updateLegalRequestDraft(draft.id, payload);
+            }
+
+            if (!draft?.id) {
+                throw new Error('پیش‌نویس درخواست معتبر نیست.');
+            }
+
+            const submitted = await submitLegalRequest(draft.id);
             const nextData = {
                 ...data,
-
-                legalRequestId: legalRequest?.id ?? data.legalRequestId,
-
+                ...mapDraftToIntake(submitted),
+                legalRequestId: submitted?.id ?? draft.id,
                 legalRequestPublicId:
-                    legalRequest?.public_id ?? data.legalRequestPublicId,
+                    submitted?.public_id ?? draft.public_id ?? null,
             };
 
             setData(nextData);
+            setMessage('درخواست حقوقی با موفقیت ثبت نهایی شد.');
 
-            saveIntakeToStorage(nextData, step);
-
-            setMessage('درخواست حقوقی با موفقیت ثبت شد.');
-
-            console.log('Legal request:', legalRequest);
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem(
+                    'legal_request_id',
+                    String(nextData.legalRequestId),
+                );
+                window.localStorage.removeItem(STORAGE_KEY);
+                cachedStorageValue = null;
+                cachedIntakeSnapshot = DEFAULT_INTAKE;
+            }
         } catch (requestError) {
+            const serverValidation = requestError?.validationMessages ?? [];
+
             setError(requestError?.message || 'ثبت درخواست انجام نشد.');
-
-            setValidationErrors(requestError?.validationMessages ?? []);
-
+            setValidationErrors(serverValidation);
             console.error(requestError);
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    useEffect(() => {
-        let active = true;
-
-        async function loadLegalRequest() {
-            try {
-                const legalRequestId = localStorage.getItem('legal_request_id');
-
-                if (!legalRequestId) {
-                    return;
-                }
-
-                const legalRequest = await getLegalRequest(legalRequestId);
-
-                if (!active) {
-                    return;
-                }
-
-                setData((previousData) => ({
-                    ...previousData,
-                    ...legalRequest,
-                }));
-            } catch (requestError) {
-                if (!active) {
-                    return;
-                }
-
-                setError(requestError?.message || 'دریافت درخواست ناموفق بود.');
-            }
-        }
-
-        loadLegalRequest();
-
-        return () => {
-            active = false;
-        };
-    }, []);
     return (
         <div
             dir="ltr"
@@ -443,7 +465,7 @@ export default function IntakeWizard() {
 
                 <div className="grid gap-6 xl:grid-cols-[1fr_245px]">
                     <section>
-                        <IntakeProgress step={step} setStep={changeStep} />
+                        <IntakeProgress step={step} setStep={navigateToStep} />
 
                         <div dir="rtl" className="mb-7 text-center">
                             <div className="mb-2 text-sm font-bold text-[#9a761f]">
@@ -508,16 +530,10 @@ export default function IntakeWizard() {
                                 isSubmitting={isSubmitting}
                                 disabled={isSubmitting || isLoadingDraft}
                             />
-
-                            {isSubmitting ? (
-                                <p className="mt-3 text-center text-xs font-bold text-slate-500">
-                                    در حال ثبت درخواست...
-                                </p>
-                            ) : null}
                         </div>
                     </section>
 
-                    <IntakeStepper step={step} setStep={changeStep} />
+                    <IntakeStepper step={step} setStep={navigateToStep} />
                 </div>
             </main>
         </div>
@@ -528,37 +544,26 @@ function StepRenderer({ step, data, update }) {
     switch (step) {
         case 0:
             return <StepDescription data={data} update={update} />;
-
         case 1:
             return <StepCategory data={data} update={update} />;
-
         case 2:
             return <StepGuide data={data} update={update} />;
-
         case 3:
             return <StepAction data={data} update={update} />;
-
         case 4:
             return <StepCity data={data} update={update} />;
-
         case 5:
             return <StepUrgency data={data} update={update} />;
-
         case 6:
             return <StepDocuments data={data} update={update} />;
-
         case 7:
             return <StepPrivacy data={data} update={update} />;
-
         case 8:
             return <StepSummary data={data} />;
-
         case 9:
             return <StepConfirmation data={data} update={update} />;
-
         case 10:
             return <StepPath data={data} update={update} />;
-
         default:
             return null;
     }

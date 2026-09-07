@@ -5,12 +5,21 @@ const requestPath = (legalRequestId, suffix = '') => {
     return suffix ? `${base}/${suffix}` : base;
 };
 
+const unwrapLegalRequest = (payload) => {
+    if (payload && typeof payload === 'object' && 'legal_request' in payload) {
+        return payload.legal_request;
+    }
+
+    return unwrapData(payload);
+};
+
 export const listLegalRequests = (query = {}) =>
     apiRequest('legal-requests', { query });
 
 export async function getCurrentDraft() {
     try {
-        return unwrapData(await apiRequest('legal-requests/draft'));
+        const payload = await apiRequest('legal-requests/draft');
+        return unwrapLegalRequest(payload);
     } catch (error) {
         if (error instanceof ApiError && error.status === 404) return null;
         throw error;
@@ -18,20 +27,20 @@ export async function getCurrentDraft() {
 }
 
 export const createLegalRequestDraft = async (data) =>
-    unwrapData(
+    unwrapLegalRequest(
         await apiRequest('legal-requests', { method: 'POST', data }),
     );
 
-export const getLegalRequestProposals = async (legalRequestId) =>
-    unwrapData(
-        await apiRequest(requestPath(legalRequestId, 'proposals')),
-    );
+export const getLegalRequestProposals = async (legalRequestId) => {
+    const payload = await apiRequest(requestPath(legalRequestId, 'proposals'));
+    return payload?.proposals ?? unwrapData(payload);
+};
 
 export const getLegalRequest = async (legalRequestId) =>
-    unwrapData(await apiRequest(requestPath(legalRequestId)));
+    unwrapLegalRequest(await apiRequest(requestPath(legalRequestId)));
 
 export const updateLegalRequestDraft = async (legalRequestId, data) =>
-    unwrapData(
+    unwrapLegalRequest(
         await apiRequest(requestPath(legalRequestId), {
             method: 'PATCH',
             data,
@@ -39,7 +48,7 @@ export const updateLegalRequestDraft = async (legalRequestId, data) =>
     );
 
 export const submitLegalRequest = async (legalRequestId) =>
-    unwrapData(
+    unwrapLegalRequest(
         await apiRequest(requestPath(legalRequestId, 'submit'), {
             method: 'POST',
         }),
