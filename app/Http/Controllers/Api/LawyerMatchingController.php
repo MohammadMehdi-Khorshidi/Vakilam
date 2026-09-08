@@ -34,6 +34,7 @@ class LawyerMatchingController extends Controller
             $legalRequest,
             $result['run'],
             $candidates,
+            $matchingService,
             [
                 'message' => $result['created']
                     ? 'Lawyer matching completed successfully.'
@@ -49,19 +50,34 @@ class LawyerMatchingController extends Controller
     ): JsonResponse
     {
         $this->ensureOwner($request, $legalRequest);
+        $this->ensureLawyerSelectionReady($legalRequest);
 
         $run = $legalRequest->matchRuns()
+            ->where('algorithm_version', LawyerMatchingService::ALGORITHM_VERSION)
             ->where('status', 'completed')
             ->latest('created_at')
-            ->firstOrFail();
+            ->first();
+
+        if ($run === null) {
+            return response()->json($this->emptyMatchingResponse(
+                $legalRequest,
+                $matchingService,
+            ));
+        }
 
         return response()->json($this->matchingResponse(
             $legalRequest,
             $run,
             $matchingService->paginateCandidates($run),
+            $matchingService,
         ));
     }
 
+    /**
+     * List all approved/available lawyers that the client may invite.
+     * Matching is optional here: when no matching run exists yet the endpoint
+     * still returns a normal directory (with null match score/rank).
+     */
     public function lawyers(
         Request $request,
         LegalRequest $legalRequest,
@@ -69,36 +85,22 @@ class LawyerMatchingController extends Controller
     ): JsonResponse
     {
         $this->ensureOwner($request, $legalRequest);
-
-        abort_unless(
-            $legalRequest->status === 'submitted'
-                && $legalRequest->service_intent === 'lawyer_selection',
-            409,
-            'Lawyer directory is only available for submitted lawyer-selection requests.',
-        );
+        $this->ensureLawyerSelectionReady($legalRequest);
 
         $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
-        $result = $matchingService->run($legalRequest);
-        $run = $result['run'];
+        $run = $legalRequest->matchRuns()
+            ->where('algorithm_version', LawyerMatchingService::ALGORITHM_VERSION)
+            ->where('status', 'completed')
+            ->latest('created_at')
+            ->first();
         $search = trim((string) $request->query('q', ''));
         $perPage = min(max((int) $request->integer('per_page', 20), 1), 50);
 
-        $scoreSubquery = LawyerMatchCandidate::query()
-            ->select('score')
-            ->whereColumn('lawyer_profile_id', 'lawyer_profiles.id')
-            ->where('match_run_id', $run->id)
-            ->limit(1);
-        $rankSubquery = LawyerMatchCandidate::query()
-            ->select('rank_position')
-            ->whereColumn('lawyer_profile_id', 'lawyer_profiles.id')
-            ->where('match_run_id', $run->id)
-            ->limit(1);
-
-        $lawyers = LawyerProfile::query()
+        $lawyersQuery = LawyerProfile::query()
             ->where('verification_status', 'approved')
             ->where('is_available', true)
             ->whereHas('user', fn ($query) => $query->where('status', 'active'))
@@ -113,16 +115,33 @@ class LawyerMatchingController extends Controller
                             }));
                 });
             })
-            ->addSelect([
-                'match_score' => $scoreSubquery,
-                'match_rank' => $rankSubquery,
-            ])
             ->with([
                 'lawyerSpecialties.specialty:id,code,name,status',
                 'serviceAreas.province:id,name',
                 'serviceAreas.city:id,province_id,name',
-            ])
-            ->orderByDesc('match_score')
+            ]);
+
+        if ($run !== null) {
+            $scoreSubquery = LawyerMatchCandidate::query()
+                ->select('score')
+                ->whereColumn('lawyer_profile_id', 'lawyer_profiles.id')
+                ->where('match_run_id', $run->id)
+                ->limit(1);
+            $rankSubquery = LawyerMatchCandidate::query()
+                ->select('rank_position')
+                ->whereColumn('lawyer_profile_id', 'lawyer_profiles.id')
+                ->where('match_run_id', $run->id)
+                ->limit(1);
+
+            $lawyersQuery
+                ->addSelect([
+                    'match_score' => $scoreSubquery,
+                    'match_rank' => $rankSubquery,
+                ])
+                ->orderByDesc('match_score');
+        }
+
+        $lawyers = $lawyersQuery
             ->orderByDesc('average_rating')
             ->orderBy('full_name')
             ->paginate($perPage)
@@ -140,7 +159,9 @@ class LawyerMatchingController extends Controller
                 'lawyer' => LawyerPublicResource::make($lawyer)->resolve(),
             ])->values(),
             'meta' => [
-                'matching_run_id' => $run->id,
+                'matching_run_id' => $run?->id,
+                'matching_status' => $run === null ? 'not_started' : 'completed',
+                'selection' => $matchingService->selectionMeta($legalRequest),
                 'pagination' => [
                     'current_page' => $lawyers->currentPage(),
                     'last_page' => $lawyers->lastPage(),
@@ -202,9 +223,14 @@ class LawyerMatchingController extends Controller
                 )->resolve(),
             ]),
             'meta' => [
-                'selection_limit' => 5,
+                'selection' => $matchingService->selectionMeta($legalRequest),
+                // Compatibility with the old response shape.
+                'selection_limit' => LawyerMatchingService::SELECTION_LIMIT,
                 'selected_count' => $distributions->count(),
-                'remaining_count' => 5 - $distributions->count(),
+                'remaining_count' => max(
+                    0,
+                    LawyerMatchingService::SELECTION_LIMIT - $distributions->count(),
+                ),
             ],
         ]);
     }
@@ -218,6 +244,7 @@ class LawyerMatchingController extends Controller
         LegalRequest $legalRequest,
         LawyerMatchRun $run,
         LengthAwarePaginator $candidates,
+        LawyerMatchingService $matchingService,
         array $extra = [],
     ): array
     {
@@ -225,10 +252,6 @@ class LawyerMatchingController extends Controller
         $data['candidates'] = LawyerMatchCandidateResource::collection(
             $candidates->getCollection(),
         )->resolve();
-        $selectedCount = $legalRequest->distributions()
-            ->where('source', 'client_invite')
-            ->whereIn('status', ['pending', 'negotiating'])
-            ->count();
 
         return [
             ...$extra,
@@ -244,11 +267,37 @@ class LawyerMatchingController extends Controller
                     'next_page_url' => $candidates->nextPageUrl(),
                     'previous_page_url' => $candidates->previousPageUrl(),
                 ],
-                'selection' => [
-                    'limit' => 5,
-                    'selected_count' => $selectedCount,
-                    'remaining_count' => 5 - $selectedCount,
+                'selection' => $matchingService->selectionMeta($legalRequest),
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function emptyMatchingResponse(
+        LegalRequest $legalRequest,
+        LawyerMatchingService $matchingService,
+    ): array {
+        return [
+            'data' => [
+                'id' => null,
+                'algorithm_version' => LawyerMatchingService::ALGORITHM_VERSION,
+                'status' => 'not_started',
+                'candidates_count' => 0,
+                'completed_at' => null,
+                'candidates' => [],
+            ],
+            'meta' => [
+                'pagination' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => 20,
+                    'total' => 0,
+                    'from' => null,
+                    'to' => null,
+                    'next_page_url' => null,
+                    'previous_page_url' => null,
                 ],
+                'selection' => $matchingService->selectionMeta($legalRequest),
             ],
         ];
     }
@@ -263,6 +312,16 @@ class LawyerMatchingController extends Controller
                 && $legalRequest->client_user_id === $user->id,
             403,
             'You are not allowed to match this legal request.',
+        );
+    }
+
+    private function ensureLawyerSelectionReady(LegalRequest $legalRequest): void
+    {
+        abort_unless(
+            $legalRequest->status === 'submitted'
+                && $legalRequest->service_intent === 'lawyer_selection',
+            409,
+            'Lawyer selection is only available for submitted lawyer-selection requests.',
         );
     }
 }

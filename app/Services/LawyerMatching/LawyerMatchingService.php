@@ -19,6 +19,11 @@ class LawyerMatchingService
 
     public const INVITATION_EXPIRY_HOURS = 72;
 
+    public const SELECTION_LIMIT = 5;
+
+    /** @var array<int, string> */
+    private const ACTIVE_INVITATION_STATUSES = ['pending', 'negotiating'];
+
     /**
      * Run and persist lawyer selection matching. Repeated calls return the
      * latest completed v1 run so an accidental retry does not duplicate work.
@@ -104,6 +109,23 @@ class LawyerMatchingService
     }
 
     /**
+     * Selection quota metadata used by every lawyer-selection endpoint.
+     * Expired pending invitations do not occupy one of the five slots.
+     *
+     * @return array{limit: int, selected_count: int, remaining_count: int}
+     */
+    public function selectionMeta(LegalRequest $legalRequest): array
+    {
+        $selectedCount = $this->activeInvitationLawyerIds($legalRequest)->count();
+
+        return [
+            'limit' => self::SELECTION_LIMIT,
+            'selected_count' => $selectedCount,
+            'remaining_count' => max(0, self::SELECTION_LIMIT - $selectedCount),
+        ];
+    }
+
+    /**
      * Send invitations to up to five lawyers explicitly selected by the client.
      *
      * Invitations are independent from final proposals. A lawyer acceptance only
@@ -129,7 +151,19 @@ class LawyerMatchingService
                 'Lawyer requests are only available for submitted lawyer-selection requests.',
             );
 
-            abort_unless(count($lawyerPublicIds) === count(array_unique($lawyerPublicIds)), 422, 'Duplicate lawyers are not allowed.');
+            if (count($lawyerPublicIds) < 1 || count($lawyerPublicIds) > self::SELECTION_LIMIT) {
+                throw ValidationException::withMessages([
+                    'lawyer_public_ids' => [
+                        'Select between one and '.self::SELECTION_LIMIT.' lawyers.',
+                    ],
+                ]);
+            }
+
+            if (count($lawyerPublicIds) !== count(array_unique($lawyerPublicIds))) {
+                throw ValidationException::withMessages([
+                    'lawyer_public_ids' => ['Duplicate lawyers are not allowed.'],
+                ]);
+            }
 
             $run = $lockedRequest->matchRuns()
                 ->where('algorithm_version', self::ALGORITHM_VERSION)
@@ -165,26 +199,15 @@ class LawyerMatchingService
                 ->get()
                 ->keyBy('lawyer_profile_id');
 
-            LegalRequestDistribution::query()
-                ->where('legal_request_id', $lockedRequest->id)
-                ->where('source', 'client_invite')
-                ->where('status', 'pending')
-                ->whereNotNull('expires_at')
-                ->where('expires_at', '<=', now())
-                ->update(['status' => 'expired']);
+            $this->expireStalePendingInvitations($lockedRequest);
 
-            $existingInviteLawyerIds = LegalRequestDistribution::query()
-                ->where('legal_request_id', $lockedRequest->id)
-                ->where('source', 'client_invite')
-                ->whereIn('status', ['pending', 'negotiating'])
-                ->pluck('lawyer_profile_id');
-
+            $existingInviteLawyerIds = $this->activeInvitationLawyerIds($lockedRequest);
             $selectedProfileIds = $lawyers->pluck('id')->values();
 
-            if ($existingInviteLawyerIds->merge($selectedProfileIds)->unique()->count() > 5) {
+            if ($existingInviteLawyerIds->merge($selectedProfileIds)->unique()->count() > self::SELECTION_LIMIT) {
                 throw ValidationException::withMessages([
                     'lawyer_public_ids' => [
-                        'A legal request can be sent to at most five lawyers.',
+                        'A legal request can have at most '.self::SELECTION_LIMIT.' active lawyer invitations.',
                     ],
                 ]);
             }
@@ -220,7 +243,7 @@ class LawyerMatchingService
                     );
 
                     if ($distribution->source === 'client_invite'
-                        && in_array($distribution->status, ['pending', 'negotiating'], true)) {
+                        && in_array($distribution->status, self::ACTIVE_INVITATION_STATUSES, true)) {
                         continue;
                     }
 
@@ -231,7 +254,8 @@ class LawyerMatchingService
                         'sent_at' => now(),
                         'viewed_at' => null,
                         'responded_at' => null,
-                        'expires_at' => now()->addHours(72),
+                        'expires_at' => now()->addHours(self::INVITATION_EXPIRY_HOURS),
+                        'closed_at' => null,
                     ])->save();
 
                     continue;
@@ -244,14 +268,14 @@ class LawyerMatchingService
                     'source' => 'client_invite',
                     'status' => 'pending',
                     'sent_at' => now(),
-                    'expires_at' => now()->addHours(72),
+                    'expires_at' => now()->addHours(self::INVITATION_EXPIRY_HOURS),
                 ]);
             }
 
             return LegalRequestDistribution::query()
                 ->where('legal_request_id', $lockedRequest->id)
                 ->where('source', 'client_invite')
-                ->whereIn('status', ['pending', 'negotiating'])
+                ->whereIn('status', self::ACTIVE_INVITATION_STATUSES)
                 ->with([
                     'lawyerProfile.lawyerSpecialties.specialty:id,code,name,status',
                     'lawyerProfile.serviceAreas.province:id,name',
@@ -273,6 +297,43 @@ class LawyerMatchingService
             ])
             ->orderBy('rank_position')
             ->paginate(20);
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    private function activeInvitationLawyerIds(LegalRequest $legalRequest): Collection
+    {
+        return LegalRequestDistribution::query()
+            ->where('legal_request_id', $legalRequest->id)
+            ->where('source', 'client_invite')
+            ->where(function ($query): void {
+                $query->where('status', 'negotiating')
+                    ->orWhere(function ($query): void {
+                        $query->where('status', 'pending')
+                            ->whereNotNull('expires_at')
+                            ->where('expires_at', '>', now());
+                    });
+            })
+            ->pluck('lawyer_profile_id')
+            ->unique()
+            ->values();
+    }
+
+    private function expireStalePendingInvitations(LegalRequest $legalRequest): void
+    {
+        LegalRequestDistribution::query()
+            ->where('legal_request_id', $legalRequest->id)
+            ->where('source', 'client_invite')
+            ->where('status', 'pending')
+            ->where(function ($query): void {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '<=', now());
+            })
+            ->update([
+                'status' => 'expired',
+                'closed_at' => now(),
+            ]);
     }
 
     /**

@@ -1,10 +1,7 @@
 import LawyersHeader from '../../../features/client/lawyers/LawyersHeader';
 import LawyersSummary from '../../../features/client/lawyers/LawyersSummary';
 import LawyersNotice from '../../../features/client/lawyers/LawyersNotice';
-import LawyersFilters from '../../../features/client/lawyers/LawyersFilters';
-import LawyersListHeader from '../../../features/client/lawyers/LawyersListHeader';
 import LawyersList from '../../../features/client/lawyers/LawyersList';
-
 
 const LawyersPage = () => {
     return (
@@ -14,10 +11,6 @@ const LawyersPage = () => {
             <LawyersSummary />
 
             <LawyersNotice />
-
-            <LawyersFilters />
-
-            <LawyersListHeader />
 
             <LawyersList />
         </main>

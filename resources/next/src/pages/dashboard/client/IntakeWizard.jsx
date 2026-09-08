@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useRouter } from 'next/navigation';
 import { Vazirmatn } from 'next/font/google';
 
 import {
@@ -205,8 +206,6 @@ function validationMessagesForStep(step, data) {
         if (!data.province_id) {
             errors.push('استان پرونده را انتخاب کنید.');
         }
-        // Requiring the display city as well prevents a stale city_id after
-        // the user changes province and has not selected a new city yet.
         if (!data.city_id || !data.city) {
             errors.push('شهر پرونده را انتخاب کنید.');
         }
@@ -240,6 +239,7 @@ function finalValidationMessages(data) {
 }
 
 export default function IntakeWizard() {
+    const router = useRouter();
     const storedIntake = useStoredIntake();
     const [data, setData] = useState(() => storedIntake.data);
     const [step, setStep] = useState(() => storedIntake.step);
@@ -259,7 +259,23 @@ export default function IntakeWizard() {
             try {
                 const draft = await getCurrentDraft();
 
-                if (!isActive || !draft) return;
+                if (!isActive) return;
+
+                if (!draft) {
+                    setData((previousData) => {
+                        const nextData = { ...previousData };
+                        delete nextData.legalRequestId;
+                        delete nextData.legalRequestPublicId;
+                        saveIntakeToStorage(nextData, step);
+                        return nextData;
+                    });
+
+                    if (typeof window !== 'undefined') {
+                        window.localStorage.removeItem('legal_request_id');
+                    }
+
+                    return;
+                }
 
                 setData((previousData) => {
                     const nextData = {
@@ -334,7 +350,7 @@ export default function IntakeWizard() {
     };
 
     const showStepErrors = (messages) => {
-        setError('لطفاً اطلاعات این مرحله را کامل کنید.');
+        setError('');
         setValidationErrors(messages);
     };
 
@@ -376,7 +392,7 @@ export default function IntakeWizard() {
 
         const clientErrors = finalValidationMessages(data);
         if (clientErrors.length > 0) {
-            setError('برای ثبت درخواست، موارد ناقص را تکمیل کنید.');
+            setError('');
             setValidationErrors(clientErrors);
             return;
         }
@@ -402,8 +418,6 @@ export default function IntakeWizard() {
                     throw new Error('شناسه پیش‌نویس از سرور دریافت نشد.');
                 }
 
-                // store() may return an already-existing draft. PATCH once to
-                // guarantee the completed wizard payload is persisted.
                 draft = await updateLegalRequestDraft(draft.id, payload);
             }
 
@@ -411,7 +425,11 @@ export default function IntakeWizard() {
                 throw new Error('پیش‌نویس درخواست معتبر نیست.');
             }
 
-            const submitted = await submitLegalRequest(draft.id);
+            const submitted =
+                draft.status === 'submitted'
+                    ? draft
+                    : await submitLegalRequest(draft.id);
+
             const nextData = {
                 ...data,
                 ...mapDraftToIntake(submitted),
@@ -421,7 +439,6 @@ export default function IntakeWizard() {
             };
 
             setData(nextData);
-            setMessage('درخواست حقوقی با موفقیت ثبت نهایی شد.');
 
             if (typeof window !== 'undefined') {
                 window.localStorage.setItem(
@@ -432,11 +449,28 @@ export default function IntakeWizard() {
                 cachedStorageValue = null;
                 cachedIntakeSnapshot = DEFAULT_INTAKE;
             }
+
+            if (submitted?.service_intent === 'lawyer_selection') {
+                router.push(
+                    `/client/lawyersAdmin?legal_request_id=${encodeURIComponent(
+                        submitted.id,
+                    )}`,
+                );
+                return;
+            }
+
+            setMessage('درخواست حقوقی با موفقیت ثبت نهایی شد.');
         } catch (requestError) {
             const serverValidation = requestError?.validationMessages ?? [];
 
-            setError(requestError?.message || 'ثبت درخواست انجام نشد.');
-            setValidationErrors(serverValidation);
+            if (serverValidation.length > 0) {
+                setError('');
+                setValidationErrors(serverValidation);
+            } else {
+                setError(requestError?.message || 'ثبت درخواست انجام نشد.');
+                setValidationErrors([]);
+            }
+
             console.error(requestError);
         } finally {
             setIsSubmitting(false);
@@ -493,7 +527,7 @@ export default function IntakeWizard() {
                                 update={updateData}
                             />
 
-                            {error ? (
+                            {error && validationErrors.length === 0 ? (
                                 <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-7 text-red-700">
                                     {error}
                                 </div>

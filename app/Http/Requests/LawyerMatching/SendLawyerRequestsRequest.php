@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\LawyerMatching;
 
+use App\Services\LawyerMatching\LawyerMatchingService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -16,7 +17,12 @@ class SendLawyerRequestsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'lawyer_public_ids' => ['required', 'array', 'min:1', 'max:5'],
+            'lawyer_public_ids' => [
+                'required',
+                'array',
+                'min:1',
+                'max:'.LawyerMatchingService::SELECTION_LIMIT,
+            ],
             'lawyer_public_ids.*' => [
                 'required',
                 'uuid',

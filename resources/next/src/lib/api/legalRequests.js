@@ -39,20 +39,50 @@ export const getLegalRequestProposals = async (legalRequestId) => {
 export const getLegalRequest = async (legalRequestId) =>
     unwrapLegalRequest(await apiRequest(requestPath(legalRequestId)));
 
-export const updateLegalRequestDraft = async (legalRequestId, data) =>
-    unwrapLegalRequest(
-        await apiRequest(requestPath(legalRequestId), {
-            method: 'PATCH',
-            data,
-        }),
-    );
+export async function updateLegalRequestDraft(legalRequestId, data) {
+    try {
+        return unwrapLegalRequest(
+            await apiRequest(requestPath(legalRequestId), {
+                method: 'PATCH',
+                data,
+            }),
+        );
+    } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+            const existing = await getLegalRequest(legalRequestId);
 
-export const submitLegalRequest = async (legalRequestId) =>
-    unwrapLegalRequest(
-        await apiRequest(requestPath(legalRequestId, 'submit'), {
-            method: 'POST',
-        }),
-    );
+            if (existing?.status === 'submitted') {
+                return existing;
+            }
+        }
+
+        if (error instanceof ApiError && error.status === 404) {
+            return createLegalRequestDraft(data);
+        }
+
+        throw error;
+    }
+}
+
+export async function submitLegalRequest(legalRequestId) {
+    try {
+        return unwrapLegalRequest(
+            await apiRequest(requestPath(legalRequestId, 'submit'), {
+                method: 'POST',
+            }),
+        );
+    } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+            const existing = await getLegalRequest(legalRequestId);
+
+            if (existing?.status === 'submitted') {
+                return existing;
+            }
+        }
+
+        throw error;
+    }
+}
 
 export const getServiceOptions = async (legalRequestId) =>
     unwrapData(
@@ -66,3 +96,21 @@ export const selectServiceIntent = async (legalRequestId, serviceIntent) =>
             data: { service_intent: serviceIntent },
         }),
     );
+
+export const runLawyerMatching = async (legalRequestId, query = {}) =>
+    apiRequest(requestPath(legalRequestId, 'matching'), {
+        method: 'POST',
+        query,
+    });
+
+export const getLawyerMatching = async (legalRequestId, query = {}) =>
+    apiRequest(requestPath(legalRequestId, 'matching'), { query });
+
+export const sendLawyerRequests = async (legalRequestId, lawyerPublicIds) =>
+    apiRequest(requestPath(legalRequestId, 'lawyer-requests'), {
+        method: 'POST',
+        data: { lawyer_public_ids: lawyerPublicIds },
+    });
+
+export const getClientLawyerRequests = async (legalRequestId) =>
+    apiRequest(requestPath(legalRequestId, 'lawyer-requests'));

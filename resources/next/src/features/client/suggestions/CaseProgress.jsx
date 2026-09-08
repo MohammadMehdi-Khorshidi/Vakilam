@@ -24,14 +24,9 @@ const progressSteps = [
 ];
 
 const IntakeProgress = ({ step, setStep }) => {
-    // step در Wizard از 0 شروع می‌شود
-    // ولی شماره مراحل UI از 1
     const currentStep = step + 1;
 
     const handleBack = () => {
-        // اگر منظورت از دکمه «پنهان کردن مراحل جزئی»
-        // برگشتن به مرحله قبل نیست، این قسمت را بعداً
-        // می‌توانیم به toggle واقعی تبدیل کنیم.
         if (currentStep > 1) {
             setStep(step - 1);
         }
@@ -42,7 +37,6 @@ const IntakeProgress = ({ step, setStep }) => {
             dir="rtl"
             className="rounded-[18px] border border-[#e0e8e4] bg-white p-4 shadow-[0_4px_18px_rgba(18,63,55,0.035)]"
         >
-            {/* Header */}
             <div className="mb-4 flex items-center justify-between gap-4">
                 <div>
                     <span className="font-bold text-[#52655f]">
@@ -60,11 +54,10 @@ const IntakeProgress = ({ step, setStep }) => {
                     disabled={currentStep <= 1}
                     className="rounded-[10px] border border-[#b9d0c9] bg-white px-4 py-2 font-bold text-[#42685e] transition hover:border-[#123f37] hover:text-[#123f37] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                    پنهان‌کردن مراحل جزئی
+                    مرحله قبل
                 </button>
             </div>
 
-            {/* Progress Steps */}
             <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
                 {progressSteps.map((item) => {
                     const completed = item.id < currentStep;
@@ -75,7 +68,6 @@ const IntakeProgress = ({ step, setStep }) => {
                             key={item.id}
                             type="button"
                             onClick={() => {
-                                // فقط مراحل قبلی و مرحله فعلی قابل انتخاب
                                 if (item.id <= currentStep) {
                                     setStep(item.id - 1);
                                 }

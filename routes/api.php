@@ -159,10 +159,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/legal-requests/{legalRequest}/service-intent', 'store');
     });
 
-    // Matching
+    // Matching / selectable lawyers
     Route::controller(LawyerMatchingController::class)->group(function () {
         Route::post('/legal-requests/{legalRequest}/matching', 'store');
         Route::get('/legal-requests/{legalRequest}/matching', 'show');
+        Route::get('/legal-requests/{legalRequest}/lawyers', 'lawyers');
         Route::post('/legal-requests/{legalRequest}/lawyer-requests', 'sendRequests');
         Route::get('/legal-requests/{legalRequest}/consultation-lawyers', 'consultationLawyers');
     });
