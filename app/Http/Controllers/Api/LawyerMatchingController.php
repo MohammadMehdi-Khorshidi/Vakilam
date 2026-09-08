@@ -12,6 +12,7 @@ use App\Models\LawyerMatchCandidate;
 use App\Models\LawyerMatchRun;
 use App\Models\LawyerProfile;
 use App\Models\LegalRequest;
+use App\Models\LegalRequestDistribution;
 use App\Models\User;
 use App\Services\LawyerMatching\LawyerMatchingService;
 use Illuminate\Http\JsonResponse;
@@ -96,6 +97,14 @@ class LawyerMatchingController extends Controller
         $perPage = min(max((int) $request->integer('per_page', 20), 1), 50);
         $categoryCode = $legalRequest->legalCategory?->code;
 
+        $inviteStatusSubquery = LegalRequestDistribution::query()
+            ->select('status')
+            ->whereColumn('lawyer_profile_id', 'lawyer_profiles.id')
+            ->where('legal_request_id', $legalRequest->id)
+            ->where('source', 'client_invite')
+            ->latest('sent_at')
+            ->limit(1);
+
         $lawyersQuery = LawyerProfile::query()
             ->where('verification_status', 'approved')
             ->where('is_available', true)
@@ -116,6 +125,7 @@ class LawyerMatchingController extends Controller
                     ->where('specialties.code', $categoryCode)
                     ->where('specialties.status', true),
             ]))
+            ->addSelect(['invite_status' => $inviteStatusSubquery])
             ->with([
                 'lawyerSpecialties.specialty:id,code,name,status',
                 'serviceAreas.province:id,name',
@@ -154,6 +164,11 @@ class LawyerMatchingController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        $initialSelectionCompleted = LegalRequestDistribution::query()
+            ->where('legal_request_id', $legalRequest->id)
+            ->where('source', 'client_invite')
+            ->exists();
+
         return response()->json([
             'data' => collect($lawyers->items())->map(fn (LawyerProfile $lawyer): array => [
                 'match_score' => $lawyer->getAttribute('match_score') !== null
@@ -163,11 +178,13 @@ class LawyerMatchingController extends Controller
                     ? (int) $lawyer->getAttribute('match_rank')
                     : null,
                 'is_matching_candidate' => $lawyer->getAttribute('match_rank') !== null,
+                'invite_status' => $lawyer->getAttribute('invite_status'),
                 'lawyer' => LawyerPublicResource::make($lawyer)->resolve(),
             ])->values(),
             'meta' => [
                 'matching_run_id' => $run?->id,
                 'matching_status' => $run === null ? 'not_started' : 'completed',
+                'initial_selection_completed' => $initialSelectionCompleted,
                 'selection' => $matchingService->selectionMeta($legalRequest),
                 'pagination' => [
                     'current_page' => $lawyers->currentPage(),
@@ -198,9 +215,7 @@ class LawyerMatchingController extends Controller
                     'explanation' => $result['explanation'],
                     'lawyer' => LawyerPublicResource::make($result['lawyer'])->resolve(),
                 ]),
-            'meta' => [
-                'count' => $recommendations->count(),
-            ],
+            'meta' => ['count' => $recommendations->count()],
         ]);
     }
 
@@ -210,6 +225,18 @@ class LawyerMatchingController extends Controller
         LawyerMatchingService $matchingService,
     ): JsonResponse {
         $this->ensureOwner($request, $legalRequest);
+        $this->ensureLawyerSelectionReady($legalRequest);
+
+        // Initial lawyer selection is a one-time wizard action.
+        // Later lawyer invitations should be implemented from the case detail page.
+        abort_if(
+            LegalRequestDistribution::query()
+                ->where('legal_request_id', $legalRequest->id)
+                ->where('source', 'client_invite')
+                ->exists(),
+            409,
+            'Initial lawyer selection has already been completed for this legal request.',
+        );
 
         $lawyerPublicIds = $request->validated('lawyer_public_ids');
         $distributions = $matchingService->sendRequests(
@@ -228,6 +255,7 @@ class LawyerMatchingController extends Controller
                 )->resolve(),
             ]),
             'meta' => [
+                'initial_selection_completed' => true,
                 'selection' => $matchingService->selectionMeta($legalRequest),
                 'selection_limit' => LawyerMatchingService::SELECTION_LIMIT,
                 'selected_count' => $distributions->count(),

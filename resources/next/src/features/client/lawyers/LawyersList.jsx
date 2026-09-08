@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { CheckCircle2, Search, X } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
 import LawyerCard from '@/components/carts/LawyerCard';
@@ -32,12 +32,14 @@ export default function LawyersList() {
         selected_count: 0,
         remaining_count: SELECTION_LIMIT,
     });
+    const [initialSelectionCompleted, setInitialSelectionCompleted] =
+        useState(false);
     const [query, setQuery] = useState('');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
+    const [successModalOpen, setSuccessModalOpen] = useState(false);
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -88,6 +90,9 @@ export default function LawyersList() {
                 }
 
                 setLawyers(all);
+                setInitialSelectionCompleted(
+                    Boolean(first?.meta?.initial_selection_completed),
+                );
                 setSelectionMeta(
                     first?.meta?.selection ?? {
                         limit: SELECTION_LIMIT,
@@ -120,8 +125,9 @@ export default function LawyersList() {
     );
 
     const toggleLawyer = (publicId) => {
+        if (initialSelectionCompleted) return;
+
         setError('');
-        setMessage('');
 
         setSelectedIds((previous) => {
             if (previous.includes(publicId)) {
@@ -138,11 +144,17 @@ export default function LawyersList() {
     };
 
     const submitSelection = async () => {
-        if (!legalRequestId || sending || selectedIds.length === 0) return;
+        if (
+            !legalRequestId ||
+            sending ||
+            initialSelectionCompleted ||
+            selectedIds.length === 0
+        ) {
+            return;
+        }
 
         setSending(true);
         setError('');
-        setMessage('');
 
         try {
             const response = await sendLawyerRequests(
@@ -150,12 +162,22 @@ export default function LawyersList() {
                 selectedIds,
             );
 
-            if (response?.meta?.selection) {
-                setSelectionMeta(response.meta.selection);
-            }
+            setSelectionMeta(
+                response?.meta?.selection ?? selectionMeta,
+            );
+            setInitialSelectionCompleted(true);
+
+            const selectedSet = new Set(selectedIds);
+            setLawyers((previous) =>
+                previous.map((item) =>
+                    selectedSet.has(item?.lawyer?.public_id)
+                        ? { ...item, invite_status: 'pending' }
+                        : item,
+                ),
+            );
 
             setSelectedIds([]);
-            setMessage('درخواست برای وکلای انتخاب‌شده ارسال شد.');
+            setSuccessModalOpen(true);
         } catch (requestError) {
             setError(
                 requestError?.validationMessages?.[0] ||
@@ -168,94 +190,146 @@ export default function LawyersList() {
     };
 
     return (
-        <section dir="rtl" className={`${vazir.className} space-y-4`}>
-            <div className="rounded-[18px] border border-[#dfbd6c] bg-white p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <h2 className="font-extrabold text-[#173f38]">
-                            انتخاب وکیل
-                        </h2>
-                        <p className="mt-1 text-sm text-[#74817d]">
-                            وکلای متناسب‌تر با درخواست شما در ابتدای لیست قرار می‌گیرند.
+        <>
+            <section dir="rtl" className={`${vazir.className} space-y-4`}>
+                <div className="rounded-[18px] border border-[#dfbd6c] bg-white p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <h2 className="font-extrabold text-[#173f38]">
+                                انتخاب وکیل
+                            </h2>
+                            <p className="mt-1 text-sm text-[#74817d]">
+                                وکلای متناسب‌تر با درخواست شما در ابتدای لیست قرار می‌گیرند.
+                            </p>
+                        </div>
+
+                        <div className="relative w-full lg:max-w-md">
+                            <Search
+                                size={18}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#80908a]"
+                            />
+                            <input
+                                type="search"
+                                value={query}
+                                onChange={(event) => setQuery(event.target.value)}
+                                placeholder="جستجو نام وکیل یا تخصص..."
+                                className="w-full rounded-xl border border-[#dfe7e4] bg-[#fbfdfc] py-3 pr-11 pl-4 text-sm outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    {initialSelectionCompleted ? (
+                        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 md:flex-row md:items-center md:justify-between">
+                            <span className="text-sm font-bold text-emerald-800">
+                                انتخاب اولیه وکلا برای این درخواست انجام شده است.
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => router.push('/client/cases')}
+                                className="rounded-lg bg-[#123f37] px-5 py-2.5 text-sm font-bold text-white"
+                            >
+                                پرونده‌های من
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="mt-4 flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
+                            <span className="text-sm font-bold text-[#53645f]">
+                                {selectedIds.length} از {SELECTION_LIMIT} وکیل انتخاب شده
+                            </span>
+
+                            <button
+                                type="button"
+                                onClick={submitSelection}
+                                disabled={sending || selectedIds.length === 0}
+                                className="rounded-xl bg-[#123f37] px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
+                            >
+                                {sending
+                                    ? 'در حال ارسال...'
+                                    : `ثبت و ارسال به ${selectedIds.length} وکیل`}
+                            </button>
+                        </div>
+                    )}
+
+                    {error ? (
+                        <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                            {error}
+                        </div>
+                    ) : null}
+                </div>
+
+                {loading ? (
+                    <div className="rounded-[18px] border bg-white p-10 text-center text-[#7b8783]">
+                        در حال دریافت وکلا...
+                    </div>
+                ) : lawyers.length === 0 ? (
+                    <div className="rounded-[18px] border bg-white p-10 text-center text-[#7b8783]">
+                        وکیلی پیدا نشد.
+                    </div>
+                ) : (
+                    lawyers.map((item) => {
+                        const lawyer = item.lawyer;
+                        const publicId = lawyer?.public_id;
+                        const selected = selectedIds.includes(publicId);
+                        const disabled =
+                            initialSelectionCompleted ||
+                            Boolean(item.invite_status) ||
+                            (!selected && selectedIds.length >= maxSelectable);
+
+                        return (
+                            <LawyerCard
+                                key={publicId}
+                                lawyer={lawyer}
+                                selectable
+                                selected={selected}
+                                selectionStatus={item.invite_status}
+                                selectionDisabled={disabled}
+                                onSelect={() => toggleLawyer(publicId)}
+                                onProfileClick={() =>
+                                    router.push(`/client/lawyersAdmin/${publicId}`)
+                                }
+                            />
+                        );
+                    })
+                )}
+            </section>
+
+            {successModalOpen ? (
+                <div
+                    dir="rtl"
+                    className={`${vazir.className} fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]`}
+                >
+                    <div className="relative w-full max-w-md rounded-2xl bg-white p-7 text-center shadow-2xl">
+                        <button
+                            type="button"
+                            onClick={() => setSuccessModalOpen(false)}
+                            className="absolute left-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+                            aria-label="بستن"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                            <CheckCircle2 size={30} />
+                        </div>
+
+                        <h3 className="mt-5 text-xl font-black text-[#173f38]">
+                            وکلای انتخابی ثبت شدند
+                        </h3>
+
+                        <p className="mt-3 text-sm leading-7 text-[#687772]">
+                            درخواست شما برای وکلای انتخاب‌شده ارسال شد. انتخاب اولیه این درخواست تکمیل شده است.
                         </p>
-                    </div>
 
-                    <div className="relative w-full lg:max-w-md">
-                        <Search
-                            size={18}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-[#80908a]"
-                        />
-                        <input
-                            type="search"
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            placeholder="جستجو نام وکیل یا تخصص..."
-                            className="w-full rounded-xl border border-[#dfe7e4] bg-[#fbfdfc] py-3 pr-11 pl-4 text-sm outline-none"
-                        />
+                        <button
+                            type="button"
+                            onClick={() => router.push('/client/cases')}
+                            className="mt-6 w-full rounded-xl bg-[#123f37] px-5 py-3 font-bold text-white transition hover:bg-[#0d302a]"
+                        >
+                            رفتن به پرونده‌های من
+                        </button>
                     </div>
                 </div>
-
-                <div className="mt-4 flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
-                    <span className="text-sm font-bold text-[#53645f]">
-                        {selectionMeta.remaining_count ?? SELECTION_LIMIT} جای باقی‌مانده
-                    </span>
-
-                    <button
-                        type="button"
-                        onClick={submitSelection}
-                        disabled={sending || selectedIds.length === 0}
-                        className="rounded-xl bg-[#123f37] px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
-                    >
-                        {sending
-                            ? 'در حال ارسال...'
-                            : `ارسال درخواست به ${selectedIds.length} وکیل`}
-                    </button>
-                </div>
-
-                {error ? (
-                    <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                        {error}
-                    </div>
-                ) : null}
-
-                {message ? (
-                    <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-                        {message}
-                    </div>
-                ) : null}
-            </div>
-
-            {loading ? (
-                <div className="rounded-[18px] border bg-white p-10 text-center text-[#7b8783]">
-                    در حال دریافت وکلا...
-                </div>
-            ) : lawyers.length === 0 ? (
-                <div className="rounded-[18px] border bg-white p-10 text-center text-[#7b8783]">
-                    وکیلی پیدا نشد.
-                </div>
-            ) : (
-                lawyers.map((item) => {
-                    const lawyer = item.lawyer;
-                    const publicId = lawyer?.public_id;
-                    const selected = selectedIds.includes(publicId);
-                    const disabled =
-                        !selected && selectedIds.length >= maxSelectable;
-
-                    return (
-                        <LawyerCard
-                            key={publicId}
-                            lawyer={lawyer}
-                            selectable
-                            selected={selected}
-                            selectionDisabled={disabled}
-                            onSelect={() => toggleLawyer(publicId)}
-                            onProfileClick={() =>
-                                router.push(`/client/lawyersAdmin/${publicId}`)
-                            }
-                        />
-                    );
-                })
-            )}
-        </section>
+            ) : null}
+        </>
     );
 }

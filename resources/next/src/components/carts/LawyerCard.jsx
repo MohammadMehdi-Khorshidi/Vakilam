@@ -12,6 +12,7 @@ export default function LawyerCard({
     selectable = false,
     selected = false,
     selectionDisabled = false,
+    selectionStatus = null,
     onSelect,
 }) {
     const name = lawyer.full_name || lawyer.name || 'وکیل وکیلم';
@@ -21,6 +22,8 @@ export default function LawyerCard({
     const locations = serviceAreas
         .map((area) => area.city?.name || area.province?.name)
         .filter(Boolean);
+
+    const alreadyInvited = Boolean(selectionStatus);
 
     return (
         <article
@@ -83,18 +86,24 @@ export default function LawyerCard({
 
                 <div className="flex shrink-0 flex-wrap gap-2">
                     {selectable ? (
-                        <button
-                            type="button"
-                            onClick={onSelect}
-                            disabled={selectionDisabled}
-                            className={`rounded-[11px] border px-5 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                                selected
-                                    ? 'border-[#b98b2e] bg-[#fff7e4] text-[#765719]'
-                                    : 'border-[#123f37] bg-white text-[#123f37] hover:bg-[#f2f8f6]'
-                            }`}
-                        >
-                            {selected ? 'انتخاب شده ✓' : 'انتخاب وکیل'}
-                        </button>
+                        alreadyInvited ? (
+                            <span className="rounded-[11px] border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-700">
+                                درخواست ارسال شده ✓
+                            </span>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={onSelect}
+                                disabled={selectionDisabled}
+                                className={`rounded-[11px] border px-5 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                    selected
+                                        ? 'border-[#b98b2e] bg-[#fff7e4] text-[#765719]'
+                                        : 'border-[#123f37] bg-white text-[#123f37] hover:bg-[#f2f8f6]'
+                                }`}
+                            >
+                                {selected ? 'انتخاب شده ✓' : 'انتخاب وکیل'}
+                            </button>
+                        )
                     ) : null}
 
                     <button
