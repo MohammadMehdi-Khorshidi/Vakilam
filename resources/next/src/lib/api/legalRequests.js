@@ -38,6 +38,11 @@ export const getLegalRequestProposals = async (legalRequestId) => {
 export const getLegalRequest = async (legalRequestId) =>
     unwrapLegalRequest(await apiRequest(requestPath(legalRequestId)));
 
+export const deleteLegalRequestDraft = async (legalRequestId) =>
+    apiRequest(requestPath(legalRequestId), {
+        method: 'DELETE',
+    });
+
 export async function updateLegalRequestDraft(legalRequestId, data) {
     try {
         return unwrapLegalRequest(

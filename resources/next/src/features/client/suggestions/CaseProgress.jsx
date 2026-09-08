@@ -1,36 +1,17 @@
 'use client';
 
+import { RotateCcw } from 'lucide-react';
+
 const progressSteps = [
-    {
-        id: 1,
-        title: 'شرح مسئله',
-    },
-    {
-        id: 2,
-        title: 'دسته‌بندی',
-    },
-    {
-        id: 3,
-        title: 'اطلاعات پایه',
-    },
-    {
-        id: 4,
-        title: 'مدارک اختیاری',
-    },
-    {
-        id: 5,
-        title: 'تأیید و انتخاب وکیل',
-    },
+    { id: 1, title: 'شرح مسئله' },
+    { id: 2, title: 'دسته‌بندی' },
+    { id: 3, title: 'اطلاعات پایه' },
+    { id: 4, title: 'مدارک اختیاری' },
+    { id: 5, title: 'تأیید و انتخاب وکیل' },
 ];
 
-const IntakeProgress = ({ step, setStep }) => {
+const IntakeProgress = ({ step, setStep, onReset }) => {
     const currentStep = step + 1;
-
-    const handleBack = () => {
-        if (currentStep > 1) {
-            setStep(step - 1);
-        }
-    };
 
     return (
         <section
@@ -44,17 +25,17 @@ const IntakeProgress = ({ step, setStep }) => {
                     </span>
 
                     <p className="mt-1 text-[#899591]">
-                        به شکل کوتاه، همه اطلاعات تکمیلی اختیاری‌اند.
+                        اطلاعات هر مرحله را می‌توانید قبل از ثبت نهایی اصلاح کنید.
                     </p>
                 </div>
 
                 <button
                     type="button"
-                    onClick={handleBack}
-                    disabled={currentStep <= 1}
-                    className="rounded-[10px] border border-[#b9d0c9] bg-white px-4 py-2 font-bold text-[#42685e] transition hover:border-[#123f37] hover:text-[#123f37] disabled:cursor-not-allowed disabled:opacity-40"
+                    onClick={onReset}
+                    className="inline-flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 px-4 py-2 font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100"
                 >
-                    مرحله قبل
+                    <RotateCcw size={16} />
+                    شروع دوباره
                 </button>
             </div>
 

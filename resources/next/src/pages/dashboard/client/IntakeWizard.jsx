@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
@@ -16,6 +16,7 @@ import {
 } from '@/lib/intake';
 import {
     createLegalRequestDraft,
+    deleteLegalRequestDraft,
     getCurrentDraft,
     submitLegalRequest,
     updateLegalRequestDraft,
@@ -252,6 +253,8 @@ export default function IntakeWizard() {
     const [step, setStep] = useState(() => storedIntake.step);
     const [isLoadingDraft, setIsLoadingDraft] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
+    const [resetModalOpen, setResetModalOpen] = useState(false);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [validationErrors, setValidationErrors] = useState([]);
@@ -394,6 +397,41 @@ export default function IntakeWizard() {
         setValidationErrors([]);
     };
 
+    const resetIntake = async () => {
+        if (isResetting) return;
+
+        setIsResetting(true);
+        setError('');
+        setMessage('');
+        setValidationErrors([]);
+
+        try {
+            if (data.legalRequestId) {
+                await deleteLegalRequestDraft(data.legalRequestId);
+            }
+
+            if (typeof window !== 'undefined') {
+                window.localStorage.removeItem(STORAGE_KEY);
+                window.localStorage.removeItem('legal_request_id');
+            }
+
+            cachedStorageValue = null;
+            cachedIntakeSnapshot = DEFAULT_INTAKE;
+
+            setData({ ...initialData });
+            setStep(0);
+            setResetModalOpen(false);
+        } catch (requestError) {
+            setResetModalOpen(false);
+            setError(
+                requestError?.message ||
+                    'شروع دوباره انجام نشد. لطفاً دوباره تلاش کنید.',
+            );
+        } finally {
+            setIsResetting(false);
+        }
+    };
+
     const submitIntake = async () => {
         if (isSubmitting) return;
 
@@ -506,7 +544,11 @@ export default function IntakeWizard() {
 
                 <div className="grid gap-6 xl:grid-cols-[1fr_245px]">
                     <section>
-                        <IntakeProgress step={step} setStep={navigateToStep} />
+                        <IntakeProgress
+                            step={step}
+                            setStep={navigateToStep}
+                            onReset={() => setResetModalOpen(true)}
+                        />
 
                         <div dir="rtl" className="mb-7 text-center">
                             <div className="mb-2 text-sm font-bold text-[#9a761f]">
@@ -569,7 +611,11 @@ export default function IntakeWizard() {
                                 onNext={next}
                                 onSubmit={submitIntake}
                                 isSubmitting={isSubmitting}
-                                disabled={isSubmitting || isLoadingDraft}
+                                disabled={
+                                    isSubmitting ||
+                                    isLoadingDraft ||
+                                    isResetting
+                                }
                             />
                         </div>
                     </section>
@@ -577,6 +623,45 @@ export default function IntakeWizard() {
                     <IntakeStepper step={step} setStep={navigateToStep} />
                 </div>
             </main>
+
+            {resetModalOpen ? (
+                <div
+                    dir="rtl"
+                    className={`${vazir.className} fixed inset-0 z-[120] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]`}
+                >
+                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-lg font-black text-[#183b34]">
+                            شروع دوباره؟
+                        </h2>
+
+                        <p className="mt-3 text-sm leading-7 text-slate-600">
+                            با شروع دوباره، اطلاعات این پیش‌نویس پاک می‌شود و فرایند از مرحله اول آغاز خواهد شد.
+                        </p>
+
+                        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row">
+                            <button
+                                type="button"
+                                onClick={() => setResetModalOpen(false)}
+                                disabled={isResetting}
+                                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600 disabled:opacity-50"
+                            >
+                                انصراف
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={resetIntake}
+                                disabled={isResetting}
+                                className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {isResetting
+                                    ? 'در حال پاک‌کردن...'
+                                    : 'پاک‌کردن و شروع دوباره'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -586,19 +671,49 @@ function StepRenderer({ step, data, update, validationError }) {
         case 0:
             return <StepDescription data={data} update={update} />;
         case 1:
-            return <StepCategory data={data} update={update} validationError={validationError} />;
+            return (
+                <StepCategory
+                    data={data}
+                    update={update}
+                    validationError={validationError}
+                />
+            );
         case 2:
-            return <StepGuide data={data} update={update} validationError={validationError} />;
+            return (
+                <StepGuide
+                    data={data}
+                    update={update}
+                    validationError={validationError}
+                />
+            );
         case 3:
             return <StepAction data={data} update={update} />;
         case 4:
-            return <StepCity data={data} update={update} validationError={validationError} />;
+            return (
+                <StepCity
+                    data={data}
+                    update={update}
+                    validationError={validationError}
+                />
+            );
         case 5:
-            return <StepUrgency data={data} update={update} validationError={validationError} />;
+            return (
+                <StepUrgency
+                    data={data}
+                    update={update}
+                    validationError={validationError}
+                />
+            );
         case 6:
             return <StepDocuments data={data} update={update} />;
         case 7:
-            return <StepPrivacy data={data} update={update} validationError={validationError} />;
+            return (
+                <StepPrivacy
+                    data={data}
+                    update={update}
+                    validationError={validationError}
+                />
+            );
         case 8:
             return <StepSummary data={data} />;
         case 9:
@@ -609,4 +724,3 @@ function StepRenderer({ step, data, update, validationError }) {
             return null;
     }
 }
-

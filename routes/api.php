@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\Api\Auth\LoginController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
@@ -149,6 +149,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/legal-requests', 'store');
         Route::get('/legal-requests/{legalRequest}', 'show');
         Route::patch('/legal-requests/{legalRequest}', 'update');
+        Route::delete('/legal-requests/{legalRequest}', 'destroy');
         Route::post('/legal-requests/{legalRequest}/submit', 'submit');
         Route::get('/legal-requests/{legalRequest}/proposals', 'proposals');
     });
@@ -283,3 +284,4 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
 Route::post('/payments/{payment:public_id}/webhook', [PaymentController::class, 'webhook'])
     ->middleware('throttle:30,1');
+

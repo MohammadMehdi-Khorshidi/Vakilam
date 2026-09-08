@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\Api;
 
@@ -208,6 +208,38 @@ class LegalRequestController extends Controller
         ]);
     }
 
+    public function destroy(
+        Request $request,
+        LegalRequest $legalRequest,
+    ): JsonResponse {
+        $this->ensureOwner($request, $legalRequest);
+
+        abort_unless(
+            $legalRequest->status === 'draft',
+            409,
+            'Only draft legal requests can be deleted.',
+        );
+
+        DB::transaction(function () use ($legalRequest): void {
+            $lockedRequest = LegalRequest::query()
+                ->whereKey($legalRequest->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                $lockedRequest->status === 'draft',
+                409,
+                'Only draft legal requests can be deleted.',
+            );
+
+            $lockedRequest->delete();
+        });
+
+        return response()->json([
+            'message' => 'Draft legal request deleted successfully.',
+        ]);
+    }
+
     public function submit(
         Request $request,
         LegalRequest $legalRequest,
@@ -352,3 +384,4 @@ class LegalRequestController extends Controller
         ]);
     }
 }
+
