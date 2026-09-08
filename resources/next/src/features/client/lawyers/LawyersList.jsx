@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle2, Search, X } from 'lucide-react';
+import { CheckCircle2, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
 import LawyerCard from '@/components/carts/LawyerCard';
@@ -20,12 +20,45 @@ const vazir = Vazirmatn({
 
 const SELECTION_LIMIT = 5;
 
+const SORT_OPTIONS = [
+    { key: 'topic', label: 'ارتباط با موضوع' },
+    { key: 'location', label: 'نزدیکی موقعیت' },
+    { key: 'experience', label: 'سابقه بیشتر' },
+    { key: 'rating', label: 'امتیاز بالاتر کاربران' },
+];
+
+const DEFAULT_SORTS = ['topic', 'location'];
+
+function priorityScore(item, activeSorts) {
+    const metrics = item?.sort_metrics ?? {};
+    let score = 0;
+
+    if (activeSorts.includes('topic') && metrics.topic_match) {
+        score += 40;
+    }
+
+    if (activeSorts.includes('location')) {
+        score += Math.max(0, Math.min(Number(metrics.location) || 0, 2)) * 12.5;
+    }
+
+    if (activeSorts.includes('experience')) {
+        score += Math.min(Math.max(Number(metrics.experience) || 0, 0), 20);
+    }
+
+    if (activeSorts.includes('rating')) {
+        score += Math.min(Math.max(Number(metrics.rating) || 0, 0) * 3, 15);
+    }
+
+    return score;
+}
+
 export default function LawyersList() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const legalRequestId = searchParams.get('legal_request_id');
 
     const [lawyers, setLawyers] = useState([]);
+    const [activeSorts, setActiveSorts] = useState(DEFAULT_SORTS);
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectionMeta, setSelectionMeta] = useState({
         limit: SELECTION_LIMIT,
@@ -118,6 +151,45 @@ export default function LawyersList() {
             mounted = false;
         };
     }, [legalRequestId, debouncedQuery]);
+
+    const toggleSort = (key) => {
+        setActiveSorts((previous) =>
+            previous.includes(key)
+                ? previous.filter((item) => item !== key)
+                : [...previous, key],
+        );
+    };
+
+    const sortedLawyers = useMemo(() => {
+        return [...lawyers].sort((first, second) => {
+            const scoreDifference =
+                priorityScore(second, activeSorts) -
+                priorityScore(first, activeSorts);
+
+            if (scoreDifference !== 0) {
+                return scoreDifference;
+            }
+
+            // Keep the backend matching order as the stable tie-breaker.
+            const firstRank = Number(first?.match_rank);
+            const secondRank = Number(second?.match_rank);
+            const firstHasRank = Number.isFinite(firstRank) && firstRank > 0;
+            const secondHasRank = Number.isFinite(secondRank) && secondRank > 0;
+
+            if (firstHasRank && secondHasRank && firstRank !== secondRank) {
+                return firstRank - secondRank;
+            }
+
+            if (firstHasRank !== secondHasRank) {
+                return firstHasRank ? -1 : 1;
+            }
+
+            return String(first?.lawyer?.full_name || '').localeCompare(
+                String(second?.lawyer?.full_name || ''),
+                'fa',
+            );
+        });
+    }, [lawyers, activeSorts]);
 
     const maxSelectable = Math.max(
         0,
@@ -218,6 +290,35 @@ export default function LawyersList() {
                         </div>
                     </div>
 
+                    <div className="mt-4 border-t border-[#edf1ef] pt-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="ml-1 inline-flex items-center gap-2 text-sm font-extrabold text-[#173f38]">
+                                <SlidersHorizontal size={17} />
+                                اولویت نمایش
+                            </span>
+
+                            {SORT_OPTIONS.map((option) => {
+                                const active = activeSorts.includes(option.key);
+
+                                return (
+                                    <button
+                                        key={option.key}
+                                        type="button"
+                                        onClick={() => toggleSort(option.key)}
+                                        aria-pressed={active}
+                                        className={`rounded-full border px-4 py-2 text-xs font-bold transition ${
+                                            active
+                                                ? 'border-[#123f37] bg-[#123f37] text-white'
+                                                : 'border-[#dfe7e4] bg-white text-[#53645f] hover:border-[#9db7b0]'
+                                        }`}
+                                    >
+                                        {option.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {initialSelectionCompleted ? (
                         <div className="mt-4 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 md:flex-row md:items-center md:justify-between">
                             <span className="text-sm font-bold text-emerald-800">
@@ -266,7 +367,7 @@ export default function LawyersList() {
                         وکیلی پیدا نشد.
                     </div>
                 ) : (
-                    lawyers.map((item) => {
+                    sortedLawyers.map((item) => {
                         const lawyer = item.lawyer;
                         const publicId = lawyer?.public_id;
                         const selected = selectedIds.includes(publicId);

@@ -179,6 +179,18 @@ class LawyerMatchingController extends Controller
                     : null,
                 'is_matching_candidate' => $lawyer->getAttribute('match_rank') !== null,
                 'invite_status' => $lawyer->getAttribute('invite_status'),
+                'sort_metrics' => [
+                    'topic_match' => (bool) $lawyer->getAttribute('request_specialty_match'),
+                    'location' => $lawyer->serviceAreas->contains(
+                        fn ($area): bool => (int) $area->city_id === (int) $legalRequest->city_id
+                    ) ? 2 : (
+                        $lawyer->serviceAreas->contains(
+                            fn ($area): bool => (int) $area->province_id === (int) $legalRequest->province_id
+                        ) ? 1 : 0
+                    ),
+                    'experience' => (int) ($lawyer->lawyerSpecialties->max('years_experience') ?? 0),
+                    'rating' => (float) ($lawyer->average_rating ?? 0),
+                ],
                 'lawyer' => LawyerPublicResource::make($lawyer)->resolve(),
             ])->values(),
             'meta' => [
