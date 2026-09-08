@@ -9,7 +9,6 @@ const unwrapLegalRequest = (payload) => {
     if (payload && typeof payload === 'object' && 'legal_request' in payload) {
         return payload.legal_request;
     }
-
     return unwrapData(payload);
 };
 
@@ -50,10 +49,7 @@ export async function updateLegalRequestDraft(legalRequestId, data) {
     } catch (error) {
         if (error instanceof ApiError && error.status === 409) {
             const existing = await getLegalRequest(legalRequestId);
-
-            if (existing?.status === 'submitted') {
-                return existing;
-            }
+            if (existing?.status === 'submitted') return existing;
         }
 
         if (error instanceof ApiError && error.status === 404) {
@@ -74,10 +70,7 @@ export async function submitLegalRequest(legalRequestId) {
     } catch (error) {
         if (error instanceof ApiError && error.status === 409) {
             const existing = await getLegalRequest(legalRequestId);
-
-            if (existing?.status === 'submitted') {
-                return existing;
-            }
+            if (existing?.status === 'submitted') return existing;
         }
 
         throw error;
@@ -85,9 +78,7 @@ export async function submitLegalRequest(legalRequestId) {
 }
 
 export const getServiceOptions = async (legalRequestId) =>
-    unwrapData(
-        await apiRequest(requestPath(legalRequestId, 'service-options')),
-    );
+    unwrapData(await apiRequest(requestPath(legalRequestId, 'service-options')));
 
 export const selectServiceIntent = async (legalRequestId, serviceIntent) =>
     unwrapData(
@@ -105,6 +96,9 @@ export const runLawyerMatching = async (legalRequestId, query = {}) =>
 
 export const getLawyerMatching = async (legalRequestId, query = {}) =>
     apiRequest(requestPath(legalRequestId, 'matching'), { query });
+
+export const listSelectableLawyers = async (legalRequestId, query = {}) =>
+    apiRequest(requestPath(legalRequestId, 'lawyers'), { query });
 
 export const sendLawyerRequests = async (legalRequestId, lawyerPublicIds) =>
     apiRequest(requestPath(legalRequestId, 'lawyer-requests'), {

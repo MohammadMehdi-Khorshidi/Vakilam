@@ -6,7 +6,14 @@ const vazirmatn = Vazirmatn({
     display: 'swap',
 });
 
-export default function LawyerCard({ lawyer, onProfileClick }) {
+export default function LawyerCard({
+    lawyer,
+    onProfileClick,
+    selectable = false,
+    selected = false,
+    selectionDisabled = false,
+    onSelect,
+}) {
     const name = lawyer.full_name || lawyer.name || 'وکیل وکیلم';
     const initial = Array.from(name)[0] || 'و';
     const specialties = lawyer.specialties || [];
@@ -18,7 +25,11 @@ export default function LawyerCard({ lawyer, onProfileClick }) {
     return (
         <article
             dir="rtl"
-            className={`${vazirmatn.className} rounded-[18px] border border-[#dfbd6c] bg-white p-5 shadow-[0_5px_20px_rgba(18,63,55,0.04)]`}
+            className={`${vazirmatn.className} rounded-[18px] border ${
+                selected
+                    ? 'border-[#b98b2e] ring-2 ring-[#ead6a5]'
+                    : 'border-[#dfbd6c]'
+            } bg-white p-5 shadow-[0_5px_20px_rgba(18,63,55,0.04)]`}
         >
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex min-w-0 items-start gap-4">
@@ -70,13 +81,30 @@ export default function LawyerCard({ lawyer, onProfileClick }) {
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={onProfileClick}
-                    className="shrink-0 rounded-[11px] bg-[#123f37] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#0d302a]"
-                >
-                    مشاهده پروفایل
-                </button>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                    {selectable ? (
+                        <button
+                            type="button"
+                            onClick={onSelect}
+                            disabled={selectionDisabled}
+                            className={`rounded-[11px] border px-5 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                selected
+                                    ? 'border-[#b98b2e] bg-[#fff7e4] text-[#765719]'
+                                    : 'border-[#123f37] bg-white text-[#123f37] hover:bg-[#f2f8f6]'
+                            }`}
+                        >
+                            {selected ? 'انتخاب شده ✓' : 'انتخاب وکیل'}
+                        </button>
+                    ) : null}
+
+                    <button
+                        type="button"
+                        onClick={onProfileClick}
+                        className="rounded-[11px] bg-[#123f37] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#0d302a]"
+                    >
+                        مشاهده پروفایل
+                    </button>
+                </div>
             </div>
         </article>
     );

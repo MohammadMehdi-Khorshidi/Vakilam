@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
 import LawyerCard from '@/components/carts/LawyerCard';
 import {
-    getLawyerMatching,
+    listSelectableLawyers,
     runLawyerMatching,
     sendLawyerRequests,
 } from '@/lib/api/legalRequests';
@@ -20,33 +20,12 @@ const vazir = Vazirmatn({
 
 const SELECTION_LIMIT = 5;
 
-function candidateSearchText(candidate) {
-    const lawyer = candidate?.lawyer ?? {};
-    const specialtyNames = (lawyer.specialties ?? [])
-        .map((item) => item?.specialty?.name || item?.name || '')
-        .join(' ');
-
-    const locationNames = (lawyer.service_areas ?? [])
-        .map((area) => `${area?.province?.name || ''} ${area?.city?.name || ''}`)
-        .join(' ');
-
-    return [
-        lawyer.full_name,
-        lawyer.bio,
-        specialtyNames,
-        locationNames,
-    ]
-        .filter(Boolean)
-        .join(' ')
-        .toLocaleLowerCase('fa');
-}
-
 export default function LawyersList() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const legalRequestId = searchParams.get('legal_request_id');
 
-    const [candidates, setCandidates] = useState([]);
+    const [lawyers, setLawyers] = useState([]);
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectionMeta, setSelectionMeta] = useState({
         limit: SELECTION_LIMIT,
@@ -54,20 +33,28 @@ export default function LawyersList() {
         remaining_count: SELECTION_LIMIT,
     });
     const [query, setQuery] = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
 
     useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setDebouncedQuery(query.trim());
+        }, 300);
+
+        return () => window.clearTimeout(timer);
+    }, [query]);
+
+    useEffect(() => {
         let mounted = true;
 
-        async function loadMatchingLawyers() {
+        async function loadLawyers() {
             if (!legalRequestId) {
                 if (mounted) {
-                    setCandidates([]);
                     setLoading(false);
-                    setError('شناسه درخواست حقوقی برای انتخاب وکیل مشخص نیست.');
+                    setError('شناسه درخواست حقوقی مشخص نیست.');
                 }
                 return;
             }
@@ -76,40 +63,33 @@ export default function LawyersList() {
             setError('');
 
             try {
-                const firstResponse = await runLawyerMatching(legalRequestId, {
+                await runLawyerMatching(legalRequestId);
+
+                const first = await listSelectableLawyers(legalRequestId, {
+                    q: debouncedQuery || undefined,
+                    per_page: 50,
                     page: 1,
                 });
 
                 if (!mounted) return;
 
-                const firstCandidates = firstResponse?.data?.candidates ?? [];
-                const lastPage =
-                    Number(firstResponse?.meta?.pagination?.last_page) || 1;
-
-                let allCandidates = [...firstCandidates];
+                let all = [...(first?.data ?? [])];
+                const lastPage = Number(first?.meta?.pagination?.last_page) || 1;
 
                 for (let page = 2; page <= lastPage; page += 1) {
-                    const response = await getLawyerMatching(legalRequestId, {
+                    const response = await listSelectableLawyers(legalRequestId, {
+                        q: debouncedQuery || undefined,
+                        per_page: 50,
                         page,
                     });
 
                     if (!mounted) return;
-
-                    allCandidates = [
-                        ...allCandidates,
-                        ...(response?.data?.candidates ?? []),
-                    ];
+                    all = [...all, ...(response?.data ?? [])];
                 }
 
-                allCandidates.sort(
-                    (first, second) =>
-                        Number(first?.rank ?? Number.MAX_SAFE_INTEGER) -
-                        Number(second?.rank ?? Number.MAX_SAFE_INTEGER),
-                );
-
-                setCandidates(allCandidates);
+                setLawyers(all);
                 setSelectionMeta(
-                    firstResponse?.meta?.selection ?? {
+                    first?.meta?.selection ?? {
                         limit: SELECTION_LIMIT,
                         selected_count: 0,
                         remaining_count: SELECTION_LIMIT,
@@ -119,7 +99,7 @@ export default function LawyersList() {
                 if (mounted) {
                     setError(
                         requestError?.message ||
-                            'دریافت وکلای پیشنهادی با خطا مواجه شد.',
+                            'دریافت فهرست وکلا با خطا مواجه شد.',
                     );
                 }
             } finally {
@@ -127,22 +107,12 @@ export default function LawyersList() {
             }
         }
 
-        loadMatchingLawyers();
+        loadLawyers();
 
         return () => {
             mounted = false;
         };
-    }, [legalRequestId]);
-
-    const filteredCandidates = useMemo(() => {
-        const normalizedQuery = query.trim().toLocaleLowerCase('fa');
-
-        if (!normalizedQuery) return candidates;
-
-        return candidates.filter((candidate) =>
-            candidateSearchText(candidate).includes(normalizedQuery),
-        );
-    }, [candidates, query]);
+    }, [legalRequestId, debouncedQuery]);
 
     const maxSelectable = Math.max(
         0,
@@ -159,11 +129,7 @@ export default function LawyersList() {
             }
 
             if (previous.length >= maxSelectable) {
-                setError(
-                    maxSelectable === 0
-                        ? 'برای این درخواست سقف ۵ وکیل فعال تکمیل شده است.'
-                        : `در این مرحله حداکثر ${maxSelectable} وکیل دیگر می‌توانید انتخاب کنید.`,
-                );
+                setError('سقف انتخاب وکیل برای این درخواست تکمیل شده است.');
                 return previous;
             }
 
@@ -184,53 +150,33 @@ export default function LawyersList() {
                 selectedIds,
             );
 
-            const metaSelection =
-                response?.meta?.selection ??
-                (response?.meta
-                    ? {
-                          limit: response.meta.selection_limit ?? SELECTION_LIMIT,
-                          selected_count: response.meta.selected_count ?? 0,
-                          remaining_count:
-                              response.meta.remaining_count ?? 0,
-                      }
-                    : null);
-
-            if (metaSelection) {
-                setSelectionMeta(metaSelection);
+            if (response?.meta?.selection) {
+                setSelectionMeta(response.meta.selection);
             }
 
-            setMessage('درخواست برای وکلای انتخاب‌شده ارسال شد.');
             setSelectedIds([]);
+            setMessage('درخواست برای وکلای انتخاب‌شده ارسال شد.');
         } catch (requestError) {
             setError(
                 requestError?.validationMessages?.[0] ||
                     requestError?.message ||
-                    'ارسال درخواست برای وکلا انجام نشد.',
+                    'ارسال درخواست انجام نشد.',
             );
         } finally {
             setSending(false);
         }
     };
 
-    if (loading) {
-        return (
-            <div className="rounded-[18px] border border-[#e2e9e6] bg-white p-10 text-center text-[#7b8783]">
-                در حال محاسبه و دریافت وکلای متناسب با درخواست...
-            </div>
-        );
-    }
-
     return (
         <section dir="rtl" className={`${vazir.className} space-y-4`}>
-            <div className="rounded-[18px] border border-[#dfbd6c] bg-white p-5 shadow-[0_5px_20px_rgba(18,63,55,0.04)]">
+            <div className="rounded-[18px] border border-[#dfbd6c] bg-white p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <h2 className="font-extrabold text-[#173f38]">
-                            وکلای متناسب با درخواست شما
+                            انتخاب وکیل
                         </h2>
                         <p className="mt-1 text-sm text-[#74817d]">
-                            لیست بر اساس امتیاز matching مرتب شده است. حداکثر ۵
-                            وکیل می‌توانند هم‌زمان برای این درخواست فعال باشند.
+                            وکلای متناسب‌تر با درخواست شما در ابتدای لیست قرار می‌گیرند.
                         </p>
                     </div>
 
@@ -243,25 +189,22 @@ export default function LawyersList() {
                             type="search"
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder="جستجو نام وکیل، تخصص یا شهر..."
-                            className="w-full rounded-xl border border-[#dfe7e4] bg-[#fbfdfc] py-3 pr-11 pl-4 text-sm outline-none transition focus:border-[#8eb7ab]"
+                            placeholder="جستجو نام وکیل یا تخصص..."
+                            className="w-full rounded-xl border border-[#dfe7e4] bg-[#fbfdfc] py-3 pr-11 pl-4 text-sm outline-none"
                         />
                     </div>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-3 border-t border-[#edf1ef] pt-4 md:flex-row md:items-center md:justify-between">
-                    <p className="text-sm font-bold text-[#53645f]">
-                        {selectionMeta.selected_count || 0} وکیل از قبل فعال —
-                        {' '}
-                        {selectionMeta.remaining_count ?? SELECTION_LIMIT} جای
-                        باقی‌مانده
-                    </p>
+                <div className="mt-4 flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
+                    <span className="text-sm font-bold text-[#53645f]">
+                        {selectionMeta.remaining_count ?? SELECTION_LIMIT} جای باقی‌مانده
+                    </span>
 
                     <button
                         type="button"
                         onClick={submitSelection}
                         disabled={sending || selectedIds.length === 0}
-                        className="rounded-xl bg-[#123f37] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#0d302a] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-xl bg-[#123f37] px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
                     >
                         {sending
                             ? 'در حال ارسال...'
@@ -270,80 +213,46 @@ export default function LawyersList() {
                 </div>
 
                 {error ? (
-                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                    <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
                         {error}
                     </div>
                 ) : null}
 
                 {message ? (
-                    <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                    <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
                         {message}
                     </div>
                 ) : null}
             </div>
 
-            {candidates.length === 0 ? (
-                <div className="rounded-[18px] border border-[#e2e9e6] bg-white p-10 text-center">
-                    <h3 className="font-extrabold text-[#173f38]">
-                        فعلاً وکیل متناسبی پیدا نشد
-                    </h3>
-                    <p className="mt-2 text-sm text-[#7b8783]">
-                        matching برای همین درخواست انجام شد، اما در حال حاضر
-                        وکیل تأییدشده، فعال و واجد شرایطی وجود ندارد.
-                    </p>
+            {loading ? (
+                <div className="rounded-[18px] border bg-white p-10 text-center text-[#7b8783]">
+                    در حال دریافت وکلا...
                 </div>
-            ) : filteredCandidates.length === 0 ? (
-                <div className="rounded-[18px] border border-[#e2e9e6] bg-white p-8 text-center text-sm text-[#7b8783]">
-                    نتیجه‌ای برای جستجوی «{query}» پیدا نشد.
+            ) : lawyers.length === 0 ? (
+                <div className="rounded-[18px] border bg-white p-10 text-center text-[#7b8783]">
+                    وکیلی پیدا نشد.
                 </div>
             ) : (
-                filteredCandidates.map((candidate) => {
-                    const lawyer = candidate.lawyer;
+                lawyers.map((item) => {
+                    const lawyer = item.lawyer;
                     const publicId = lawyer?.public_id;
                     const selected = selectedIds.includes(publicId);
                     const disabled =
                         !selected && selectedIds.length >= maxSelectable;
 
                     return (
-                        <div
+                        <LawyerCard
                             key={publicId}
-                            className={`rounded-[20px] ${
-                                selected
-                                    ? 'ring-2 ring-[#c79a37] ring-offset-2'
-                                    : ''
-                            }`}
-                        >
-                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 text-xs font-bold">
-                                    <span className="rounded-full bg-[#123f37] px-3 py-1.5 text-white">
-                                        رتبه {candidate.rank}
-                                    </span>
-                                    <span className="rounded-full bg-[#f3ead5] px-3 py-1.5 text-[#7b5c18]">
-                                        امتیاز تطبیق {candidate.score}
-                                    </span>
-                                </div>
-
-                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#dfbd6c] bg-white px-4 py-2 text-sm font-bold text-[#173f38]">
-                                    <input
-                                        type="checkbox"
-                                        checked={selected}
-                                        disabled={disabled}
-                                        onChange={() => toggleLawyer(publicId)}
-                                        className="h-4 w-4 accent-[#123f37]"
-                                    />
-                                    {selected ? 'انتخاب شده' : 'انتخاب وکیل'}
-                                </label>
-                            </div>
-
-                            <LawyerCard
-                                lawyer={lawyer}
-                                onProfileClick={() =>
-                                    router.push(
-                                        `/client/lawyersAdmin/${publicId}`,
-                                    )
-                                }
-                            />
-                        </div>
+                            lawyer={lawyer}
+                            selectable
+                            selected={selected}
+                            selectionDisabled={disabled}
+                            onSelect={() => toggleLawyer(publicId)}
+                            onProfileClick={() =>
+                                router.push(`/client/lawyersAdmin/${publicId}`)
+                            }
+                        />
                     );
                 })
             )}

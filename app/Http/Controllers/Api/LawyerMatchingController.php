@@ -24,8 +24,7 @@ class LawyerMatchingController extends Controller
         ListLawyerMatchesRequest $request,
         LegalRequest $legalRequest,
         LawyerMatchingService $matchingService,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $this->ensureOwner($request, $legalRequest);
         $result = $matchingService->run($legalRequest);
         $candidates = $matchingService->paginateCandidates($result['run']);
@@ -47,8 +46,7 @@ class LawyerMatchingController extends Controller
         ListLawyerMatchesRequest $request,
         LegalRequest $legalRequest,
         LawyerMatchingService $matchingService,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $this->ensureOwner($request, $legalRequest);
         $this->ensureLawyerSelectionReady($legalRequest);
 
@@ -73,17 +71,11 @@ class LawyerMatchingController extends Controller
         ));
     }
 
-    /**
-     * List all approved/available lawyers that the client may invite.
-     * Matching is optional here: when no matching run exists yet the endpoint
-     * still returns a normal directory (with null match score/rank).
-     */
     public function lawyers(
         Request $request,
         LegalRequest $legalRequest,
         LawyerMatchingService $matchingService,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $this->ensureOwner($request, $legalRequest);
         $this->ensureLawyerSelectionReady($legalRequest);
 
@@ -92,13 +84,17 @@ class LawyerMatchingController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
+        $legalRequest->loadMissing('legalCategory:id,code,status');
+
         $run = $legalRequest->matchRuns()
             ->where('algorithm_version', LawyerMatchingService::ALGORITHM_VERSION)
             ->where('status', 'completed')
             ->latest('created_at')
             ->first();
+
         $search = trim((string) $request->query('q', ''));
         $perPage = min(max((int) $request->integer('per_page', 20), 1), 50);
+        $categoryCode = $legalRequest->legalCategory?->code;
 
         $lawyersQuery = LawyerProfile::query()
             ->where('verification_status', 'approved')
@@ -115,6 +111,11 @@ class LawyerMatchingController extends Controller
                             }));
                 });
             })
+            ->when($categoryCode !== null, fn ($query) => $query->withCount([
+                'specialties as request_specialty_match' => fn ($specialtyQuery) => $specialtyQuery
+                    ->where('specialties.code', $categoryCode)
+                    ->where('specialties.status', true),
+            ]))
             ->with([
                 'lawyerSpecialties.specialty:id,code,name,status',
                 'serviceAreas.province:id,name',
@@ -127,6 +128,7 @@ class LawyerMatchingController extends Controller
                 ->whereColumn('lawyer_profile_id', 'lawyer_profiles.id')
                 ->where('match_run_id', $run->id)
                 ->limit(1);
+
             $rankSubquery = LawyerMatchCandidate::query()
                 ->select('rank_position')
                 ->whereColumn('lawyer_profile_id', 'lawyer_profiles.id')
@@ -138,7 +140,12 @@ class LawyerMatchingController extends Controller
                     'match_score' => $scoreSubquery,
                     'match_rank' => $rankSubquery,
                 ])
-                ->orderByDesc('match_score');
+                ->orderByRaw('match_rank IS NULL')
+                ->orderBy('match_rank');
+        }
+
+        if ($categoryCode !== null) {
+            $lawyersQuery->orderByDesc('request_specialty_match');
         }
 
         $lawyers = $lawyersQuery
@@ -155,7 +162,7 @@ class LawyerMatchingController extends Controller
                 'match_rank' => $lawyer->getAttribute('match_rank') !== null
                     ? (int) $lawyer->getAttribute('match_rank')
                     : null,
-                'is_matching_candidate' => $lawyer->getAttribute('match_score') !== null,
+                'is_matching_candidate' => $lawyer->getAttribute('match_rank') !== null,
                 'lawyer' => LawyerPublicResource::make($lawyer)->resolve(),
             ])->values(),
             'meta' => [
@@ -178,8 +185,7 @@ class LawyerMatchingController extends Controller
         Request $request,
         LegalRequest $legalRequest,
         LawyerMatchingService $matchingService,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $this->ensureOwner($request, $legalRequest);
         $recommendations = $matchingService->consultationRecommendations($legalRequest);
 
@@ -202,10 +208,9 @@ class LawyerMatchingController extends Controller
         SendLawyerRequestsRequest $request,
         LegalRequest $legalRequest,
         LawyerMatchingService $matchingService,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $this->ensureOwner($request, $legalRequest);
-        /** @var array<int, string> $lawyerPublicIds */
+
         $lawyerPublicIds = $request->validated('lawyer_public_ids');
         $distributions = $matchingService->sendRequests(
             $legalRequest,
@@ -224,7 +229,6 @@ class LawyerMatchingController extends Controller
             ]),
             'meta' => [
                 'selection' => $matchingService->selectionMeta($legalRequest),
-                // Compatibility with the old response shape.
                 'selection_limit' => LawyerMatchingService::SELECTION_LIMIT,
                 'selected_count' => $distributions->count(),
                 'remaining_count' => max(
@@ -235,19 +239,13 @@ class LawyerMatchingController extends Controller
         ]);
     }
 
-    /**
-     * @param  LengthAwarePaginator<int, \App\Models\LawyerMatchCandidate>  $candidates
-     * @param  array<string, mixed>  $extra
-     * @return array<string, mixed>
-     */
     private function matchingResponse(
         LegalRequest $legalRequest,
         LawyerMatchRun $run,
         LengthAwarePaginator $candidates,
         LawyerMatchingService $matchingService,
         array $extra = [],
-    ): array
-    {
+    ): array {
         $data = LawyerMatchRunResource::make($run)->resolve();
         $data['candidates'] = LawyerMatchCandidateResource::collection(
             $candidates->getCollection(),
@@ -272,7 +270,6 @@ class LawyerMatchingController extends Controller
         ];
     }
 
-    /** @return array<string, mixed> */
     private function emptyMatchingResponse(
         LegalRequest $legalRequest,
         LawyerMatchingService $matchingService,
