@@ -1,51 +1,25 @@
 'use client';
 
-import { Info, Sparkles } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
-import { categories, categoryLabel, normalizeCategoryCode } from '@/lib/intake';
+import { categories, normalizeCategoryCode } from '@/lib/intake';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
     weight: ['400', '500', '600', '700', '800'],
 });
 
-export default function StepCategory({ data, update }) {
+export default function StepCategory({ data, update, validationError }) {
     const selectedCategory = normalizeCategoryCode(data.category);
 
     const selectCategory = (category) => {
-        // If a resumed server draft contained a UUID, choosing a new category
-        // must clear it so the new seeded code is sent instead of the old UUID.
         update('legal_category_id', null);
         update('category', category.id);
     };
 
     return (
         <div dir="rtl" className={vazir.className}>
-            <div className="mb-5 rounded-[15px] border border-[#d8bb82]/60 bg-[#fffaf0] px-5 py-4">
-                <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f7edcf]">
-                        <Sparkles size={17} className="text-[#c69f48]" />
-                    </div>
-
-                    <div>
-                        <span className="text-[11px] font-semibold text-[#8c8170]">
-                            دسته‌بندی مسئله
-                        </span>
-
-                        <h3 className="mt-1 text-[17px] font-black text-[#243f38]">
-                            {selectedCategory
-                                ? categoryLabel(selectedCategory)
-                                : 'یک دسته را انتخاب کنید'}
-                        </h3>
-
-                        <p className="mt-1.5 text-[11px] leading-6 text-[#7f8985]">
-                            دسته‌بندی برای یافتن وکیل مناسب و مسیر بعدی استفاده می‌شود.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {categories.map((category) => {
                     const selected = selectedCategory === category.id;
@@ -82,6 +56,12 @@ export default function StepCategory({ data, update }) {
                     );
                 })}
             </div>
+
+            {validationError ? (
+                <p className="mt-3 text-sm font-bold text-red-600">
+                    {validationError}
+                </p>
+            ) : null}
 
             <div className="mt-4 flex items-start gap-3 rounded-[14px] border border-[#d4e8ef] bg-[#eff8fc] px-4 py-3">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[#477987]">

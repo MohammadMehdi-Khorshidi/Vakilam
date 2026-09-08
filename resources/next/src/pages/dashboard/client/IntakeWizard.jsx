@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,7 +21,6 @@ import {
     updateLegalRequestDraft,
 } from '@/lib/api/legalRequests';
 import IntakeProgress from '@/features/client/suggestions/CaseProgress';
-import IntakeNotice from '../../../features/client/legal-request/IntakeNotice';
 import IntakeActions from '../../../features/client/legal-request/IntakeActions';
 import IntakeStepper from '../../../features/client/legal-request/IntakeStepper';
 import StepDescription from '../../../features/client/legal-request/steps/StepDescription';
@@ -198,8 +197,12 @@ function validationMessagesForStep(step, data) {
     if (step === 1) {
         const categoryCode = normalizeCategoryCode(data.category);
         if (!data.legal_category_id && !VALID_CATEGORY_CODES.has(categoryCode)) {
-            errors.push('یک دسته‌بندی حقوقی انتخاب کنید.');
+            errors.push('لطفاً دسته‌بندی مسئله را انتخاب کنید.');
         }
+    }
+
+    if (step === 2 && !String(data.answer || '').trim()) {
+        errors.push('لطفاً مشخص کنید آیا مدرک یا مستند مرتبط دارید.');
     }
 
     if (step === 4) {
@@ -215,7 +218,11 @@ function validationMessagesForStep(step, data) {
         step === 5 &&
         !VALID_URGENCIES.has(normalizeUrgencyValue(data.urgency))
     ) {
-        errors.push('میزان فوریت را انتخاب کنید.');
+        errors.push('لطفاً میزان فوریت مسئله را انتخاب کنید.');
+    }
+
+    if (step === 7 && !String(data.privacy || '').trim()) {
+        errors.push('لطفاً سطح محرمانگی پرونده را انتخاب کنید.');
     }
 
     if (step === 9 && !data.confirmed) {
@@ -233,7 +240,7 @@ function validationMessagesForStep(step, data) {
 }
 
 function finalValidationMessages(data) {
-    return [0, 1, 4, 5, 9, 10].flatMap((step) =>
+    return [0, 1, 2, 4, 5, 7, 9, 10].flatMap((step) =>
         validationMessagesForStep(step, data),
     );
 }
@@ -519,12 +526,11 @@ export default function IntakeWizard() {
                             dir="rtl"
                             className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-7"
                         >
-                            <IntakeNotice />
-
                             <StepRenderer
                                 step={step}
                                 data={data}
                                 update={updateData}
+                                validationError={validationErrors[0] || ''}
                             />
 
                             {error && validationErrors.length === 0 ? (
@@ -533,7 +539,8 @@ export default function IntakeWizard() {
                                 </div>
                             ) : null}
 
-                            {validationErrors.length > 0 ? (
+                            {validationErrors.length > 0 &&
+                            ![1, 2, 4, 5, 7].includes(step) ? (
                                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                                     <p className="text-sm font-black text-amber-800">
                                         موارد زیر را اصلاح کنید:
@@ -574,24 +581,24 @@ export default function IntakeWizard() {
     );
 }
 
-function StepRenderer({ step, data, update }) {
+function StepRenderer({ step, data, update, validationError }) {
     switch (step) {
         case 0:
             return <StepDescription data={data} update={update} />;
         case 1:
-            return <StepCategory data={data} update={update} />;
+            return <StepCategory data={data} update={update} validationError={validationError} />;
         case 2:
-            return <StepGuide data={data} update={update} />;
+            return <StepGuide data={data} update={update} validationError={validationError} />;
         case 3:
             return <StepAction data={data} update={update} />;
         case 4:
-            return <StepCity data={data} update={update} />;
+            return <StepCity data={data} update={update} validationError={validationError} />;
         case 5:
-            return <StepUrgency data={data} update={update} />;
+            return <StepUrgency data={data} update={update} validationError={validationError} />;
         case 6:
             return <StepDocuments data={data} update={update} />;
         case 7:
-            return <StepPrivacy data={data} update={update} />;
+            return <StepPrivacy data={data} update={update} validationError={validationError} />;
         case 8:
             return <StepSummary data={data} />;
         case 9:
@@ -602,3 +609,4 @@ function StepRenderer({ step, data, update }) {
             return null;
     }
 }
+

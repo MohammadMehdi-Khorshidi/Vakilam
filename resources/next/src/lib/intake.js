@@ -1,4 +1,4 @@
-export const steps = [
+﻿export const steps = [
     'شرح مسئله',
     'برداشت و دسته‌بندی',
     'گفت‌وگو و راهنما',
@@ -21,9 +21,9 @@ export const initialData = {
     province_id: '',
     city_id: '',
     city: '',
-    urgency: 'normal',
+    urgency: '',
     documents: [],
-    privacy: 'استاندارد',
+    privacy: '',
     confirmed: false,
     path: '',
 };
@@ -164,7 +164,7 @@ export function normalizeCategoryCode(value) {
 }
 
 export function normalizeUrgencyValue(value) {
-    if (!value) return 'normal';
+    if (!value) return '';
     if (typeof value === 'object') {
         return normalizeUrgencyValue(value.value ?? value.id);
     }
@@ -207,7 +207,7 @@ export const titles = [
 
 export const subtitles = [
     'لازم نیست عنوان دعوا یا اصطلاح حقوقی را بدانید؛ فقط اتفاق را ساده و روشن بنویسید.',
-    'این تشخیص پیشنهادی است؛ آن را تأیید یا اصلاح کنید.',
+    '',
     'پاسخ‌ها کمک می‌کنند راهنمایی اولیه متناسب‌تری دریافت کنید.',
     'این راهنما تصمیم نهایی حقوقی محسوب نمی‌شود.',
     'محل وقوع موضوع یا مرجع احتمالی رسیدگی را انتخاب کنید.',
@@ -218,3 +218,4 @@ export const subtitles = [
     'پس از تأیید، درخواست برای انتخاب مسیر آماده می‌شود.',
     'یکی از روش‌های فعال دریافت خدمت را انتخاب کنید.',
 ];
+

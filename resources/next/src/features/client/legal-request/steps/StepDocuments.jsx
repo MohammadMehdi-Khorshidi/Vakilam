@@ -8,19 +8,34 @@ const vazir = Vazirmatn({
     weight: ['400', '500', '600', '700', '800'],
 });
 
-export default function StepDocuments({ data, update }) {
-    const addDemoFile = () => {
-        const fileName = `مدرک-${data.documents.length + 1}.pdf`;
+const HAS_DOCUMENT_ANSWER = 'بله، مدرک دارم.';
 
-        update('documents', [...data.documents, fileName]);
+export default function StepDocuments({ data, update }) {
+    const documents = Array.isArray(data.documents) ? data.documents : [];
+    const shouldShowUpload = data.answer === HAS_DOCUMENT_ANSWER;
+
+    const addDemoFile = () => {
+        const fileName = `مدرک-${documents.length + 1}.pdf`;
+        update('documents', [...documents, fileName]);
     };
 
     const removeFile = (fileName) => {
         update(
             'documents',
-            data.documents.filter((item) => item !== fileName),
+            documents.filter((item) => item !== fileName),
         );
     };
+
+    if (!shouldShowUpload) {
+        return (
+            <div
+                dir="rtl"
+                className={`${vazir.className} rounded-xl border border-slate-200 bg-slate-50 px-5 py-5 text-sm leading-7 text-slate-600`}
+            >
+                در مرحله قبل اعلام کردید مدرکی برای بارگذاری در اختیار ندارید یا از مدارک موردنیاز مطمئن نیستید؛ می‌توانید بدون بارگذاری فایل ادامه دهید.
+            </div>
+        );
+    }
 
     return (
         <div dir="rtl" className={vazir.className}>
@@ -42,7 +57,7 @@ export default function StepDocuments({ data, update }) {
                 </button>
             </div>
 
-            {data.documents.map((file) => (
+            {documents.map((file) => (
                 <div
                     key={file}
                     className="mt-2 flex items-center justify-between rounded-xl bg-[#e8f2ef] p-3"

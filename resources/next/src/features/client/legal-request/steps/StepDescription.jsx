@@ -1,4 +1,3 @@
-import { Sparkles } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
 const vazir = Vazirmatn({
@@ -11,19 +10,6 @@ const suggestions = ['چک پرداخت‌نشده', 'اختلاف قراردا�
 export default function StepDescription({ data, update }) {
     return (
         <div dir="rtl" className={vazir.className}>
-            <div className="mb-5 flex gap-3 rounded-xl border bg-[#f2f8f6] p-4">
-                <Sparkles className="shrink-0 text-[#d8bb82]" />
-
-                <div>
-                    <b>سلام، من دستیار وکیلم هستم.</b>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                        به زبان خودتان بگویید چه اتفاقی افتاده و چه کمکی نیاز
-                        دارید.
-                    </p>
-                </div>
-            </div>
-
             <label className="mb-2 block text-sm font-bold">
                 شرح مسئله شما
             </label>
