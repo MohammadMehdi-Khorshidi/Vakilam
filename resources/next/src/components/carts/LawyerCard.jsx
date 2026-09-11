@@ -6,6 +6,23 @@ const vazirmatn = Vazirmatn({
     display: 'swap',
 });
 
+const selectionStatusLabels = {
+    pending: 'در انتظار پاسخ وکیل',
+    negotiating: 'مذاکره فعال',
+    rejected: 'این وکیل درخواست را رد کرده',
+    expired: 'دعوت قبلی منقضی شده',
+    closed: 'مذاکره بسته شده',
+    selected: 'وکیل انتخاب شده',
+};
+
+const blockedStatuses = new Set([
+    'pending',
+    'negotiating',
+    'rejected',
+    'closed',
+    'selected',
+]);
+
 export default function LawyerCard({
     lawyer,
     onProfileClick,
@@ -23,20 +40,28 @@ export default function LawyerCard({
         .map((area) => area.city?.name || area.province?.name)
         .filter(Boolean);
 
-    const alreadyInvited = Boolean(selectionStatus);
+    const blockedByHistory = blockedStatuses.has(selectionStatus);
+    const rejected = selectionStatus === 'rejected';
+    const expired = selectionStatus === 'expired';
 
     return (
         <article
             dir="rtl"
             className={`${vazirmatn.className} rounded-[18px] border ${
-                selected
-                    ? 'border-[#b98b2e] ring-2 ring-[#ead6a5]'
-                    : 'border-[#dfbd6c]'
-            } bg-white p-5 shadow-[0_5px_20px_rgba(18,63,55,0.04)]`}
+                rejected
+                    ? 'border-red-200 bg-red-50/30'
+                    : selected
+                      ? 'border-[#b98b2e] bg-white ring-2 ring-[#ead6a5]'
+                      : 'border-[#dfbd6c] bg-white'
+            } p-5 shadow-[0_5px_20px_rgba(18,63,55,0.04)]`}
         >
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex min-w-0 items-start gap-4">
-                    <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[17px] bg-[#123f37] font-extrabold text-white">
+                    <div
+                        className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[17px] font-extrabold text-white ${
+                            rejected ? 'bg-slate-400' : 'bg-[#123f37]'
+                        }`}
+                    >
                         {initial}
                         <span className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#3a9b6e]">
                             <CheckCircle2 size={12} />
@@ -45,10 +70,26 @@ export default function LawyerCard({
 
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="font-extrabold text-[#173f38]">{name}</h2>
+                            <h2 className="font-extrabold text-[#173f38]">
+                                {name}
+                            </h2>
                             <span className="rounded-full bg-[#effaf4] px-3 py-1 text-xs font-bold text-[#27805a]">
                                 احراز هویت تأییدشده
                             </span>
+                            {selectionStatus ? (
+                                <span
+                                    className={`rounded-full px-3 py-1 text-xs font-bold ${
+                                        rejected
+                                            ? 'bg-red-100 text-red-700'
+                                            : expired
+                                              ? 'bg-amber-50 text-amber-700'
+                                              : 'bg-[#eef4f2] text-[#49665e]'
+                                    }`}
+                                >
+                                    {selectionStatusLabels[selectionStatus] ||
+                                        selectionStatus}
+                                </span>
+                            ) : null}
                         </div>
 
                         {lawyer.bio && (
@@ -74,7 +115,11 @@ export default function LawyerCard({
                             )}
                             {specialties.map((item) => (
                                 <span
-                                    key={item.id || item.specialty?.id || item.name}
+                                    key={
+                                        item.id ||
+                                        item.specialty?.id ||
+                                        item.name
+                                    }
                                     className="rounded-full bg-[#f2f7f5] px-3 py-1.5"
                                 >
                                     {item.specialty?.name || item.name}
@@ -86,9 +131,16 @@ export default function LawyerCard({
 
                 <div className="flex shrink-0 flex-wrap gap-2">
                     {selectable ? (
-                        alreadyInvited ? (
-                            <span className="rounded-[11px] border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-700">
-                                درخواست ارسال شده ✓
+                        blockedByHistory ? (
+                            <span
+                                className={`rounded-[11px] border px-5 py-3 text-sm font-bold ${
+                                    rejected
+                                        ? 'border-red-200 bg-red-50 text-red-700'
+                                        : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                }`}
+                            >
+                                {selectionStatusLabels[selectionStatus] ||
+                                    'قبلاً دعوت شده'}
                             </span>
                         ) : (
                             <button
@@ -101,7 +153,11 @@ export default function LawyerCard({
                                         : 'border-[#123f37] bg-white text-[#123f37] hover:bg-[#f2f8f6]'
                                 }`}
                             >
-                                {selected ? 'انتخاب شده ✓' : 'انتخاب وکیل'}
+                                {selected
+                                    ? 'انتخاب شده ✓'
+                                    : expired
+                                      ? 'دعوت دوباره'
+                                      : 'انتخاب وکیل'}
                             </button>
                         )
                     ) : null}

@@ -11,15 +11,18 @@ import {
     Clock3,
     FileText,
     Handshake,
+    MapPin,
     MessageCircle,
+    Plus,
     Scale,
-    Send,
+    Users,
     WalletCards,
 } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
 import { apiRequest, unwrapData } from '@/lib/api/client';
 import {
+    getClientLawyerRequests,
     getLegalRequest,
     getLegalRequestProposals,
 } from '@/lib/api/legalRequests';
@@ -36,6 +39,15 @@ const statusLabels = {
     cancelled: 'لغوشده',
 };
 
+const invitationStatusLabels = {
+    pending: 'در انتظار پاسخ',
+    negotiating: 'مذاکره فعال',
+    rejected: 'رد شده توسط وکیل',
+    expired: 'منقضی شده',
+    closed: 'بسته شده',
+    selected: 'انتخاب نهایی',
+};
+
 const urgencyLabels = {
     low: 'کم',
     normal: 'عادی',
@@ -48,7 +60,17 @@ const serviceIntentLabels = {
     lawyer_selection: 'انتخاب وکیل',
 };
 
+const partyRoleLabels = {
+    plaintiff: 'خواهان',
+    defendant: 'خوانده',
+    claimant: 'شاکی',
+    accused: 'متهم',
+    client: 'موکل',
+    opponent: 'طرف مقابل',
+};
+
 const faNumber = new Intl.NumberFormat('fa-IR');
+const ACTIVE_INVITATION_STATUSES = new Set(['pending', 'negotiating']);
 
 function formatDate(value) {
     if (!value) return 'ثبت نشده';
@@ -83,7 +105,9 @@ function SectionCard({ icon: Icon, title, description, children }) {
                     <Icon size={19} />
                 </div>
                 <div>
-                    <h2 className="font-extrabold text-[#173f38]">{title}</h2>
+                    <h2 className="font-extrabold text-[#173f38]">
+                        {title}
+                    </h2>
                     {description ? (
                         <p className="mt-1 text-xs leading-6 text-[#7e8d88]">
                             {description}
@@ -96,31 +120,39 @@ function SectionCard({ icon: Icon, title, description, children }) {
     );
 }
 
-function Timeline({ isActiveMatter, status }) {
-    const steps = isActiveMatter
-        ? [
-              'درخواست ثبت شد',
-              'مذاکره با وکیل',
-              'پیشنهاد پذیرفته شد',
-              'قرارداد و پرداخت',
-              'پرونده در جریان',
-          ]
-        : [
-              'درخواست ثبت شد',
-              'ارسال برای وکلا',
-              'مذاکره',
-              'پیشنهاد وکیل',
-              'قرارداد و پرداخت',
-          ];
+function Timeline({ isActiveMatter, invitations, proposals }) {
+    const steps = [
+        'درخواست ثبت شد',
+        'در انتظار پاسخ وکلا',
+        'مذاکره',
+        'توافق با وکیل',
+        'قرارداد و پرداخت',
+        'پرونده در جریان',
+    ];
 
-    const currentIndex = isActiveMatter
-        ? 4
-        : status === 'matched'
-          ? 1
-          : 0;
+    let currentIndex = 0;
+
+    if (invitations.length > 0) currentIndex = 1;
+    if (
+        invitations.some(
+            (invitation) => invitation.status === 'negotiating',
+        )
+    ) {
+        currentIndex = 2;
+    }
+
+    if (
+        proposals.some((proposal) =>
+            ['selected', 'accepted'].includes(proposal.status),
+        )
+    ) {
+        currentIndex = 3;
+    }
+
+    if (isActiveMatter) currentIndex = 5;
 
     return (
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
             {steps.map((step, index) => {
                 const done = index <= currentIndex;
 
@@ -168,7 +200,7 @@ function ProposalCard({ proposal }) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <p className="text-xs font-bold text-[#907849]">
-                        پیشنهاد رسمی وکیل
+                        پیشنهاد رسمی در مذاکره
                     </p>
                     <h3 className="mt-1 font-extrabold text-[#4d4a3b]">
                         {proposal.lawyer?.full_name || 'وکیل'}
@@ -183,6 +215,17 @@ function ProposalCard({ proposal }) {
                 <p className="mt-4 text-sm leading-7 text-[#626056]">
                     {proposal.summary}
                 </p>
+            ) : null}
+
+            {proposal.service_scope ? (
+                <div className="mt-3 rounded-xl bg-white/70 p-3">
+                    <p className="text-xs font-bold text-[#8b7440]">
+                        نحوه و محدوده انجام کار
+                    </p>
+                    <p className="mt-2 text-sm leading-7 text-[#626056]">
+                        {proposal.service_scope}
+                    </p>
+                </div>
             ) : null}
 
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -211,12 +254,59 @@ function ProposalCard({ proposal }) {
     );
 }
 
+function InvitationCard({ invitation }) {
+    const rejected = invitation.status === 'rejected';
+
+    return (
+        <article
+            className={`rounded-xl border p-4 ${
+                rejected
+                    ? 'border-red-200 bg-red-50/50'
+                    : 'border-[#dde7e3] bg-[#fafcfb]'
+            }`}
+        >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h3 className="font-extrabold text-[#31534b]">
+                        {invitation.lawyer?.full_name || 'وکیل'}
+                    </h3>
+                    <p className="mt-1 text-xs text-[#81908b]">
+                        ارسال درخواست: {formatDate(invitation.sent_at)}
+                    </p>
+                </div>
+
+                <span
+                    className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold ${
+                        rejected
+                            ? 'bg-red-100 text-red-700'
+                            : invitation.status === 'negotiating'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-[#eef4f2] text-[#536d65]'
+                    }`}
+                >
+                    {invitationStatusLabels[invitation.status] ||
+                        invitation.status}
+                </span>
+            </div>
+
+            {rejected ? (
+                <p className="mt-3 text-xs leading-6 text-red-700">
+                    این وکیل قبلاً درخواست را رد کرده و برای همین درخواست
+                    دوباره قابل دعوت نیست.
+                </p>
+            ) : null}
+        </article>
+    );
+}
+
 export default function CaseDetailPage({ caseId }) {
     const searchParams = useSearchParams();
-    const type = searchParams.get('type') === 'case' ? 'case' : 'request';
+    const type =
+        searchParams.get('type') === 'case' ? 'case' : 'request';
 
     const [item, setItem] = useState(null);
     const [proposals, setProposals] = useState([]);
+    const [invitations, setInvitations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -245,20 +335,30 @@ export default function CaseDetailPage({ caseId }) {
                     if (mounted) {
                         setItem(found);
                         setProposals([]);
+                        setInvitations([]);
                     }
                     return;
                 }
 
-                const [request, requestProposals] = await Promise.all([
-                    getLegalRequest(caseId),
-                    getLegalRequestProposals(caseId).catch(() => []),
-                ]);
+                const [request, requestProposals, invitationResponse] =
+                    await Promise.all([
+                        getLegalRequest(caseId),
+                        getLegalRequestProposals(caseId).catch(() => []),
+                        getClientLawyerRequests(caseId).catch(() => ({
+                            data: [],
+                        })),
+                    ]);
 
                 if (mounted) {
                     setItem(request);
                     setProposals(
                         Array.isArray(requestProposals)
                             ? requestProposals
+                            : [],
+                    );
+                    setInvitations(
+                        Array.isArray(invitationResponse?.data)
+                            ? invitationResponse.data
                             : [],
                     );
                 }
@@ -286,6 +386,19 @@ export default function CaseDetailPage({ caseId }) {
     const pageTitle = useMemo(
         () => item?.title || 'موضوع حقوقی بدون عنوان',
         [item],
+    );
+
+    const activeInvitationCount = invitations.filter((invitation) =>
+        ACTIVE_INVITATION_STATUSES.has(invitation.status),
+    ).length;
+
+    const remainingInvitationCount = Math.max(
+        0,
+        5 - activeInvitationCount,
+    );
+
+    const hasAcceptedProposal = proposals.some((proposal) =>
+        ['selected', 'accepted'].includes(proposal.status),
     );
 
     if (loading) {
@@ -380,26 +493,54 @@ export default function CaseDetailPage({ caseId }) {
                     {!isActiveMatter ? (
                         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <DetailItem
+                                label="موضوع حقوقی"
+                                value={item.legal_category?.name}
+                            />
+                            <DetailItem
+                                label="موقعیت"
+                                value={
+                                    [item.province?.name, item.city?.name]
+                                        .filter(Boolean)
+                                        .join('، ') || null
+                                }
+                            />
+                            <DetailItem
                                 label="فوریت"
                                 value={urgencyLabels[item.urgency]}
                             />
                             <DetailItem
                                 label="نوع خدمت"
                                 value={
-                                    serviceIntentLabels[item.service_intent]
+                                    serviceIntentLabels[
+                                        item.service_intent
+                                    ]
                                 }
                             />
                             <DetailItem
                                 label="تاریخ ثبت"
                                 value={formatDate(
-                                    item.submitted_at || item.created_at,
+                                    item.submitted_at ||
+                                        item.created_at,
                                 )}
                             />
                             <DetailItem
                                 label="وضعیت"
                                 value={
-                                    statusLabels[item.status] || item.status
+                                    statusLabels[item.status] ||
+                                    item.status
                                 }
+                            />
+                            <DetailItem
+                                label="تعداد طرفین ثبت‌شده"
+                                value={faNumber.format(
+                                    item.parties?.length || 0,
+                                )}
+                            />
+                            <DetailItem
+                                label="تعداد مدارک"
+                                value={faNumber.format(
+                                    item.documents?.length || 0,
+                                )}
                             />
                         </div>
                     ) : (
@@ -415,7 +556,8 @@ export default function CaseDetailPage({ caseId }) {
                             <DetailItem
                                 label="وضعیت"
                                 value={
-                                    statusLabels[item.status] || item.status
+                                    statusLabels[item.status] ||
+                                    item.status
                                 }
                             />
                         </div>
@@ -423,55 +565,200 @@ export default function CaseDetailPage({ caseId }) {
                 </header>
 
                 <div className="space-y-5">
+                    {!isActiveMatter ? (
+                        <SectionCard
+                            icon={FileText}
+                            title="شرح درخواست حقوقی"
+                            description="اطلاعاتی که هنگام ثبت این درخواست وارد کرده‌اید."
+                        >
+                            <p className="whitespace-pre-wrap rounded-xl bg-[#f8faf9] p-4 text-sm leading-8 text-[#52665f]">
+                                {item.description ||
+                                    'شرحی برای این درخواست ثبت نشده است.'}
+                            </p>
+
+                            <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                <div>
+                                    <h3 className="mb-2 text-sm font-extrabold text-[#31534b]">
+                                        طرفین
+                                    </h3>
+                                    {item.parties?.length ? (
+                                        <div className="space-y-2">
+                                            {item.parties.map(
+                                                (party) => (
+                                                    <div
+                                                        key={party.id}
+                                                        className="rounded-xl border border-[#e2e9e6] bg-white p-3"
+                                                    >
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <span className="font-bold text-[#3f5d55]">
+                                                                {party.full_name ||
+                                                                    'بدون نام'}
+                                                            </span>
+                                                            <span className="rounded-full bg-[#eef4f2] px-2.5 py-1 text-[11px] font-bold text-[#62776f]">
+                                                                {partyRoleLabels[
+                                                                    party
+                                                                        .party_role
+                                                                ] ||
+                                                                    party.party_role ||
+                                                                    'طرف پرونده'}
+                                                            </span>
+                                                            {party.is_client ? (
+                                                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                                                                    خودم
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                        {party.relation_note ? (
+                                                            <p className="mt-2 text-xs leading-6 text-[#7b8984]">
+                                                                {
+                                                                    party.relation_note
+                                                                }
+                                                            </p>
+                                                        ) : null}
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="rounded-xl bg-[#fafcfb] p-4 text-sm text-[#899691]">
+                                            طرفی ثبت نشده است.
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <h3 className="mb-2 text-sm font-extrabold text-[#31534b]">
+                                        مدارک
+                                    </h3>
+                                    {item.documents?.length ? (
+                                        <div className="space-y-2">
+                                            {item.documents.map(
+                                                (document) => (
+                                                    <div
+                                                        key={
+                                                            document.id ||
+                                                            document.public_id
+                                                        }
+                                                        className="rounded-xl border border-[#e2e9e6] bg-white p-3"
+                                                    >
+                                                        <p className="font-bold text-[#3f5d55]">
+                                                            {document.title ||
+                                                                document
+                                                                    .current_file
+                                                                    ?.original_name ||
+                                                                'مدرک'}
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-[#87958f]">
+                                                            {document
+                                                                .document_type
+                                                                ?.name ||
+                                                                document
+                                                                    .current_file
+                                                                    ?.original_name ||
+                                                                'فایل ثبت‌شده'}
+                                                        </p>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="rounded-xl bg-[#fafcfb] p-4 text-sm text-[#899691]">
+                                            مدرکی برای این درخواست ثبت نشده
+                                            است.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </SectionCard>
+                    ) : null}
+
                     <SectionCard
                         icon={Scale}
                         title="روند پرونده"
-                        description="موقعیت فعلی این درخواست در فرایند انتخاب وکیل تا شروع پرونده."
+                        description="موقعیت فعلی درخواست از زمان ثبت تا شروع پرونده."
                     >
                         <Timeline
                             isActiveMatter={isActiveMatter}
-                            status={item.status}
+                            invitations={invitations}
+                            proposals={proposals}
                         />
                     </SectionCard>
 
                     {!isActiveMatter ? (
                         <>
                             <SectionCard
-                                icon={MessageCircle}
+                                icon={Users}
                                 title="وکلا و مذاکرات"
-                                description="پاسخ وکلا، گفتگوها و مذاکرات مربوط به این درخواست از این بخش مدیریت می‌شود."
+                                description="دعوت‌ها، پاسخ وکلا و مذاکرات این درخواست را از این بخش مدیریت کنید."
                             >
-                                <div className="rounded-xl border border-dashed border-[#d4dfdb] bg-[#fafcfb] p-4">
-                                    <p className="text-sm leading-7 text-[#65756f]">
-                                        در این مرحله می‌توانید وکلای دعوت‌شده و
-                                        وضعیت مذاکره با هرکدام را دنبال کنید.
-                                        نمایش مستقیم گفتگوها در مرحله بعد به همین
-                                        بخش متصل می‌شود.
-                                    </p>
+                                <div className="mb-4 flex flex-col gap-3 rounded-xl bg-[#f6faf8] p-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-sm font-extrabold text-[#31534b]">
+                                            {faNumber.format(
+                                                activeInvitationCount,
+                                            )}{' '}
+                                            دعوت فعال از ۵ جایگاه
+                                        </p>
+                                        <p className="mt-1 text-xs leading-6 text-[#7b8984]">
+                                            وکیل‌هایی که درخواست را رد کنند
+                                            دوباره قابل دعوت نیستند، اما
+                                            جایگاهشان برای وکیل دیگری آزاد
+                                            می‌شود.
+                                        </p>
+                                    </div>
 
-                                    <div className="mt-4 flex flex-wrap gap-2">
+                                    {!hasAcceptedProposal &&
+                                    remainingInvitationCount > 0 ? (
                                         <Link
                                             href={`/client/lawyersAdmin?legal_request_id=${encodeURIComponent(
                                                 item.id,
-                                            )}`}
-                                            className="inline-flex items-center gap-2 rounded-xl bg-[#174c42] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#103b33]"
+                                            )}&mode=additional`}
+                                            className="inline-flex w-fit shrink-0 items-center gap-2 rounded-xl bg-[#174c42] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#103b33]"
                                         >
-                                            <Send size={16} />
-                                            مدیریت وکلا
+                                            <Plus size={16} />
+                                            دعوت وکیل جدید
                                         </Link>
-                                    </div>
+                                    ) : (
+                                        <span className="w-fit rounded-xl bg-[#edf3f1] px-4 py-2.5 text-xs font-bold text-[#667a73]">
+                                            {hasAcceptedProposal
+                                                ? 'وکیل نهایی انتخاب شده است'
+                                                : 'ظرفیت دعوت فعال تکمیل است'}
+                                        </span>
+                                    )}
                                 </div>
+
+                                {invitations.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed border-[#d4dfdb] bg-[#fafcfb] p-5 text-center text-sm text-[#7b8984]">
+                                        هنوز درخواستی برای وکیلی ارسال نشده
+                                        است.
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        {invitations.map(
+                                            (invitation) => (
+                                                <InvitationCard
+                                                    key={
+                                                        invitation.distribution_id
+                                                    }
+                                                    invitation={
+                                                        invitation
+                                                    }
+                                                />
+                                            ),
+                                        )}
+                                    </div>
+                                )}
                             </SectionCard>
 
                             <SectionCard
                                 icon={Handshake}
                                 title="پیشنهادهای رسمی"
-                                description="پیشنهادهای مالی و اجرایی وکلا در طول مذاکره اینجا نگهداری می‌شود."
+                                description="پیشنهادهای مالی و اجرایی وکلا در طول مذاکره در این بخش نگهداری می‌شود."
                             >
                                 {proposals.length === 0 ? (
                                     <div className="rounded-xl bg-[#fafcfb] px-4 py-8 text-center text-sm text-[#87958f]">
-                                        هنوز پیشنهاد رسمی از طرف وکیلی ثبت نشده
-                                        است.
+                                        هنوز پیشنهاد رسمی از طرف وکیلی ثبت
+                                        نشده است.
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
@@ -491,11 +778,11 @@ export default function CaseDetailPage({ caseId }) {
                             <SectionCard
                                 icon={FileText}
                                 title="قرارداد"
-                                description="پس از پذیرش پیشنهاد نهایی وکیل، قرارداد همکاری از این بخش دنبال می‌شود."
+                                description="بعد از توافق با وکیل، قرارداد همکاری از این بخش دنبال می‌شود."
                             >
                                 <p className="rounded-xl bg-[#fafcfb] px-4 py-5 text-sm leading-7 text-[#7b8984]">
-                                    هنوز قرارداد فعالی برای این درخواست ایجاد
-                                    نشده است.
+                                    قرارداد پس از نهایی‌شدن توافق با وکیل در
+                                    این بخش نمایش داده می‌شود.
                                 </p>
                             </SectionCard>
 
@@ -505,7 +792,8 @@ export default function CaseDetailPage({ caseId }) {
                                 description="بعد از نهایی‌شدن قرارداد، صورتحساب و پرداخت در همین صفحه در دسترس خواهد بود."
                             >
                                 <p className="rounded-xl bg-[#fafcfb] px-4 py-5 text-sm leading-7 text-[#7b8984]">
-                                    پرداخت بعد از نهایی‌شدن قرارداد فعال می‌شود.
+                                    پرداخت بعد از نهایی‌شدن قرارداد فعال
+                                    می‌شود.
                                 </p>
                             </SectionCard>
                         </>
@@ -513,11 +801,12 @@ export default function CaseDetailPage({ caseId }) {
                         <SectionCard
                             icon={BriefcaseBusiness}
                             title="پرونده فعال"
-                            description="این پرونده مرحله درخواست و پرداخت را پشت سر گذاشته و وارد فرایند ارائه خدمت شده است."
+                            description="این پرونده مرحله توافق، قرارداد و پرداخت را پشت سر گذاشته و وارد فرایند ارائه خدمت شده است."
                         >
                             <p className="rounded-xl bg-[#f3f8f6] px-4 py-5 text-sm leading-7 text-[#587168]">
-                                جزئیات اجرایی پرونده، اسناد، جلسات و ارتباط با
-                                وکیل در مراحل بعدی به همین صفحه اضافه می‌شود.
+                                جزئیات اجرایی پرونده، اسناد، جلسات و ارتباط
+                                با وکیل در مراحل بعدی به همین صفحه اضافه
+                                می‌شود.
                             </p>
                         </SectionCard>
                     )}

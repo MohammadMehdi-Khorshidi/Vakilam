@@ -19,8 +19,21 @@ class LegalRequestResource extends JsonResource
             'title' => $this->title,
             'description' => $this->description,
             'legal_category_id' => $this->legal_category_id,
+            'legal_category' => $this->legalCategory === null ? null : [
+                'id' => $this->legalCategory->id,
+                'code' => $this->legalCategory->code,
+                'name' => $this->legalCategory->name,
+            ],
             'province_id' => $this->province_id,
+            'province' => $this->province === null ? null : [
+                'id' => $this->province->id,
+                'name' => $this->province->name,
+            ],
             'city_id' => $this->city_id,
+            'city' => $this->city === null ? null : [
+                'id' => $this->city->id,
+                'name' => $this->city->name,
+            ],
             'urgency' => $this->urgency,
             'service_intent' => $this->service_intent,
             'status' => $this->status,

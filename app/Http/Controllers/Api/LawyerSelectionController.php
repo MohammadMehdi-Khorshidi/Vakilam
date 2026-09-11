@@ -19,9 +19,6 @@ use Illuminate\Support\Facades\DB;
 
 class LawyerSelectionController extends Controller
 {
-    /**
-     * List lawyer invitations for the authenticated lawyer.
-     */
     public function lawyerInvitations(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -71,9 +68,6 @@ class LawyerSelectionController extends Controller
         return response()->json($invitations);
     }
 
-    /**
-     * List lawyer invitations for a client's legal request.
-     */
     public function clientInvitations(
         Request $request,
         LegalRequest $legalRequest,
@@ -115,18 +109,24 @@ class LawyerSelectionController extends Controller
         ]);
     }
 
-    /**
-     * Compatibility endpoint for sending one client invitation.
-     *
-     * The canonical bulk endpoint remains:
-     * /legal-requests/{legalRequest}/lawyer-requests
-     */
     public function store(
         SendLawyerSelectionRequest $request,
         LegalRequest $legalRequest,
         LawyerProfile $lawyerProfile,
         LawyerMatchingService $matchingService,
     ): JsonResponse {
+        $previousInvitation = LegalRequestDistribution::query()
+            ->where('legal_request_id', $legalRequest->id)
+            ->where('lawyer_profile_id', $lawyerProfile->id)
+            ->where('source', Negotiation::SOURCE_CLIENT_INVITE)
+            ->first();
+
+        abort_if(
+            $previousInvitation?->status === 'rejected',
+            409,
+            'This lawyer has already rejected this legal request and cannot be invited again.',
+        );
+
         $distributions = $matchingService->sendRequests(
             $legalRequest,
             [$lawyerProfile->public_id],
@@ -149,12 +149,6 @@ class LawyerSelectionController extends Controller
         ], 201);
     }
 
-    /**
-     * Accepting or rejecting a direct lawyer invitation.
-     *
-     * Accepting opens a Negotiation.
-     * It never creates an Engagement.
-     */
     public function respond(
         RespondLawyerSelectionRequest $request,
         LegalRequestDistribution $distribution,
@@ -171,10 +165,6 @@ class LawyerSelectionController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                /*
-                 * The lawyer can only respond to a client invitation
-                 * that is still pending.
-                 */
                 abort_unless(
                     $lockedDistribution->source === Negotiation::SOURCE_CLIENT_INVITE
                     && $lockedDistribution->status === 'pending',
@@ -182,10 +172,6 @@ class LawyerSelectionController extends Controller
                     'This lawyer request is no longer pending.',
                 );
 
-                /*
-                 * An invitation without an expiry date is treated
-                 * as invalid/expired by the current business rule.
-                 */
                 if (
                     $lockedDistribution->expires_at === null
                     || ! $lockedDistribution->expires_at->isFuture()
@@ -210,10 +196,6 @@ class LawyerSelectionController extends Controller
                     ];
                 }
 
-                /*
-                 * Lock the legal request as well so that its state
-                 * cannot change during the response transaction.
-                 */
                 $legalRequest = LegalRequest::query()
                     ->whereKey($lockedDistribution->legal_request_id)
                     ->lockForUpdate()
@@ -226,9 +208,6 @@ class LawyerSelectionController extends Controller
                     'This legal request is not available for negotiation.',
                 );
 
-                /*
-                 * Reject invitation.
-                 */
                 if ($request->validated('action') === 'reject') {
                     $lockedDistribution->forceFill([
                         'status' => 'rejected',
@@ -250,12 +229,6 @@ class LawyerSelectionController extends Controller
                     ];
                 }
 
-                /*
-                 * Accept invitation.
-                 *
-                 * NegotiationService is the canonical owner of
-                 * negotiation creation/opening.
-                 */
                 $lockedDistribution->forceFill([
                     'status' => 'negotiating',
                     'responded_at' => now(),
@@ -284,9 +257,6 @@ class LawyerSelectionController extends Controller
             },
         );
 
-        /*
-         * Expired invitation.
-         */
         if ($result['expired']) {
             return response()->json([
                 'message' => 'This lawyer request has expired.',
@@ -296,32 +266,21 @@ class LawyerSelectionController extends Controller
             ], 409);
         }
 
-        /*
-         * Accepted / rejected invitation.
-         */
         return response()->json([
             'message' => $result['accepted']
                 ? 'Lawyer collaboration request accepted and negotiation opened.'
                 : 'Lawyer collaboration request rejected successfully.',
-
             'distribution' => $result['distribution'],
-
             'negotiation' => $result['negotiation'] === null
                 ? null
                 : [
                     'public_id' => $result['negotiation']->public_id,
                     'status' => $result['negotiation']->status,
                 ],
-
             'engagement' => null,
         ], $result['accepted'] ? 201 : 200);
     }
 
-    /**
-     * Write an audit log entry for a lawyer-selection action.
-     *
-     * @param array<string, mixed> $metadata
-     */
     private function audit(
         RespondLawyerSelectionRequest $request,
         LegalRequestDistribution $distribution,

@@ -9,6 +9,7 @@ import LawyerCard from '@/components/carts/LawyerCard';
 import {
     listSelectableLawyers,
     runLawyerMatching,
+    sendAdditionalLawyerRequests,
     sendLawyerRequests,
 } from '@/lib/api/legalRequests';
 
@@ -28,25 +29,37 @@ const SORT_OPTIONS = [
 ];
 
 const DEFAULT_SORTS = ['topic', 'location'];
+const BLOCKED_INVITE_STATUSES = new Set([
+    'pending',
+    'negotiating',
+    'rejected',
+    'closed',
+    'selected',
+]);
 
 function priorityScore(item, activeSorts) {
     const metrics = item?.sort_metrics ?? {};
     let score = 0;
 
-    if (activeSorts.includes('topic') && metrics.topic_match) {
-        score += 40;
-    }
+    if (activeSorts.includes('topic') && metrics.topic_match) score += 40;
 
     if (activeSorts.includes('location')) {
-        score += Math.max(0, Math.min(Number(metrics.location) || 0, 2)) * 12.5;
+        score +=
+            Math.max(0, Math.min(Number(metrics.location) || 0, 2)) * 12.5;
     }
 
     if (activeSorts.includes('experience')) {
-        score += Math.min(Math.max(Number(metrics.experience) || 0, 0), 20);
+        score += Math.min(
+            Math.max(Number(metrics.experience) || 0, 0),
+            20,
+        );
     }
 
     if (activeSorts.includes('rating')) {
-        score += Math.min(Math.max(Number(metrics.rating) || 0, 0) * 3, 15);
+        score += Math.min(
+            Math.max(Number(metrics.rating) || 0, 0) * 3,
+            15,
+        );
     }
 
     return score;
@@ -56,6 +69,7 @@ export default function LawyersList() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const legalRequestId = searchParams.get('legal_request_id');
+    const additionalMode = searchParams.get('mode') === 'additional';
 
     const [lawyers, setLawyers] = useState([]);
     const [activeSorts, setActiveSorts] = useState(DEFAULT_SORTS);
@@ -109,14 +123,18 @@ export default function LawyersList() {
                 if (!mounted) return;
 
                 let all = [...(first?.data ?? [])];
-                const lastPage = Number(first?.meta?.pagination?.last_page) || 1;
+                const lastPage =
+                    Number(first?.meta?.pagination?.last_page) || 1;
 
                 for (let page = 2; page <= lastPage; page += 1) {
-                    const response = await listSelectableLawyers(legalRequestId, {
-                        q: debouncedQuery || undefined,
-                        per_page: 50,
-                        page,
-                    });
+                    const response = await listSelectableLawyers(
+                        legalRequestId,
+                        {
+                            q: debouncedQuery || undefined,
+                            per_page: 50,
+                            page,
+                        },
+                    );
 
                     if (!mounted) return;
                     all = [...all, ...(response?.data ?? [])];
@@ -161,34 +179,18 @@ export default function LawyersList() {
     };
 
     const sortedLawyers = useMemo(() => {
-        return [...lawyers].sort((first, second) => {
-            const scoreDifference =
-                priorityScore(second, activeSorts) -
-                priorityScore(first, activeSorts);
+        if (activeSorts.length === 0) return lawyers;
 
-            if (scoreDifference !== 0) {
-                return scoreDifference;
-            }
+        return lawyers
+            .map((item, index) => ({ item, index }))
+            .sort((first, second) => {
+                const scoreDifference =
+                    priorityScore(second.item, activeSorts) -
+                    priorityScore(first.item, activeSorts);
 
-            // Keep the backend matching order as the stable tie-breaker.
-            const firstRank = Number(first?.match_rank);
-            const secondRank = Number(second?.match_rank);
-            const firstHasRank = Number.isFinite(firstRank) && firstRank > 0;
-            const secondHasRank = Number.isFinite(secondRank) && secondRank > 0;
-
-            if (firstHasRank && secondHasRank && firstRank !== secondRank) {
-                return firstRank - secondRank;
-            }
-
-            if (firstHasRank !== secondHasRank) {
-                return firstHasRank ? -1 : 1;
-            }
-
-            return String(first?.lawyer?.full_name || '').localeCompare(
-                String(second?.lawyer?.full_name || ''),
-                'fa',
-            );
-        });
+                return scoreDifference || first.index - second.index;
+            })
+            .map(({ item }) => item);
     }, [lawyers, activeSorts]);
 
     const maxSelectable = Math.max(
@@ -196,8 +198,13 @@ export default function LawyersList() {
         Number(selectionMeta?.remaining_count ?? SELECTION_LIMIT),
     );
 
-    const toggleLawyer = (publicId) => {
-        if (initialSelectionCompleted) return;
+    const selectionLocked =
+        (!additionalMode && initialSelectionCompleted) || maxSelectable === 0;
+
+    const toggleLawyer = (publicId, inviteStatus) => {
+        if (selectionLocked || BLOCKED_INVITE_STATUSES.has(inviteStatus)) {
+            return;
+        }
 
         setError('');
 
@@ -207,7 +214,9 @@ export default function LawyersList() {
             }
 
             if (previous.length >= maxSelectable) {
-                setError('سقف انتخاب وکیل برای این درخواست تکمیل شده است.');
+                setError(
+                    'سقف دعوت فعال وکیل برای این درخواست تکمیل شده است.',
+                );
                 return previous;
             }
 
@@ -219,7 +228,7 @@ export default function LawyersList() {
         if (
             !legalRequestId ||
             sending ||
-            initialSelectionCompleted ||
+            selectionLocked ||
             selectedIds.length === 0
         ) {
             return;
@@ -229,15 +238,34 @@ export default function LawyersList() {
         setError('');
 
         try {
-            const response = await sendLawyerRequests(
-                legalRequestId,
-                selectedIds,
-            );
+            if (additionalMode) {
+                await sendAdditionalLawyerRequests(
+                    legalRequestId,
+                    selectedIds,
+                );
 
-            setSelectionMeta(
-                response?.meta?.selection ?? selectionMeta,
-            );
-            setInitialSelectionCompleted(true);
+                setSelectionMeta((previous) => ({
+                    ...previous,
+                    selected_count:
+                        Number(previous?.selected_count || 0) +
+                        selectedIds.length,
+                    remaining_count: Math.max(
+                        0,
+                        Number(previous?.remaining_count || 0) -
+                            selectedIds.length,
+                    ),
+                }));
+            } else {
+                const response = await sendLawyerRequests(
+                    legalRequestId,
+                    selectedIds,
+                );
+
+                setSelectionMeta(
+                    response?.meta?.selection ?? selectionMeta,
+                );
+                setInitialSelectionCompleted(true);
+            }
 
             const selectedSet = new Set(selectedIds);
             setLawyers((previous) =>
@@ -261,6 +289,19 @@ export default function LawyersList() {
         }
     };
 
+    const goBack = () => {
+        if (additionalMode && legalRequestId) {
+            router.push(
+                `/client/cases/${encodeURIComponent(
+                    legalRequestId,
+                )}?type=request`,
+            );
+            return;
+        }
+
+        router.push('/client/cases');
+    };
+
     return (
         <>
             <section dir="rtl" className={`${vazir.className} space-y-4`}>
@@ -268,10 +309,14 @@ export default function LawyersList() {
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <h2 className="font-extrabold text-[#173f38]">
-                                انتخاب وکیل
+                                {additionalMode
+                                    ? 'دعوت وکیل جدید'
+                                    : 'انتخاب وکیل'}
                             </h2>
                             <p className="mt-1 text-sm text-[#74817d]">
-                                وکلای متناسب‌تر با درخواست شما در ابتدای لیست قرار می‌گیرند.
+                                {additionalMode
+                                    ? `می‌توانید تا ${maxSelectable} وکیل دیگر به این درخواست دعوت کنید.`
+                                    : 'وکلای متناسب‌تر با درخواست شما در ابتدای لیست قرار می‌گیرند.'}
                             </p>
                         </div>
 
@@ -283,7 +328,9 @@ export default function LawyersList() {
                             <input
                                 type="search"
                                 value={query}
-                                onChange={(event) => setQuery(event.target.value)}
+                                onChange={(event) =>
+                                    setQuery(event.target.value)
+                                }
                                 placeholder="جستجو نام وکیل یا تخصص..."
                                 className="w-full rounded-xl border border-[#dfe7e4] bg-[#fbfdfc] py-3 pr-11 pl-4 text-sm outline-none"
                             />
@@ -298,13 +345,17 @@ export default function LawyersList() {
                             </span>
 
                             {SORT_OPTIONS.map((option) => {
-                                const active = activeSorts.includes(option.key);
+                                const active = activeSorts.includes(
+                                    option.key,
+                                );
 
                                 return (
                                     <button
                                         key={option.key}
                                         type="button"
-                                        onClick={() => toggleSort(option.key)}
+                                        onClick={() =>
+                                            toggleSort(option.key)
+                                        }
                                         aria-pressed={active}
                                         className={`rounded-full border px-4 py-2 text-xs font-bold transition ${
                                             active
@@ -319,34 +370,44 @@ export default function LawyersList() {
                         </div>
                     </div>
 
-                    {initialSelectionCompleted ? (
+                    {!additionalMode && initialSelectionCompleted ? (
                         <div className="mt-4 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 md:flex-row md:items-center md:justify-between">
                             <span className="text-sm font-bold text-emerald-800">
-                                انتخاب اولیه وکلا برای این درخواست انجام شده است.
+                                انتخاب اولیه وکلا برای این درخواست قبلاً انجام
+                                شده است. دعوت‌های بعدی را از جزئیات درخواست
+                                مدیریت کنید.
                             </span>
                             <button
                                 type="button"
-                                onClick={() => router.push('/client/cases')}
+                                onClick={goBack}
                                 className="rounded-lg bg-[#123f37] px-5 py-2.5 text-sm font-bold text-white"
                             >
                                 پرونده‌های من
                             </button>
                         </div>
+                    ) : maxSelectable === 0 ? (
+                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-bold text-amber-800">
+                            در حال حاضر هر ۵ جایگاه دعوت فعال این درخواست پر
+                            است.
+                        </div>
                     ) : (
                         <div className="mt-4 flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
                             <span className="text-sm font-bold text-[#53645f]">
-                                {selectedIds.length} از {SELECTION_LIMIT} وکیل انتخاب شده
+                                {selectedIds.length} وکیل انتخاب شده؛{' '}
+                                {maxSelectable} جایگاه فعال در دسترس است.
                             </span>
 
                             <button
                                 type="button"
                                 onClick={submitSelection}
-                                disabled={sending || selectedIds.length === 0}
+                                disabled={
+                                    sending || selectedIds.length === 0
+                                }
                                 className="rounded-xl bg-[#123f37] px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
                             >
                                 {sending
                                     ? 'در حال ارسال...'
-                                    : `ثبت و ارسال به ${selectedIds.length} وکیل`}
+                                    : `ارسال درخواست به ${selectedIds.length} وکیل`}
                             </button>
                         </div>
                     )}
@@ -371,10 +432,15 @@ export default function LawyersList() {
                         const lawyer = item.lawyer;
                         const publicId = lawyer?.public_id;
                         const selected = selectedIds.includes(publicId);
+                        const blockedByHistory =
+                            BLOCKED_INVITE_STATUSES.has(
+                                item.invite_status,
+                            );
                         const disabled =
-                            initialSelectionCompleted ||
-                            Boolean(item.invite_status) ||
-                            (!selected && selectedIds.length >= maxSelectable);
+                            selectionLocked ||
+                            blockedByHistory ||
+                            (!selected &&
+                                selectedIds.length >= maxSelectable);
 
                         return (
                             <LawyerCard
@@ -384,9 +450,16 @@ export default function LawyersList() {
                                 selected={selected}
                                 selectionStatus={item.invite_status}
                                 selectionDisabled={disabled}
-                                onSelect={() => toggleLawyer(publicId)}
+                                onSelect={() =>
+                                    toggleLawyer(
+                                        publicId,
+                                        item.invite_status,
+                                    )
+                                }
                                 onProfileClick={() =>
-                                    router.push(`/client/lawyersAdmin/${publicId}`)
+                                    router.push(
+                                        `/client/lawyersAdmin/${publicId}`,
+                                    )
                                 }
                             />
                         );
@@ -414,19 +487,23 @@ export default function LawyersList() {
                         </div>
 
                         <h3 className="mt-5 text-xl font-black text-[#173f38]">
-                            وکلای انتخابی ثبت شدند
+                            درخواست‌ها ارسال شدند
                         </h3>
 
                         <p className="mt-3 text-sm leading-7 text-[#687772]">
-                            درخواست شما برای وکلای انتخاب‌شده ارسال شد. انتخاب اولیه این درخواست تکمیل شده است.
+                            {additionalMode
+                                ? 'وکلای جدید به این درخواست دعوت شدند. وضعیت پاسخ آن‌ها را از صفحه جزئیات درخواست می‌توانید دنبال کنید.'
+                                : 'درخواست شما برای وکلای انتخاب‌شده ارسال شد. انتخاب اولیه این درخواست تکمیل شده است.'}
                         </p>
 
                         <button
                             type="button"
-                            onClick={() => router.push('/client/cases')}
+                            onClick={goBack}
                             className="mt-6 w-full rounded-xl bg-[#123f37] px-5 py-3 font-bold text-white transition hover:bg-[#0d302a]"
                         >
-                            رفتن به پرونده‌های من
+                            {additionalMode
+                                ? 'بازگشت به جزئیات درخواست'
+                                : 'رفتن به پرونده‌های من'}
                         </button>
                     </div>
                 </div>

@@ -111,5 +111,26 @@ export const sendLawyerRequests = async (legalRequestId, lawyerPublicIds) =>
         data: { lawyer_public_ids: lawyerPublicIds },
     });
 
+export async function sendAdditionalLawyerRequests(
+    legalRequestId,
+    lawyerPublicIds,
+) {
+    const results = [];
+
+    for (const lawyerPublicId of lawyerPublicIds) {
+        results.push(
+            await apiRequest(
+                requestPath(
+                    legalRequestId,
+                    `lawyer-selection/${encodeURIComponent(lawyerPublicId)}`,
+                ),
+                { method: 'POST' },
+            ),
+        );
+    }
+
+    return results;
+}
+
 export const getClientLawyerRequests = async (legalRequestId) =>
     apiRequest(requestPath(legalRequestId, 'lawyer-requests'));
