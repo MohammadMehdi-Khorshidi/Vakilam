@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Http\Controllers\Api;
 
@@ -46,8 +46,6 @@ class LegalRequestController extends Controller
         $data = $request->validated();
 
         [$legalRequest, $created] = DB::transaction(function () use ($client, $data): array {
-            // Serialise draft creation for this user so two simultaneous autosaves
-            // cannot create two active drafts.
             User::query()
                 ->whereKey($client->id)
                 ->lockForUpdate()
@@ -384,4 +382,3 @@ class LegalRequestController extends Controller
         ]);
     }
 }
-
