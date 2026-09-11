@@ -6,6 +6,7 @@ import {
     ArrowLeft,
     BriefcaseBusiness,
     Clock3,
+    Eye,
     FilePlus2,
     Hourglass,
 } from 'lucide-react';
@@ -130,21 +131,16 @@ function CaseSection({
                                 </div>
                             </div>
 
-                            {type === 'request' ? (
-                                <Link
-                                    href={`/client/lawyersAdmin?legal_request_id=${encodeURIComponent(
-                                        item.id,
-                                    )}`}
-                                    className="inline-flex w-fit shrink-0 items-center gap-2 rounded-xl border border-[#bcd2cb] bg-[#f7fbf9] px-4 py-2.5 text-sm font-bold text-[#174c42] transition hover:border-[#78a99d] hover:bg-[#eef7f3]"
-                                >
-                                    ادامه فرایند
-                                    <ArrowLeft size={16} />
-                                </Link>
-                            ) : (
-                                <span className="w-fit shrink-0 rounded-xl bg-[#f3f7f5] px-4 py-2.5 text-xs font-bold text-[#6f817b]">
-                                    جزئیات پرونده در مرحله بعد
-                                </span>
-                            )}
+                            <Link
+                                href={`/client/cases/${encodeURIComponent(
+                                    item.id,
+                                )}?type=${type}`}
+                                className="inline-flex w-fit shrink-0 items-center gap-2 rounded-xl border border-[#bcd2cb] bg-[#f7fbf9] px-4 py-2.5 text-sm font-bold text-[#174c42] transition hover:border-[#78a99d] hover:bg-[#eef7f3]"
+                            >
+                                <Eye size={16} />
+                                مشاهده جزئیات
+                                <ArrowLeft size={15} />
+                            </Link>
                         </article>
                     ))}
                 </div>
