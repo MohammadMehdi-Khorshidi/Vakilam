@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\NegotiationMessageSent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Negotiations\StoreFinalProposalRequest;
 use App\Http\Requests\Negotiations\StoreNegotiationMessageRequest;
@@ -56,7 +57,11 @@ class NegotiationController extends Controller
     public function show(Request $request, Negotiation $negotiation): JsonResponse
     {
         $this->ensureParticipant($request, $negotiation);
-        $negotiation->load([...$this->relations(), 'messages.sender:id,public_id,name,last_name']);
+
+        $negotiation->load([
+            ...$this->relations(),
+            'messages.sender:id,public_id,name,last_name',
+        ]);
 
         return response()->json([
             'data' => NegotiationResource::make($negotiation)->resolve(),
@@ -73,9 +78,10 @@ class NegotiationController extends Controller
             in_array($negotiation->status, [
                 Negotiation::STATUS_ACTIVE,
                 Negotiation::STATUS_PROPOSAL_SUBMITTED,
+                Negotiation::STATUS_WON,
             ], true),
             409,
-            'Messages can only be sent while the negotiation is open.',
+            'Messages can only be sent while this negotiation is open.',
         );
 
         $message = $negotiation->messages()->create([
@@ -84,6 +90,11 @@ class NegotiationController extends Controller
         ]);
 
         $message->load('sender:id,public_id,name,last_name');
+
+        broadcast(new NegotiationMessageSent(
+            $negotiation->public_id,
+            $message,
+        ))->toOthers();
 
         return response()->json([
             'message' => 'Negotiation message sent successfully.',
@@ -116,7 +127,7 @@ class NegotiationController extends Controller
                     Negotiation::STATUS_PROPOSAL_SUBMITTED,
                 ], true),
                 409,
-                'This negotiation is already closed.',
+                'This negotiation is already closed or finalized.',
             );
 
             abort_if(
@@ -130,17 +141,19 @@ class NegotiationController extends Controller
                 'closed_at' => now(),
             ])->save();
 
-            $proposal = $locked->proposal()->first();
-            if ($proposal !== null && in_array($proposal->status, [
-                LawyerProposal::STATUS_DRAFT,
-                LawyerProposal::STATUS_SUBMITTED,
-                LawyerProposal::STATUS_SHORTLISTED,
-            ], true)) {
-                $proposal->forceFill(['status' => LawyerProposal::STATUS_CANCELLED])->save();
-            }
+            $locked->proposals()
+                ->whereIn('status', [
+                    LawyerProposal::STATUS_DRAFT,
+                    LawyerProposal::STATUS_SUBMITTED,
+                    LawyerProposal::STATUS_SHORTLISTED,
+                ])
+                ->update(['status' => LawyerProposal::STATUS_CANCELLED]);
 
             if ($locked->distribution_id !== null) {
-                $locked->distribution()->update(['status' => 'closed']);
+                $locked->distribution()->update([
+                    'status' => 'closed',
+                    'closed_at' => now(),
+                ]);
             }
 
             return $locked;
@@ -148,7 +161,9 @@ class NegotiationController extends Controller
 
         return response()->json([
             'message' => 'Negotiation closed successfully.',
-            'data' => NegotiationResource::make($negotiation->load($this->relations()))->resolve(),
+            'data' => NegotiationResource::make(
+                $negotiation->load($this->relations())
+            )->resolve(),
         ]);
     }
 
@@ -161,7 +176,7 @@ class NegotiationController extends Controller
         abort_unless(
             $negotiation->lawyer_profile_id === $user->lawyerProfile->id,
             403,
-            'Only the lawyer in this negotiation can create the final proposal.',
+            'Only the lawyer in this negotiation can create the proposal.',
         );
 
         $proposal = DB::transaction(function () use ($request, $negotiation): LawyerProposal {
@@ -174,34 +189,45 @@ class NegotiationController extends Controller
             abort_unless(
                 $locked->status === Negotiation::STATUS_ACTIVE,
                 409,
-                'A final proposal can only be drafted from an active negotiation.',
+                'A new proposal can only be drafted while negotiation is active.',
+            );
+
+            abort_if(
+                Engagement::query()
+                    ->where('legal_request_id', $locked->legal_request_id)
+                    ->exists(),
+                409,
+                'The agreement is already finalized.',
             );
 
             abort_unless(
                 $locked->legalRequest?->status === 'submitted'
                     && $locked->legalRequest?->service_intent === 'lawyer_selection',
                 409,
-                'This legal request is not available for a final proposal.',
+                'This legal request is not available for a proposal.',
             );
 
-            $existing = LawyerProposal::query()
-                ->where('legal_request_id', $locked->legal_request_id)
-                ->where('lawyer_profile_id', $locked->lawyer_profile_id)
+            $openProposal = $locked->proposals()
+                ->whereIn('status', [
+                    LawyerProposal::STATUS_DRAFT,
+                    LawyerProposal::STATUS_SUBMITTED,
+                    LawyerProposal::STATUS_SHORTLISTED,
+                ])
                 ->lockForUpdate()
+                ->latest('created_at')
                 ->first();
 
-            if ($existing !== null) {
+            if ($openProposal !== null) {
                 abort_unless(
-                    $existing->negotiation_id === $locked->id
-                        && $existing->status === LawyerProposal::STATUS_DRAFT,
+                    $openProposal->status === LawyerProposal::STATUS_DRAFT,
                     409,
-                    'This negotiation already has a finalized proposal.',
+                    'Wait for the client to decide on the current proposal.',
                 );
 
-                $existing->fill($request->validated());
-                $existing->save();
+                $openProposal->fill($request->validated());
+                $openProposal->save();
 
-                return $existing;
+                return $openProposal;
             }
 
             return LawyerProposal::query()->create([
@@ -221,7 +247,7 @@ class NegotiationController extends Controller
         });
 
         return response()->json([
-            'message' => 'Final proposal draft created successfully.',
+            'message' => 'Proposal draft created successfully.',
             'proposal' => $proposal,
         ], 201);
     }
@@ -264,25 +290,34 @@ class NegotiationController extends Controller
 
         abort_unless($user instanceof User && $user->status === 'active', 403);
 
-        $negotiation->loadMissing(['legalRequest:id,client_user_id', 'lawyerProfile:id,user_id']);
+        $negotiation->loadMissing([
+            'legalRequest:id,client_user_id',
+            'lawyerProfile:id,user_id',
+        ]);
 
         $isClient = $negotiation->legalRequest?->client_user_id === $user->id;
         $isLawyer = $negotiation->lawyerProfile?->user_id === $user->id
             && $user->mayActAsRole('lawyer');
 
-        abort_unless($isClient || $isLawyer, 403, 'You are not a participant in this negotiation.');
+        abort_unless(
+            $isClient || $isLawyer,
+            403,
+            'You are not a participant in this negotiation.',
+        );
 
         return $user;
     }
 
-    /** @return array<int, string> */
     private function relations(): array
     {
         return [
             'legalRequest:id,public_id,title,status,client_user_id',
             'lawyerProfile:id,public_id,user_id,full_name,verification_status',
             'distribution:id,legal_request_id,lawyer_profile_id,source,status',
-            'proposal:id,public_id,negotiation_id,status,summary,service_scope,proposed_fee_rial,estimated_days,submitted_at,expires_at',
+            'proposal',
+            'proposals:id,public_id,negotiation_id,status,summary,service_scope,proposed_fee_rial,estimated_days,submitted_at,expires_at,created_at',
+            'engagement:id,public_id,legal_request_id,proposal_id,status,agreement_snapshot,contract_due_at',
+            'engagement.proposal:id,public_id',
         ];
     }
 }

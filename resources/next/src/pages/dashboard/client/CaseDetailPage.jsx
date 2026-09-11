@@ -304,13 +304,6 @@ function InvitationCard({ invitation }) {
                 </div>
             </div>
 
-            {rejected ? (
-                <p className="mt-3 text-xs leading-6 text-red-700">
-                    این وکیل قبلاً درخواست را رد کرده و برای همین درخواست
-                    دوباره قابل دعوت نیست.
-                </p>
-            ) : null}
-
             {hasNegotiation && !rejected ? (
                 <p className="mt-3 text-xs leading-6 text-[#5f746d]">
                     این وکیل درخواست را پذیرفته و مذاکره باز شده است. برای

@@ -6,6 +6,7 @@ import { MessageCircle, Send, Scale } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
 import { getLawyerNegotiations } from '@/lib/api/lawyer';
+import { proposalStatusLabel } from '@/lib/proposalStatus';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -119,7 +120,7 @@ export default function LawyerNegotiationsPage() {
                                     {item.proposal ? (
                                         <span className="inline-flex items-center gap-1">
                                             <Send size={14} />
-                                            پیشنهاد: {item.proposal.status}
+                                            پیشنهاد: {proposalStatusLabel(item.proposal.status)}
                                         </span>
                                     ) : null}
                                 </div>

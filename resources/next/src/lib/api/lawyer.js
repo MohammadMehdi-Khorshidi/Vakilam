@@ -55,3 +55,11 @@ export const submitLawyerProposal = async (proposalPublicId) => {
 
     return payload?.proposal ?? unwrapData(payload);
 };
+
+
+export const getEngagement = async (publicId) =>
+    unwrapData(
+        await apiRequest(
+            `engagements/${encodeURIComponent(publicId)}`,
+        ),
+    );

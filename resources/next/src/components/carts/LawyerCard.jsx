@@ -9,7 +9,7 @@ const vazirmatn = Vazirmatn({
 const selectionStatusLabels = {
     pending: 'در انتظار پاسخ وکیل',
     negotiating: 'مذاکره فعال',
-    rejected: 'این وکیل درخواست را رد کرده',
+    rejected: 'رد شده توسط وکیل',
     expired: 'دعوت قبلی منقضی شده',
     closed: 'مذاکره بسته شده',
     selected: 'وکیل انتخاب شده',
@@ -130,24 +130,12 @@ export default function LawyerCard({
                 </div>
 
                 <div className="flex shrink-0 flex-wrap gap-2">
-                    {selectable ? (
-                        blockedByHistory ? (
-                            <span
-                                className={`rounded-[11px] border px-5 py-3 text-sm font-bold ${
-                                    rejected
-                                        ? 'border-red-200 bg-red-50 text-red-700'
-                                        : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                }`}
-                            >
-                                {selectionStatusLabels[selectionStatus] ||
-                                    'قبلاً دعوت شده'}
-                            </span>
-                        ) : (
-                            <button
+                    {selectable && !blockedByHistory ? (
+                        <button
                                 type="button"
                                 onClick={onSelect}
                                 disabled={selectionDisabled}
-                                className={`rounded-[11px] border px-5 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                className={`rounded-lg border px-3.5 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                                     selected
                                         ? 'border-[#b98b2e] bg-[#fff7e4] text-[#765719]'
                                         : 'border-[#123f37] bg-white text-[#123f37] hover:bg-[#f2f8f6]'
@@ -159,13 +147,12 @@ export default function LawyerCard({
                                       ? 'دعوت دوباره'
                                       : 'انتخاب وکیل'}
                             </button>
-                        )
                     ) : null}
 
                     <button
                         type="button"
                         onClick={onProfileClick}
-                        className="rounded-[11px] bg-[#123f37] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#0d302a]"
+                        className="rounded-lg bg-[#123f37] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#0d302a]"
                     >
                         مشاهده پروفایل
                     </button>

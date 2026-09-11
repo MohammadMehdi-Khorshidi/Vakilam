@@ -14,13 +14,6 @@ use Illuminate\Support\Facades\DB;
 
 class ProposalSelectionService
 {
-    /**
-     * Atomically select one submitted FINAL proposal and create the single
-     * pre-contract Engagement. A proposal is final only when it belongs to a
-     * valid negotiation that already reached proposal_submitted state.
-     *
-     * @return array{proposal: LawyerProposal, engagement: Engagement, created: bool}
-     */
     public function select(
         LawyerProposal $proposal,
         User $client,
@@ -96,7 +89,7 @@ class ProposalSelectionService
                     && $negotiation->lawyer_profile_id === $lockedProposal->lawyer_profile_id
                     && $negotiation->status === Negotiation::STATUS_PROPOSAL_SUBMITTED,
                 409,
-                'The selected proposal is not the final output of an active negotiation.',
+                'The selected proposal is not the current output of this negotiation.',
             );
 
             $lawyerProfile = $lockedProposal->lawyerProfile;
@@ -110,15 +103,18 @@ class ProposalSelectionService
                 'The selected lawyer is no longer eligible.',
             );
 
-            $existingEngagement = Engagement::query()
-                ->where('legal_request_id', $legalRequest->id)
-                ->first();
-
             abort_if(
-                $existingEngagement !== null,
+                Engagement::query()
+                    ->where('legal_request_id', $legalRequest->id)
+                    ->exists(),
                 409,
                 'A lawyer has already been selected for this legal request.',
             );
+
+            LawyerProposal::query()
+                ->where('legal_request_id', $legalRequest->id)
+                ->lockForUpdate()
+                ->get();
 
             LawyerProposal::query()
                 ->where('legal_request_id', $legalRequest->id)
@@ -146,16 +142,25 @@ class ProposalSelectionService
                     'closed_at' => now(),
                 ]);
 
+            // Winning negotiation remains readable and writable.
             $negotiation->forceFill([
                 'status' => Negotiation::STATUS_WON,
-                'closed_at' => now(),
+                'closed_at' => null,
             ])->save();
 
             LegalRequestDistribution::query()
                 ->where('legal_request_id', $legalRequest->id)
                 ->whereKeyNot($lockedProposal->distribution_id)
-                ->whereIn('status', ['pending', 'negotiating', 'interest_pending', 'sent'])
-                ->update(['status' => 'cancelled']);
+                ->whereIn('status', [
+                    'pending',
+                    'negotiating',
+                    'interest_pending',
+                    'sent',
+                ])
+                ->update([
+                    'status' => 'cancelled',
+                    'closed_at' => now(),
+                ]);
 
             if ($lockedProposal->distribution_id !== null) {
                 LegalRequestDistribution::query()
@@ -165,10 +170,21 @@ class ProposalSelectionService
 
             $legalRequest->forceFill(['status' => 'matched'])->save();
 
+            $snapshot = [
+                'proposal_public_id' => $lockedProposal->public_id,
+                'negotiation_public_id' => $negotiation->public_id,
+                'summary' => $lockedProposal->summary,
+                'service_scope' => $lockedProposal->service_scope,
+                'proposed_fee_rial' => $lockedProposal->proposed_fee_rial,
+                'estimated_days' => $lockedProposal->estimated_days,
+                'accepted_at' => now()->toISOString(),
+            ];
+
             try {
                 $engagement = Engagement::query()->create([
                     'legal_request_id' => $legalRequest->id,
                     'proposal_id' => $lockedProposal->id,
+                    'agreement_snapshot' => $snapshot,
                     'client_user_id' => $client->id,
                     'lawyer_profile_id' => $lockedProposal->lawyer_profile_id,
                     'status' => 'pending_contract',
@@ -197,6 +213,7 @@ class ProposalSelectionService
                     'negotiation_id' => $negotiation->id,
                     'engagement_id' => $engagement->id,
                     'lawyer_profile_id' => $lockedProposal->lawyer_profile_id,
+                    'agreement_snapshot' => $snapshot,
                 ],
             ]);
 

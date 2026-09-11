@@ -10,6 +10,18 @@ class NegotiationResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $mapProposal = static fn ($proposal): array => [
+            'public_id' => $proposal->public_id,
+            'status' => $proposal->status,
+            'summary' => $proposal->summary,
+            'service_scope' => $proposal->service_scope,
+            'proposed_fee_rial' => $proposal->proposed_fee_rial,
+            'estimated_days' => $proposal->estimated_days,
+            'submitted_at' => $proposal->submitted_at,
+            'expires_at' => $proposal->expires_at,
+            'created_at' => $proposal->created_at,
+        ];
+
         return [
             'public_id' => $this->public_id,
             'source' => $this->source,
@@ -31,26 +43,31 @@ class NegotiationResource extends JsonResource
                 'source' => $this->distribution->source,
                 'status' => $this->distribution->status,
             ],
-            'proposal' => $this->proposal === null ? null : [
-                'public_id' => $this->proposal->public_id,
-                'status' => $this->proposal->status,
-                'summary' => $this->proposal->summary,
-                'service_scope' => $this->proposal->service_scope,
-                'proposed_fee_rial' => $this->proposal->proposed_fee_rial,
-                'estimated_days' => $this->proposal->estimated_days,
-                'submitted_at' => $this->proposal->submitted_at,
-                'expires_at' => $this->proposal->expires_at,
+            'proposal' => $this->proposal === null ? null : $mapProposal($this->proposal),
+            'proposals' => $this->whenLoaded(
+                'proposals',
+                fn () => $this->proposals->map($mapProposal)->values(),
+            ),
+            'engagement' => $this->engagement === null ? null : [
+                'public_id' => $this->engagement->public_id,
+                'status' => $this->engagement->status,
+                'proposal_public_id' => $this->engagement->proposal?->public_id,
+                'agreement_snapshot' => $this->engagement->agreement_snapshot,
+                'contract_due_at' => $this->engagement->contract_due_at,
             ],
-            'messages' => $this->whenLoaded('messages', fn () => $this->messages->map(fn ($message): array => [
-                'id' => $message->id,
-                'body' => $message->body,
-                'created_at' => $message->created_at,
-                'sender' => $message->sender === null ? null : [
-                    'public_id' => $message->sender->public_id,
-                    'name' => $message->sender->name,
-                    'last_name' => $message->sender->last_name,
-                ],
-            ])->values()),
+            'messages' => $this->whenLoaded(
+                'messages',
+                fn () => $this->messages->map(fn ($message): array => [
+                    'id' => $message->id,
+                    'body' => $message->body,
+                    'created_at' => $message->created_at,
+                    'sender' => $message->sender === null ? null : [
+                        'public_id' => $message->sender->public_id,
+                        'name' => $message->sender->name,
+                        'last_name' => $message->sender->last_name,
+                    ],
+                ])->values(),
+            ),
         ];
     }
 }
