@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Negotiations;
 
+use App\Rules\NoContactInformation;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreFinalProposalRequest extends FormRequest
@@ -14,10 +15,20 @@ class StoreFinalProposalRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'summary' => ['nullable', 'string', 'max:10000'],
-            'service_scope' => ['nullable', 'string', 'max:20000'],
-            'proposed_fee_rial' => ['nullable', 'integer', 'min:0'],
-            'estimated_days' => ['nullable', 'integer', 'min:1'],
+            'summary' => [
+                'required',
+                'string',
+                'max:10000',
+                new NoContactInformation(),
+            ],
+            'service_scope' => [
+                'required',
+                'string',
+                'max:20000',
+                new NoContactInformation(),
+            ],
+            'proposed_fee_rial' => ['required', 'integer', 'min:1'],
+            'estimated_days' => ['required', 'integer', 'min:1', 'max:3650'],
         ];
     }
 }

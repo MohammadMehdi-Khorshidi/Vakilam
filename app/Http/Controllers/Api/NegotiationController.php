@@ -70,9 +70,12 @@ class NegotiationController extends Controller
         $user = $this->ensureParticipant($request, $negotiation);
 
         abort_unless(
-            $negotiation->status === Negotiation::STATUS_ACTIVE,
+            in_array($negotiation->status, [
+                Negotiation::STATUS_ACTIVE,
+                Negotiation::STATUS_PROPOSAL_SUBMITTED,
+            ], true),
             409,
-            'Messages can only be sent while the negotiation is active.',
+            'Messages can only be sent while the negotiation is open.',
         );
 
         $message = $negotiation->messages()->create([
@@ -80,12 +83,19 @@ class NegotiationController extends Controller
             'body' => $request->validated('body'),
         ]);
 
+        $message->load('sender:id,public_id,name,last_name');
+
         return response()->json([
             'message' => 'Negotiation message sent successfully.',
             'data' => [
                 'id' => $message->id,
                 'body' => $message->body,
                 'created_at' => $message->created_at,
+                'sender' => $message->sender === null ? null : [
+                    'public_id' => $message->sender->public_id,
+                    'name' => $message->sender->name,
+                    'last_name' => $message->sender->last_name,
+                ],
             ],
         ], 201);
     }

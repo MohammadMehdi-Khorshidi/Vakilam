@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Negotiations;
 
+use App\Rules\NoContactInformation;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreNegotiationMessageRequest extends FormRequest
@@ -14,7 +15,12 @@ class StoreNegotiationMessageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => ['required', 'string', 'max:10000'],
+            'body' => [
+                'required',
+                'string',
+                'max:10000',
+                new NoContactInformation(),
+            ],
         ];
     }
 }
