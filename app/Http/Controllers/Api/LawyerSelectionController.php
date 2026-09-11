@@ -41,6 +41,12 @@ class LawyerSelectionController extends Controller
                 'legalRequest.legalCategory',
                 'legalRequest.province',
                 'legalRequest.city',
+                'legalRequest.parties',
+                'legalRequest.documents' => fn ($query) => $query
+                    ->where('status', '!=', 'archived')
+                    ->latest('created_at'),
+                'legalRequest.documents.documentType',
+                'legalRequest.documents.currentFile',
                 'negotiation',
             ])
             ->latest('sent_at')
@@ -51,17 +57,56 @@ class LawyerSelectionController extends Controller
                 'distribution_id' => $distribution->id,
                 'status' => $distribution->status,
                 'sent_at' => $distribution->sent_at?->toISOString(),
+                'responded_at' => $distribution->responded_at?->toISOString(),
                 'expires_at' => $distribution->expires_at?->toISOString(),
+                'closed_at' => $distribution->closed_at?->toISOString(),
                 'negotiation_public_id' => $distribution->negotiation?->public_id,
-                'legal_request' => [
-                    'public_id' => $distribution->legalRequest?->public_id,
-                    'title' => $distribution->legalRequest?->title,
-                    'description' => $distribution->legalRequest?->description,
-                    'urgency' => $distribution->legalRequest?->urgency,
-                    'category' => $distribution->legalRequest?->legalCategory?->name,
-                    'province' => $distribution->legalRequest?->province?->name,
-                    'city' => $distribution->legalRequest?->city?->name,
-                ],
+                'legal_request' => $distribution->legalRequest === null
+                    ? null
+                    : [
+                        'public_id' => $distribution->legalRequest->public_id,
+                        'title' => $distribution->legalRequest->title,
+                        'description' => $distribution->legalRequest->description,
+                        'urgency' => $distribution->legalRequest->urgency,
+                        'service_intent' => $distribution->legalRequest->service_intent,
+                        'status' => $distribution->legalRequest->status,
+                        'submitted_at' => $distribution->legalRequest->submitted_at?->toISOString(),
+                        'created_at' => $distribution->legalRequest->created_at?->toISOString(),
+                        'category' => $distribution->legalRequest->legalCategory?->name,
+                        'province' => $distribution->legalRequest->province?->name,
+                        'city' => $distribution->legalRequest->city?->name,
+                        'parties' => $distribution->legalRequest->parties
+                            ->map(fn ($party): array => [
+                                'id' => $party->id,
+                                'party_role' => $party->party_role,
+                                'full_name' => $party->full_name,
+                                'relation_note' => $party->relation_note,
+                                'is_client' => (bool) $party->is_client,
+                            ])
+                            ->values(),
+                        'documents' => $distribution->legalRequest->documents
+                            ->map(fn ($document): array => [
+                                'id' => $document->id,
+                                'public_id' => $document->public_id,
+                                'title' => $document->title,
+                                'status' => $document->status,
+                                'document_type' => $document->documentType === null
+                                    ? null
+                                    : [
+                                        'id' => $document->documentType->id,
+                                        'code' => $document->documentType->code,
+                                        'name' => $document->documentType->name,
+                                    ],
+                                'current_file' => $document->currentFile === null
+                                    ? null
+                                    : [
+                                        'original_name' => $document->currentFile->original_name,
+                                        'mime_type' => $document->currentFile->mime_type,
+                                        'size_bytes' => $document->currentFile->size_bytes,
+                                    ],
+                            ])
+                            ->values(),
+                    ],
             ],
         );
 

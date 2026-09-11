@@ -256,6 +256,7 @@ function ProposalCard({ proposal }) {
 
 function InvitationCard({ invitation }) {
     const rejected = invitation.status === 'rejected';
+    const hasNegotiation = Boolean(invitation.negotiation_public_id);
 
     return (
         <article
@@ -275,24 +276,45 @@ function InvitationCard({ invitation }) {
                     </p>
                 </div>
 
-                <span
-                    className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold ${
-                        rejected
-                            ? 'bg-red-100 text-red-700'
-                            : invitation.status === 'negotiating'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-[#eef4f2] text-[#536d65]'
-                    }`}
-                >
-                    {invitationStatusLabels[invitation.status] ||
-                        invitation.status}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                    <span
+                        className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold ${
+                            rejected
+                                ? 'bg-red-100 text-red-700'
+                                : invitation.status === 'negotiating'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-[#eef4f2] text-[#536d65]'
+                        }`}
+                    >
+                        {invitationStatusLabels[invitation.status] ||
+                            invitation.status}
+                    </span>
+
+                    {hasNegotiation ? (
+                        <Link
+                            href={`/client/negotiation/${encodeURIComponent(
+                                invitation.negotiation_public_id,
+                            )}`}
+                            className="inline-flex items-center gap-2 rounded-lg bg-[#174c42] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#103b33]"
+                        >
+                            <MessageCircle size={15} />
+                            ورود به گفتگو
+                        </Link>
+                    ) : null}
+                </div>
             </div>
 
             {rejected ? (
                 <p className="mt-3 text-xs leading-6 text-red-700">
                     این وکیل قبلاً درخواست را رد کرده و برای همین درخواست
                     دوباره قابل دعوت نیست.
+                </p>
+            ) : null}
+
+            {hasNegotiation && !rejected ? (
+                <p className="mt-3 text-xs leading-6 text-[#5f746d]">
+                    این وکیل درخواست را پذیرفته و مذاکره باز شده است. برای
+                    ادامه گفتگو از دکمه «ورود به گفتگو» استفاده کنید.
                 </p>
             ) : null}
         </article>

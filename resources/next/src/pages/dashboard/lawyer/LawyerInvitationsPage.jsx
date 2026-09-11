@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import {
     Check,
     Clock3,
+    FileText,
     MapPin,
     Scale,
+    Users,
     X,
 } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
@@ -29,6 +31,20 @@ const urgencyLabels = {
     urgent: 'فوری',
 };
 
+const serviceIntentLabels = {
+    consultation: 'مشاوره حقوقی',
+    lawyer_selection: 'انتخاب وکیل',
+};
+
+const partyRoleLabels = {
+    plaintiff: 'خواهان',
+    defendant: 'خوانده',
+    claimant: 'شاکی',
+    accused: 'متهم',
+    client: 'موکل',
+    opponent: 'طرف مقابل',
+};
+
 const statusLabels = {
     pending: 'در انتظار پاسخ شما',
     negotiating: 'پذیرفته‌شده / مذاکره فعال',
@@ -40,13 +56,28 @@ const statusLabels = {
 function formatDate(value) {
     if (!value) return 'ثبت نشده';
 
-    return new Intl.DateTimeFormat('fa-IR', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    }).format(new Date(value));
+    try {
+        return new Intl.DateTimeFormat('fa-IR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }).format(new Date(value));
+    } catch {
+        return 'ثبت نشده';
+    }
+}
+
+function InfoItem({ label, value }) {
+    return (
+        <div className="rounded-xl bg-[#f7faf8] px-4 py-3">
+            <p className="text-[11px] font-bold text-[#8b9994]">{label}</p>
+            <p className="mt-1.5 text-sm font-extrabold text-[#36584f]">
+                {value || 'ثبت نشده'}
+            </p>
+        </div>
+    );
 }
 
 export default function LawyerInvitationsPage() {
@@ -124,8 +155,8 @@ export default function LawyerInvitationsPage() {
                         دعوت‌های موکلان
                     </h1>
                     <p className="mt-2 text-sm leading-7 text-[#75847f]">
-                        درخواست‌هایی که موکلان مستقیماً برای شما ارسال
-                        کرده‌اند. قبول درخواست، یک مذاکره جدید باز می‌کند.
+                        جزئیات درخواست را کامل بررسی کنید و بعد درباره قبول
+                        یا رد آن تصمیم بگیرید.
                     </p>
                 </header>
 
@@ -144,17 +175,19 @@ export default function LawyerInvitationsPage() {
                         فعلاً دعوتی برای شما ثبت نشده است.
                     </div>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                         {invitations.map((invitation) => {
                             const request = invitation.legal_request ?? {};
                             const pending = invitation.status === 'pending';
                             const busy =
                                 busyId === invitation.distribution_id;
+                            const parties = request.parties ?? [];
+                            const documents = request.documents ?? [];
 
                             return (
                                 <article
                                     key={invitation.distribution_id}
-                                    className="rounded-[20px] border border-[#dde5e1] bg-white p-5 shadow-[0_8px_30px_rgba(18,62,53,0.04)]"
+                                    className="rounded-[22px] border border-[#d9e4df] bg-white p-5 shadow-[0_8px_30px_rgba(18,62,53,0.04)] md:p-6"
                                 >
                                     <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                                         <div className="min-w-0">
@@ -162,8 +195,7 @@ export default function LawyerInvitationsPage() {
                                                 <span className="rounded-full bg-[#edf5f2] px-3 py-1 text-xs font-bold text-[#315f54]">
                                                     {statusLabels[
                                                         invitation.status
-                                                    ] ||
-                                                        invitation.status}
+                                                    ] || invitation.status}
                                                 </span>
                                                 <span className="rounded-full bg-[#fff8e9] px-3 py-1 text-xs font-bold text-[#896721]">
                                                     فوریت:{' '}
@@ -173,7 +205,7 @@ export default function LawyerInvitationsPage() {
                                                 </span>
                                             </div>
 
-                                            <h2 className="mt-4 text-lg font-black text-[#173f38]">
+                                            <h2 className="mt-4 text-xl font-black text-[#173f38]">
                                                 {request.title ||
                                                     'درخواست حقوقی بدون عنوان'}
                                             </h2>
@@ -196,17 +228,13 @@ export default function LawyerInvitationsPage() {
                                                 </span>
                                                 <span className="inline-flex items-center gap-1.5">
                                                     <Clock3 size={15} />
+                                                    ثبت:{' '}
                                                     {formatDate(
-                                                        invitation.sent_at,
+                                                        request.submitted_at ||
+                                                            request.created_at,
                                                     )}
                                                 </span>
                                             </div>
-
-                                            {request.description ? (
-                                                <p className="mt-4 max-w-4xl whitespace-pre-wrap text-sm leading-8 text-[#60716b]">
-                                                    {request.description}
-                                                </p>
-                                            ) : null}
                                         </div>
 
                                         <div className="flex shrink-0 flex-wrap gap-2">
@@ -257,6 +285,142 @@ export default function LawyerInvitationsPage() {
                                                 </button>
                                             ) : null}
                                         </div>
+                                    </div>
+
+                                    <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                        <InfoItem
+                                            label="موضوع حقوقی"
+                                            value={request.category}
+                                        />
+                                        <InfoItem
+                                            label="نوع خدمت"
+                                            value={
+                                                serviceIntentLabels[
+                                                    request.service_intent
+                                                ]
+                                            }
+                                        />
+                                        <InfoItem
+                                            label="استان و شهر"
+                                            value={[
+                                                request.province,
+                                                request.city,
+                                            ]
+                                                .filter(Boolean)
+                                                .join('، ')}
+                                        />
+                                        <InfoItem
+                                            label="تاریخ ارسال دعوت"
+                                            value={formatDate(
+                                                invitation.sent_at,
+                                            )}
+                                        />
+                                    </div>
+
+                                    <section className="mt-5 rounded-2xl border border-[#e2e9e6] bg-[#fbfdfc] p-4">
+                                        <div className="flex items-center gap-2 font-extrabold text-[#31534b]">
+                                            <FileText size={18} />
+                                            شرح کامل درخواست
+                                        </div>
+                                        <p className="mt-3 whitespace-pre-wrap text-sm leading-8 text-[#60716b]">
+                                            {request.description ||
+                                                'شرحی ثبت نشده است.'}
+                                        </p>
+                                    </section>
+
+                                    <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                                        <section className="rounded-2xl border border-[#e2e9e6] p-4">
+                                            <div className="flex items-center gap-2 font-extrabold text-[#31534b]">
+                                                <Users size={18} />
+                                                طرفین ثبت‌شده
+                                            </div>
+
+                                            {parties.length === 0 ? (
+                                                <p className="mt-3 text-sm text-[#899691]">
+                                                    طرفی ثبت نشده است.
+                                                </p>
+                                            ) : (
+                                                <div className="mt-3 space-y-2">
+                                                    {parties.map((party) => (
+                                                        <div
+                                                            key={party.id}
+                                                            className="rounded-xl bg-[#f8faf9] p-3"
+                                                        >
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className="font-bold text-[#405b53]">
+                                                                    {party.full_name ||
+                                                                        'بدون نام'}
+                                                                </span>
+                                                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[#74847e]">
+                                                                    {partyRoleLabels[
+                                                                        party
+                                                                            .party_role
+                                                                    ] ||
+                                                                        party.party_role ||
+                                                                        'طرف پرونده'}
+                                                                </span>
+                                                                {party.is_client ? (
+                                                                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                                                                        موکل
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
+                                                            {party.relation_note ? (
+                                                                <p className="mt-2 text-xs leading-6 text-[#7f8d88]">
+                                                                    {
+                                                                        party.relation_note
+                                                                    }
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </section>
+
+                                        <section className="rounded-2xl border border-[#e2e9e6] p-4">
+                                            <div className="flex items-center gap-2 font-extrabold text-[#31534b]">
+                                                <FileText size={18} />
+                                                مدارک ثبت‌شده
+                                            </div>
+
+                                            {documents.length === 0 ? (
+                                                <p className="mt-3 text-sm text-[#899691]">
+                                                    مدرکی ثبت نشده است.
+                                                </p>
+                                            ) : (
+                                                <div className="mt-3 space-y-2">
+                                                    {documents.map(
+                                                        (document) => (
+                                                            <div
+                                                                key={
+                                                                    document.id ||
+                                                                    document.public_id
+                                                                }
+                                                                className="rounded-xl bg-[#f8faf9] p-3"
+                                                            >
+                                                                <p className="font-bold text-[#405b53]">
+                                                                    {document.title ||
+                                                                        document
+                                                                            .current_file
+                                                                            ?.original_name ||
+                                                                        'مدرک'}
+                                                                </p>
+                                                                <p className="mt-1 text-xs text-[#7f8d88]">
+                                                                    {document
+                                                                        .document_type
+                                                                        ?.name ||
+                                                                        document
+                                                                            .current_file
+                                                                            ?.original_name ||
+                                                                        'فایل ثبت‌شده'}
+                                                                </p>
+                                                            </div>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            )}
+                                        </section>
                                     </div>
                                 </article>
                             );
