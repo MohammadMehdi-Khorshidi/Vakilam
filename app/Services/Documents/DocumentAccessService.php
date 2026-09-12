@@ -3,6 +3,7 @@
 namespace App\Services\Documents;
 
 use App\Models\Document;
+use App\Models\Engagement;
 use App\Models\LegalMatter;
 use App\Models\LegalRequest;
 use App\Models\User;
@@ -35,6 +36,22 @@ class DocumentAccessService
             }
 
             if ($this->canManageLegalRequest($user, $legalRequest)) {
+                return true;
+            }
+
+            // The selected lawyer must be able to inspect documents requested
+            // during the accepted engagement, even before payment creates a LegalMatter.
+            if (
+                $user->mayActAsRole('lawyer')
+                && Engagement::query()
+                    ->where('legal_request_id', $legalRequest->id)
+                    ->whereIn('status', ['pending_contract', 'active'])
+                    ->whereHas(
+                        'lawyerProfile',
+                        fn ($query) => $query->where('user_id', $user->id),
+                    )
+                    ->exists()
+            ) {
                 return true;
             }
 

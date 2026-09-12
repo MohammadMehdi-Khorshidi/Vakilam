@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Contract;
 use App\Models\Engagement;
+use App\Models\EngagementDocumentRequest;
 use App\Models\User;
 use App\Services\Contracts\ContractFlowService;
 use Illuminate\Http\JsonResponse;
@@ -66,6 +66,17 @@ class EngagementWorkflowController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        $incompleteRequiredDocuments = $engagement->documentRequests()
+            ->where('is_required', true)
+            ->where('status', '!=', 'accepted')
+            ->exists();
+
+        abort_if(
+            $incompleteRequiredDocuments,
+            409,
+            'Required client documents must be reviewed and accepted before the contract is sent.',
+        );
+
         $contractFlowService->issueFromEngagement($engagement, $user);
 
         return response()->json([
@@ -103,12 +114,14 @@ class EngagementWorkflowController extends Controller
     {
         $engagement->load([
             'legalRequest:id,public_id,title,status',
-            'proposal:id,public_id,status,summary,service_scope,proposed_fee_rial,estimated_days',
+            'proposal:id,public_id,negotiation_id,status,summary,service_scope,proposed_fee_rial,estimated_days',
+            'proposal.negotiation:id,public_id,status',
             'lawyerProfile:id,public_id,user_id,full_name',
             'lawyerProfile.user:id,public_id,name,last_name',
             'client:id,public_id,name,last_name',
             'contract.versions.signatures',
             'contract.invoices.payments',
+            'documentRequests.document.currentFile',
         ]);
 
         $snapshot = (array) $engagement->agreement_snapshot;
@@ -144,6 +157,10 @@ class EngagementWorkflowController extends Controller
                 'public_id' => $engagement->lawyerProfile?->public_id,
                 'full_name' => $engagement->lawyerProfile?->full_name,
             ],
+            'negotiation' => $proposal?->negotiation === null ? null : [
+                'public_id' => $proposal->negotiation->public_id,
+                'status' => $proposal->negotiation->status,
+            ],
             'agreement' => [
                 'proposal_public_id' => $snapshot['proposal_public_id'] ?? $proposal?->public_id,
                 'summary' => $snapshot['summary'] ?? $proposal?->summary,
@@ -166,6 +183,9 @@ class EngagementWorkflowController extends Controller
                 'deliverables' => '',
                 'execution_notes' => '',
             ],
+            'document_requests' => $engagement->documentRequests
+                ->map(fn (EngagementDocumentRequest $item): array => $this->serializeDocumentRequest($item))
+                ->values(),
             'contract' => $contract === null ? null : [
                 'public_id' => $contract->public_id,
                 'status' => $contract->status,
@@ -199,6 +219,29 @@ class EngagementWorkflowController extends Controller
                         'paid_at' => $payment->paid_at,
                     ])->values(),
                 ],
+            ],
+        ];
+    }
+
+    private function serializeDocumentRequest(EngagementDocumentRequest $item): array
+    {
+        $file = $item->document?->currentFile;
+
+        return [
+            'public_id' => $item->public_id,
+            'title' => $item->title,
+            'instructions' => $item->instructions,
+            'is_required' => $item->is_required,
+            'status' => $item->status,
+            'review_note' => $item->review_note,
+            'uploaded_at' => $item->uploaded_at,
+            'reviewed_at' => $item->reviewed_at,
+            'document' => $item->document === null ? null : [
+                'public_id' => $item->document->public_id,
+                'title' => $item->document->title,
+                'file_name' => $file?->original_name,
+                'mime_type' => $file?->mime_type,
+                'size_bytes' => $file?->size_bytes,
             ],
         ];
     }

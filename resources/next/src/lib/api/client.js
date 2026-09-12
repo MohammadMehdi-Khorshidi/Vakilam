@@ -32,20 +32,7 @@ function getStoredToken() {
     }
 }
 
-/**
- * Low-level API request helper.
- * @param {string} path - path relative to /api (no leading slash required)
- * @param {{ method?: string, data?: any, query?: Record<string, any>, headers?: Record<string, string>, auth?: boolean }} options
- */
-export async function apiRequest(path, options = {}) {
-    const {
-        method = 'GET',
-        data,
-        query,
-        headers: extraHeaders = {},
-        auth = true,
-    } = options;
-
+function buildUrl(path, query) {
     const url = new URL(
         path.replace(/^\//, ''),
         apiBaseUrl().endsWith('/') ? apiBaseUrl() : `${apiBaseUrl()}/`,
@@ -59,44 +46,73 @@ export async function apiRequest(path, options = {}) {
         });
     }
 
+    return url;
+}
+
+function authHeaders(extraHeaders = {}, auth = true) {
     const headers = {
         Accept: 'application/json',
         ...extraHeaders,
     };
 
-    if (data !== undefined) {
-        headers['Content-Type'] = 'application/json';
-    }
-
     if (auth) {
         const token = getStoredToken();
-        if (token) {
-            headers.Authorization = `Bearer ${token}`;
+        if (token) headers.Authorization = `Bearer ${token}`;
+    }
+
+    return headers;
+}
+
+/**
+ * Low-level API request helper.
+ * `data` can be a plain object or FormData.
+ */
+export async function apiRequest(path, options = {}) {
+    const {
+        method = 'GET',
+        data,
+        query,
+        headers: extraHeaders = {},
+        auth = true,
+    } = options;
+
+    const url = buildUrl(path, query);
+    const headers = authHeaders(extraHeaders, auth);
+    const isFormData =
+        typeof FormData !== 'undefined' && data instanceof FormData;
+
+    let body;
+    if (data !== undefined) {
+        if (isFormData) {
+            body = data;
+        } else {
+            headers['Content-Type'] = 'application/json';
+            body = JSON.stringify(data);
         }
     }
 
     const response = await fetch(url.toString(), {
         method,
         headers,
-        body: data !== undefined ? JSON.stringify(data) : undefined,
+        body,
         credentials: 'include',
     });
 
-    let body = null;
+    let responseBody = null;
     const contentType = response.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
         try {
-            body = await response.json();
+            responseBody = await response.json();
         } catch {
-            body = null;
+            responseBody = null;
         }
     }
 
     if (!response.ok) {
         const message =
-            (body && (body.message || body.error)) ||
-            (body?.errors &&
-                Object.values(body.errors).flat().filter(Boolean)[0]) ||
+            (responseBody && (responseBody.message || responseBody.error)) ||
+            (responseBody?.errors &&
+                Object.values(responseBody.errors).flat().filter(Boolean)[0]) ||
             `خطا در ارتباط با سرور (${response.status})`;
 
         if (auth && response.status === 401 && typeof window !== 'undefined') {
@@ -104,19 +120,58 @@ export async function apiRequest(path, options = {}) {
                 window.localStorage.removeItem('vakilam_access_token');
                 window.localStorage.removeItem('vakilam_user');
             } catch {
-                // Storage may be unavailable, but the UI still needs the event.
+                // Storage may be unavailable.
             }
 
             window.dispatchEvent(new Event('vakilam:auth-session-changed'));
         }
 
-        throw new ApiError(String(message), response.status, body);
+        throw new ApiError(String(message), response.status, responseBody);
     }
 
-    return body;
+    return responseBody;
 }
 
-/** Prefer `data` key when present (Laravel resource wrappers). */
+export async function apiDownload(path, options = {}) {
+    const { query, auth = true } = options;
+    const response = await fetch(buildUrl(path, query).toString(), {
+        method: 'GET',
+        headers: authHeaders({}, auth),
+        credentials: 'include',
+    });
+
+    if (!response.ok) {
+        let body = null;
+        try {
+            body = await response.json();
+        } catch {
+            body = null;
+        }
+        throw new ApiError(
+            body?.message || `خطا در دریافت فایل (${response.status})`,
+            response.status,
+            body,
+        );
+    }
+
+    const blob = await response.blob();
+    const disposition = response.headers.get('content-disposition') || '';
+    const utfName = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    const plainName = disposition.match(/filename="?([^";]+)"?/i);
+    const fileName = utfName
+        ? decodeURIComponent(utfName[1])
+        : plainName?.[1] || 'document';
+
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+}
+
 export function unwrapData(payload) {
     if (payload && typeof payload === 'object' && 'data' in payload) {
         return payload.data;

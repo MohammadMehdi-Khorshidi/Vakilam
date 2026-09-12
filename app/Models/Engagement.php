@@ -95,6 +95,11 @@ class Engagement extends Model
         return $this->hasOne(LegalMatter::class);
     }
 
+    public function documentRequests()
+    {
+        return $this->hasMany(EngagementDocumentRequest::class);
+    }
+
     public function reviews()
     {
         return $this->hasMany(Review::class);
