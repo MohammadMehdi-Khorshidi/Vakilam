@@ -279,6 +279,8 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
 
     const {
         connected,
+        connectionState,
+        connectionError,
         otherOnline,
         otherTyping,
         notifyTyping,
@@ -454,9 +456,11 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
                                 <span className="text-xs">
                                     {otherOnline
                                         ? 'آنلاین'
-                                        : connected
-                                          ? 'آفلاین'
-                                          : 'در حال اتصال...'}
+                                        : connectionState === 'error'
+                                          ? `خطای اتصال${connectionError ? `: ${connectionError}` : ''}`
+                                          : connected
+                                            ? 'آفلاین'
+                                            : 'در حال اتصال...'}
                                 </span>
                             </div>
                         </div>

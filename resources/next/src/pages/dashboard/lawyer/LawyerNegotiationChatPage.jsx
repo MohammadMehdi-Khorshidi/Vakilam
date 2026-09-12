@@ -93,7 +93,7 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
     });
   },[]);
   const onRealtimeState = useCallback(()=>{ load({silent:true}); },[load]);
-  const {connected,otherOnline,otherTyping,notifyTyping} = useNegotiationRealtime({
+  const {connected,connectionState,connectionError,otherOnline,otherTyping,notifyTyping} = useNegotiationRealtime({
     negotiationId,
     currentUserPublicId: currentUser?.public_id,
     onMessage:onRealtimeMessage,
@@ -154,7 +154,7 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
         <Link href="/lawyer/negotiation" className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-[#315f54]"><ArrowRight size={17}/>بازگشت به مذاکرات</Link>
         <header className="rounded-[20px] border border-[#dce6e2] bg-white p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div><p className="text-xs font-bold text-[#a47b2c]">مذاکره با موکل</p><h1 className="mt-2 text-xl font-black text-[#173f38] md:text-2xl">{negotiation.legal_request?.title || 'درخواست حقوقی'}</h1><div className="mt-2 flex items-center gap-2 text-xs text-[#74847e]"><span className={`h-2 w-2 rounded-full ${otherOnline?'bg-emerald-500':'bg-slate-300'}`}/><span>{otherOnline?'موکل آنلاین است':connected?'موکل آفلاین است':'در حال اتصال...'}</span></div></div>
+            <div><p className="text-xs font-bold text-[#a47b2c]">مذاکره با موکل</p><h1 className="mt-2 text-xl font-black text-[#173f38] md:text-2xl">{negotiation.legal_request?.title || 'درخواست حقوقی'}</h1><div className="mt-2 flex items-center gap-2 text-xs text-[#74847e]"><span className={`h-2 w-2 rounded-full ${otherOnline?'bg-emerald-500':'bg-slate-300'}`}/><span>{otherOnline?'موکل آنلاین است':connectionState==='error'?`خطای اتصال${connectionError ? `: ${connectionError}` : ''}`:connected?'موکل آفلاین است':'در حال اتصال...'}</span></div></div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-[#edf5f2] px-4 py-2 text-xs font-bold text-[#315f54]">{statusLabels[negotiation.status] || negotiation.status}</span>
               {negotiation.engagement ? <button type="button" onClick={()=>setShowAgreement(v=>!v)} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700"><Handshake size={15}/>مشاهده توافق</button> : canCreateProposal ? <button type="button" onClick={()=>setProposalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#c7a154] px-4 py-2.5 text-sm font-bold text-[#173f38]"><FileSignature size={17}/>ثبت پیشنهاد رسمی</button> : null}

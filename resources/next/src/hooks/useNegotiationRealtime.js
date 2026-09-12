@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     getEcho,
     leaveNegotiationChannel,
+    resetEcho,
 } from '@/lib/realtime/echo';
 
 export default function useNegotiationRealtime({
@@ -13,9 +14,13 @@ export default function useNegotiationRealtime({
     onMessage,
     onStateChanged,
 }) {
-    const [connected, setConnected] = useState(false);
+    const [connectionState, setConnectionState] =
+        useState('connecting');
+    const [connectionError, setConnectionError] =
+        useState('');
     const [otherOnline, setOtherOnline] = useState(false);
     const [otherTyping, setOtherTyping] = useState(false);
+
     const channelRef = useRef(null);
     const typingTimerRef = useRef(null);
     const remoteTypingTimerRef = useRef(null);
@@ -26,21 +31,67 @@ export default function useNegotiationRealtime({
         }
 
         let disposed = false;
+        setConnectionState('connecting');
+        setConnectionError('');
 
         async function connect() {
             try {
                 const echo = await getEcho();
+
                 if (!echo || disposed) return;
+
+                const pusher = echo.connector?.pusher;
+
+                pusher?.connection?.bind(
+                    'state_change',
+                    (states) => {
+                        if (disposed) return;
+
+                        const current = states?.current;
+
+                        if (current === 'connected') {
+                            setConnectionState('connected');
+                            setConnectionError('');
+                        } else if (
+                            ['failed', 'unavailable', 'disconnected'].includes(
+                                current,
+                            )
+                        ) {
+                            setConnectionState('error');
+                            setConnectionError(
+                                `WebSocket: ${current}`,
+                            );
+                        } else {
+                            setConnectionState('connecting');
+                        }
+                    },
+                );
+
+                pusher?.connection?.bind('error', (error) => {
+                    if (disposed) return;
+
+                    setConnectionState('error');
+                    setConnectionError(
+                        error?.error?.data?.message ||
+                            error?.error?.message ||
+                            error?.message ||
+                            'WebSocket connection failed',
+                    );
+                });
 
                 const channel = echo.join(
                     `negotiation.${negotiationId}`,
                 );
+
                 channelRef.current = channel;
 
                 channel
                     .here((members) => {
                         if (disposed) return;
-                        setConnected(true);
+
+                        setConnectionState('connected');
+                        setConnectionError('');
+
                         setOtherOnline(
                             (members || []).some(
                                 (member) =>
@@ -65,6 +116,20 @@ export default function useNegotiationRealtime({
                             setOtherOnline(false);
                             setOtherTyping(false);
                         }
+                    })
+                    .error((error) => {
+                        if (disposed) return;
+
+                        setConnectionState('error');
+                        setConnectionError(
+                            error?.message ||
+                                error?.error ||
+                                `Presence auth failed${
+                                    error?.status
+                                        ? ` (${error.status})`
+                                        : ''
+                                }`,
+                        );
                     })
                     .listen(
                         '.negotiation.message.sent',
@@ -108,8 +173,15 @@ export default function useNegotiationRealtime({
                                 );
                         }
                     });
-            } catch {
-                if (!disposed) setConnected(false);
+            } catch (error) {
+                if (disposed) return;
+
+                resetEcho();
+                setConnectionState('error');
+                setConnectionError(
+                    error?.message ||
+                        'Realtime connection failed',
+                );
             }
         }
 
@@ -117,13 +189,13 @@ export default function useNegotiationRealtime({
 
         return () => {
             disposed = true;
-            setConnected(false);
             setOtherOnline(false);
             setOtherTyping(false);
 
             if (typingTimerRef.current) {
                 clearTimeout(typingTimerRef.current);
             }
+
             if (remoteTypingTimerRef.current) {
                 clearTimeout(
                     remoteTypingTimerRef.current,
@@ -143,6 +215,7 @@ export default function useNegotiationRealtime({
     const notifyTyping = useCallback(
         (typing = true) => {
             const channel = channelRef.current;
+
             if (!channel || !currentUserPublicId) return;
 
             channel.whisper('typing', {
@@ -167,7 +240,9 @@ export default function useNegotiationRealtime({
     );
 
     return {
-        connected,
+        connected: connectionState === 'connected',
+        connectionState,
+        connectionError,
         otherOnline,
         otherTyping,
         notifyTyping,
