@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, FileSignature, Handshake, MessageCircle, Send, ShieldAlert, X } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
@@ -13,17 +13,6 @@ import { proposalStatusLabel } from '@/lib/proposalStatus';
 
 const vazir = Vazirmatn({ subsets: ['arabic'], weight: ['400','500','600','700','800'], display: 'swap' });
 const faNumber = new Intl.NumberFormat('fa-IR');
-
-function normalizeMoneyInput(value) {
-    return String(value ?? '').replace(/\D/g, '');
-}
-
-function formatMoneyInput(value) {
-    const digits = normalizeMoneyInput(value);
-    if (!digits) return '';
-
-    return Number(digits).toLocaleString('en-US');
-}
 const statusLabels = {
   active: 'مذاکره فعال',
   proposal_submitted: 'در انتظار تصمیم موکل',
@@ -80,7 +69,22 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
   const [proposalOpen,setProposalOpen] = useState(false);
   const [proposalBusy,setProposalBusy] = useState(false);
   const [showAgreement,setShowAgreement] = useState(false);
+  const messagesViewportRef = useRef(null);
+  const shouldStickToBottomRef = useRef(true);
   const [proposalForm,setProposalForm] = useState({summary:'',service_scope:'',proposed_fee_rial:'',estimated_days:''});
+
+  const handleMessagesScroll = useCallback(() => {
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+    const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < 120;
+  },[]);
+
+  const scrollMessagesToBottom = useCallback((behavior='smooth') => {
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+    viewport.scrollTo({top: viewport.scrollHeight, behavior});
+  },[]);
 
   const load = useCallback(async ({silent=false}={}) => {
     if (!silent) setError('');
@@ -111,6 +115,13 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
     return items.sort((a,b)=>new Date(a.date)-new Date(b.date));
   },[negotiation,proposals]);
 
+  useEffect(()=>{
+    if (!messagesViewportRef.current) return;
+    if (shouldStickToBottomRef.current) {
+      requestAnimationFrame(()=>scrollMessagesToBottom('smooth'));
+    }
+  },[stream.length,scrollMessagesToBottom]);
+
   const canMessage = ['active','proposal_submitted','won'].includes(negotiation?.status);
   const canCreateProposal = negotiation?.status === 'active' && !negotiation?.engagement &&
     !proposals.some(p=>['draft','submitted','shortlisted'].includes(p.status));
@@ -130,7 +141,7 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
   async function submitProposal() {
     const summary = proposalForm.summary.trim();
     const serviceScope = proposalForm.service_scope.trim();
-    const fee = Number(normalizeMoneyInput(proposalForm.proposed_fee_rial));
+    const fee = Number(proposalForm.proposed_fee_rial);
     const days = Number(proposalForm.estimated_days);
     if (!summary || !serviceScope) return setError('خلاصه پیشنهاد و محدوده خدمات را کامل کنید.');
     if (containsContactInformation(summary) || containsContactInformation(serviceScope)) return setError(contactWarning);
@@ -167,9 +178,9 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-800"><ShieldAlert size={17} className="mt-0.5 shrink-0"/>ارسال شماره تماس، ایمیل، لینک و شناسه شبکه‌های اجتماعی مجاز نیست.</div>
         </header>
         {error ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div> : null}
-        <section className="mt-5 overflow-hidden rounded-[20px] border border-[#dce6e2] bg-white">
+        <section className="mt-5 flex max-h-[78vh] min-h-[520px] flex-col overflow-hidden rounded-[20px] border border-[#dce6e2] bg-white">
           <div className="flex items-center justify-between border-b border-[#e8eeeb] px-5 py-4"><div className="flex items-center gap-2 font-black text-[#173f38]"><MessageCircle size={19}/>گفت‌وگو</div>{otherTyping ? <span className="text-xs font-bold text-emerald-600">موکل در حال نوشتن است...</span>:null}</div>
-          <div className="min-h-[430px] space-y-3 bg-[#f8faf9] p-5">
+          <div ref={messagesViewportRef} onScroll={handleMessagesScroll} className="h-[56vh] min-h-[360px] max-h-[680px] space-y-3 overflow-y-auto overscroll-contain bg-[#f8faf9] p-5 scroll-smooth">
             {stream.length===0 ? <div className="py-20 text-center text-sm text-[#899691]">گفتگو هنوز شروع نشده است.</div> : stream.map((entry,index)=>{
               if (entry.type==='proposal') return <ProposalCard key={`proposal-${entry.proposal.public_id}`} proposal={entry.proposal}/>;
               const message=entry.message; const mine=currentUser?.public_id && message.sender?.public_id===currentUser.public_id;
@@ -180,22 +191,7 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
         </section>
       </div>
 
-      {proposalOpen ? <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]"><div className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[22px] bg-white p-6 shadow-2xl"><button type="button" onClick={()=>setProposalOpen(false)} className="absolute left-4 top-4 rounded-lg p-2 text-slate-400"><X size={19}/></button><h2 className="text-xl font-black text-[#173f38]">ثبت پیشنهاد رسمی</h2><p className="mt-2 text-sm leading-7 text-[#788782]">اگر موکل نپذیرد، چت باز می‌ماند و می‌توانید Proposal جدید ثبت کنید.</p><div className="mt-5 space-y-4"><textarea rows={3} value={proposalForm.summary} onChange={e=>setProposalForm(p=>({...p,summary:e.target.value}))} className="w-full rounded-xl border p-3" placeholder="خلاصه پیشنهاد"/><textarea rows={5} value={proposalForm.service_scope} onChange={e=>setProposalForm(p=>({...p,service_scope:e.target.value}))} className="w-full rounded-xl border p-3" placeholder="محدوده خدمات"/><div className="grid gap-4 sm:grid-cols-2"><div>
-  <input
-    type="text"
-    inputMode="numeric"
-    value={formatMoneyInput(proposalForm.proposed_fee_rial)}
-    onChange={(e)=>setProposalForm((p)=>({
-      ...p,
-      proposed_fee_rial: normalizeMoneyInput(e.target.value),
-    }))}
-    className="w-full rounded-xl border p-3"
-    placeholder="مبلغ به ریال"
-  />
-  <p className="mt-1.5 text-xs text-slate-500">
-    مثال: 10,000,000 ریال
-  </p>
-</div><input type="number" min="1" value={proposalForm.estimated_days} onChange={e=>setProposalForm(p=>({...p,estimated_days:e.target.value}))} className="rounded-xl border p-3" placeholder="زمان تقریبی (روز)"/></div><button type="button" onClick={submitProposal} disabled={proposalBusy} className="w-full rounded-xl bg-[#174c42] px-5 py-3.5 font-bold text-white disabled:opacity-50">{proposalBusy?'در حال ثبت...':'ثبت و ارسال پیشنهاد رسمی'}</button></div></div></div> : null}
+      {proposalOpen ? <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]"><div className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[22px] bg-white p-6 shadow-2xl"><button type="button" onClick={()=>setProposalOpen(false)} className="absolute left-4 top-4 rounded-lg p-2 text-slate-400"><X size={19}/></button><h2 className="text-xl font-black text-[#173f38]">ثبت پیشنهاد رسمی</h2><p className="mt-2 text-sm leading-7 text-[#788782]">اگر موکل نپذیرد، چت باز می‌ماند و می‌توانید Proposal جدید ثبت کنید.</p><div className="mt-5 space-y-4"><textarea rows={3} value={proposalForm.summary} onChange={e=>setProposalForm(p=>({...p,summary:e.target.value}))} className="w-full rounded-xl border p-3" placeholder="خلاصه پیشنهاد"/><textarea rows={5} value={proposalForm.service_scope} onChange={e=>setProposalForm(p=>({...p,service_scope:e.target.value}))} className="w-full rounded-xl border p-3" placeholder="محدوده خدمات"/><div className="grid gap-4 sm:grid-cols-2"><input type="number" min="1" value={proposalForm.proposed_fee_rial} onChange={e=>setProposalForm(p=>({...p,proposed_fee_rial:e.target.value}))} className="rounded-xl border p-3" placeholder="مبلغ به ریال"/><input type="number" min="1" value={proposalForm.estimated_days} onChange={e=>setProposalForm(p=>({...p,estimated_days:e.target.value}))} className="rounded-xl border p-3" placeholder="زمان تقریبی (روز)"/></div><button type="button" onClick={submitProposal} disabled={proposalBusy} className="w-full rounded-xl bg-[#174c42] px-5 py-3.5 font-bold text-white disabled:opacity-50">{proposalBusy?'در حال ثبت...':'ثبت و ارسال پیشنهاد رسمی'}</button></div></div></div> : null}
     </main>
   );
 }

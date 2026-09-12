@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
     ArrowRight,
@@ -221,6 +221,34 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
     const [proposalBusy, setProposalBusy] = useState(false);
     const [error, setError] = useState('');
     const [showAgreement, setShowAgreement] = useState(false);
+    const messagesViewportRef = useRef(null);
+    const shouldStickToBottomRef = useRef(true);
+
+    const handleMessagesScroll = useCallback(() => {
+        const viewport = messagesViewportRef.current;
+        if (!viewport) return;
+
+        const distanceFromBottom =
+            viewport.scrollHeight -
+            viewport.scrollTop -
+            viewport.clientHeight;
+
+        shouldStickToBottomRef.current =
+            distanceFromBottom < 120;
+    }, []);
+
+    const scrollMessagesToBottom = useCallback(
+        (behavior = 'smooth') => {
+            const viewport = messagesViewportRef.current;
+            if (!viewport) return;
+
+            viewport.scrollTo({
+                top: viewport.scrollHeight,
+                behavior,
+            });
+        },
+        [],
+    );
 
     const load = useCallback(async ({ silent = false } = {}) => {
         if (!silent) setError('');
@@ -300,6 +328,16 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
                 new Date(b.date).getTime(),
         );
     }, [negotiation, proposals]);
+
+    useEffect(() => {
+        if (!messagesViewportRef.current) return;
+
+        if (shouldStickToBottomRef.current) {
+            requestAnimationFrame(() => {
+                scrollMessagesToBottom('smooth');
+            });
+        }
+    }, [stream.length, scrollMessagesToBottom]);
 
     const canMessage = ['active', 'proposal_submitted', 'won'].includes(
         negotiation?.status,
@@ -486,7 +524,7 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
                     </div>
                 ) : null}
 
-                <section className="mt-5 overflow-hidden rounded-[20px] border border-[#dce6e2] bg-white">
+                <section className="mt-5 flex max-h-[78vh] min-h-[520px] flex-col overflow-hidden rounded-[20px] border border-[#dce6e2] bg-white">
                     <div className="flex items-center justify-between border-b border-[#e8eeeb] px-5 py-4">
                         <div className="flex items-center gap-2 font-black text-[#173f38]">
                             <MessageCircle size={19} />
@@ -500,7 +538,7 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
                         ) : null}
                     </div>
 
-                    <div className="min-h-[430px] space-y-3 bg-[#f8faf9] p-5">
+                    <div ref={messagesViewportRef} onScroll={handleMessagesScroll} className="h-[56vh] min-h-[360px] max-h-[680px] space-y-3 overflow-y-auto overscroll-contain bg-[#f8faf9] p-5 scroll-smooth">
                         {stream.length === 0 ? (
                             <div className="py-20 text-center text-sm text-[#899691]">
                                 گفتگو هنوز شروع نشده است. می‌توانید اولین
