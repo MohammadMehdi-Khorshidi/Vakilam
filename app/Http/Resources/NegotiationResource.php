@@ -22,6 +22,12 @@ class NegotiationResource extends JsonResource
             'created_at' => $proposal->created_at,
         ];
 
+        $attachments = $this->attachments()
+            ->where('expires_at', '>', now())
+            ->with('sender:id,public_id,name,last_name')
+            ->orderBy('created_at')
+            ->get();
+
         return [
             'public_id' => $this->public_id,
             'source' => $this->source,
@@ -68,6 +74,19 @@ class NegotiationResource extends JsonResource
                     ],
                 ])->values(),
             ),
+            'attachments' => $attachments->map(fn ($attachment): array => [
+                'public_id' => $attachment->public_id,
+                'original_name' => $attachment->original_name,
+                'mime_type' => $attachment->mime_type,
+                'size_bytes' => (int) $attachment->size_bytes,
+                'created_at' => $attachment->created_at,
+                'expires_at' => $attachment->expires_at,
+                'sender' => $attachment->sender === null ? null : [
+                    'public_id' => $attachment->sender->public_id,
+                    'name' => $attachment->sender->name,
+                    'last_name' => $attachment->sender->last_name,
+                ],
+            ])->values(),
         ];
     }
 }

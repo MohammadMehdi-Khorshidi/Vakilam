@@ -5,10 +5,13 @@ import Link from 'next/link';
 import {
     ArrowRight,
     Check,
+    Download,
     Handshake,
     MessageCircle,
+    Paperclip,
     Send,
     ShieldAlert,
+    UploadCloud,
     X,
 } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
@@ -26,6 +29,7 @@ import {
 } from '@/lib/contactGuard';
 import useNegotiationPolling from '@/hooks/useNegotiationPolling';
 import { proposalStatusLabel } from '@/lib/proposalStatus';
+import { downloadNegotiationAttachment, uploadNegotiationAttachment } from '@/lib/api/negotiationAttachments';
 
 const vazir = Vazirmatn({
     subsets: ['arabic'],
@@ -218,6 +222,8 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
     const [body, setBody] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [attachmentBusy, setAttachmentBusy] = useState(false);
+    const attachmentInputRef = useRef(null);
     const [proposalBusy, setProposalBusy] = useState(false);
     const [error, setError] = useState('');
     const [showAgreement, setShowAgreement] = useState(false);
@@ -310,6 +316,14 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
             message,
         }));
 
+        (negotiation.attachments ?? []).forEach((attachment) => {
+            items.push({
+                type: 'attachment',
+                date: attachment.created_at,
+                attachment,
+            });
+        });
+
         proposals
             .filter((proposal) => proposal.submitted_at)
             .forEach((proposal) => {
@@ -342,6 +356,9 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
     const canMessage = ['active', 'proposal_submitted', 'won'].includes(
         negotiation?.status,
     );
+    const canAttach =
+        ['active', 'proposal_submitted'].includes(negotiation?.status) &&
+        !negotiation?.engagement;
 
     const sendMessage = async () => {
         const trimmed = body.trim();
@@ -371,6 +388,41 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
             );
         } finally {
             setSending(false);
+        }
+    };
+
+
+    const sendAttachment = async (file) => {
+        if (!file || attachmentBusy || !canAttach) return;
+
+        setAttachmentBusy(true);
+        setError('');
+
+        try {
+            await uploadNegotiationAttachment(negotiationId, file);
+            await refreshNow();
+        } catch (requestError) {
+            setError(
+                requestError?.validationMessages?.[0] ||
+                    requestError?.message ||
+                    'ارسال فایل موقت انجام نشد.',
+            );
+        } finally {
+            if (attachmentInputRef.current) {
+                attachmentInputRef.current.value = '';
+            }
+            setAttachmentBusy(false);
+        }
+    };
+
+    const downloadAttachment = async (publicId) => {
+        try {
+            await downloadNegotiationAttachment(publicId);
+        } catch (requestError) {
+            setError(
+                requestError?.message ||
+                    'دریافت فایل موقت انجام نشد.',
+            );
         }
     };
 
@@ -546,6 +598,40 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
                             </div>
                         ) : (
                             stream.map((entry, index) => {
+                                if (entry.type === 'attachment') {
+                                    const attachment = entry.attachment;
+                                    const mine =
+                                        currentUser?.public_id &&
+                                        attachment.sender?.public_id === currentUser.public_id;
+
+                                    return (
+                                        <div
+                                            key={`attachment-${attachment.public_id}`}
+                                            className={`flex ${mine ? 'justify-start' : 'justify-end'}`}
+                                        >
+                                            <div className={`max-w-[82%] rounded-2xl border p-3 ${mine ? 'border-[#2c6c5e] bg-[#174c42] text-white' : 'border-[#dce5e1] bg-white text-[#405851]'}`}>
+                                                <div className="flex items-center gap-2">
+                                                    <Paperclip size={16} />
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-bold">{attachment.original_name}</p>
+                                                        <p className={`mt-1 text-[10px] ${mine ? 'text-white/60' : 'text-slate-400'}`}>
+                                                            فایل موقت مذاکره • حذف خودکار پس از ۴۸ ساعت
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => downloadAttachment(attachment.public_id)}
+                                                    className={`mt-3 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold ${mine ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                                >
+                                                    <Download size={13} />
+                                                    دریافت فایل
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
                                 if (entry.type === 'proposal') {
                                     return (
                                         <ProposalCard
@@ -626,6 +712,29 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
                     </div>
 
                     <div className="border-t border-[#e7ecea] bg-white p-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                            <p className="text-[10px] leading-5 text-slate-400">
+                                فایل‌های چت موقت‌اند و ۴۸ ساعت بعد حذف می‌شوند. مدارک نهایی پرونده را فقط در بخش توافق/Engagement ارسال کنید.
+                            </p>
+                            <input
+                                ref={attachmentInputRef}
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                className="hidden"
+                                onChange={(event) =>
+                                    sendAttachment(event.target.files?.[0])
+                                }
+                            />
+                            <button
+                                type="button"
+                                disabled={!canAttach || attachmentBusy}
+                                onClick={() => attachmentInputRef.current?.click()}
+                                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:border-[#7aa096] hover:bg-[#f3f8f6] disabled:opacity-40"
+                            >
+                                <UploadCloud size={14} />
+                                {attachmentBusy ? 'در حال ارسال...' : 'ارسال فایل موقت'}
+                            </button>
+                        </div>
                         <div className="flex gap-2">
                             <textarea
                                 value={body}

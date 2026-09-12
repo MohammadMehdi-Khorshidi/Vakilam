@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, FileSignature, Handshake, MessageCircle, Send, ShieldAlert, X } from 'lucide-react';
+import { ArrowRight, Download, FileSignature, Handshake, MessageCircle, Paperclip, Send, ShieldAlert, UploadCloud, X } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
 import { apiRequest, unwrapData } from '@/lib/api/client';
@@ -10,6 +10,7 @@ import { createNegotiationProposal, getNegotiation, sendNegotiationMessage, subm
 import { contactWarning, containsContactInformation } from '@/lib/contactGuard';
 import useNegotiationPolling from '@/hooks/useNegotiationPolling';
 import { proposalStatusLabel } from '@/lib/proposalStatus';
+import { downloadNegotiationAttachment, uploadNegotiationAttachment } from '@/lib/api/negotiationAttachments';
 
 const vazir = Vazirmatn({ subsets: ['arabic'], weight: ['400','500','600','700','800'], display: 'swap' });
 const faNumber = new Intl.NumberFormat('fa-IR');
@@ -73,6 +74,8 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
   const [body,setBody] = useState('');
   const [loading,setLoading] = useState(true);
   const [sending,setSending] = useState(false);
+  const [attachmentBusy,setAttachmentBusy] = useState(false);
+  const attachmentInputRef = useRef(null);
   const [error,setError] = useState('');
   const [proposalOpen,setProposalOpen] = useState(false);
   const [proposalBusy,setProposalBusy] = useState(false);
@@ -120,6 +123,7 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
     if (!negotiation) return [];
     const items = (negotiation.messages ?? []).map(message=>({type:'message',date:message.created_at,message}));
     proposals.filter(p=>p.submitted_at).forEach(proposal=>items.push({type:'proposal',date:proposal.submitted_at || proposal.created_at,proposal}));
+    (negotiation.attachments ?? []).forEach(attachment=>items.push({type:'attachment',date:attachment.created_at,attachment}));
     return items.sort((a,b)=>new Date(a.date)-new Date(b.date));
   },[negotiation,proposals]);
 
@@ -131,6 +135,7 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
   },[stream.length,scrollMessagesToBottom]);
 
   const canMessage = ['active','proposal_submitted','won'].includes(negotiation?.status);
+  const canAttach = ['active','proposal_submitted'].includes(negotiation?.status) && !negotiation?.engagement;
   const canCreateProposal = negotiation?.status === 'active' && !negotiation?.engagement &&
     !proposals.some(p=>['draft','submitted','shortlisted'].includes(p.status));
 
@@ -144,6 +149,29 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
       setBody(''); notifyTyping(false); await refreshNow();
     } catch(e) { setError(e?.validationMessages?.[0] || e?.message || 'ارسال پیام انجام نشد.'); }
     finally { setSending(false); }
+  }
+
+
+  async function sendAttachment(file) {
+    if (!file || attachmentBusy || !canAttach) return;
+    setAttachmentBusy(true); setError('');
+    try {
+      await uploadNegotiationAttachment(negotiationId, file);
+      await refreshNow();
+    } catch(e) {
+      setError(e?.validationMessages?.[0] || e?.message || 'ارسال فایل موقت انجام نشد.');
+    } finally {
+      if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+      setAttachmentBusy(false);
+    }
+  }
+
+  async function downloadAttachment(publicId) {
+    try {
+      await downloadNegotiationAttachment(publicId);
+    } catch(e) {
+      setError(e?.message || 'دریافت فایل موقت انجام نشد.');
+    }
   }
 
   async function submitProposal() {
@@ -191,11 +219,23 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
           <div ref={messagesViewportRef} onScroll={handleMessagesScroll} className="h-[56vh] min-h-[360px] max-h-[680px] space-y-3 overflow-y-auto overscroll-contain bg-[#f8faf9] p-5 scroll-smooth">
             {stream.length===0 ? <div className="py-20 text-center text-sm text-[#899691]">گفتگو هنوز شروع نشده است.</div> : stream.map((entry,index)=>{
               if (entry.type==='proposal') return <ProposalCard key={`proposal-${entry.proposal.public_id}`} proposal={entry.proposal}/>;
+              if (entry.type==='attachment') {
+                const attachment=entry.attachment;
+                const mine=currentUser?.public_id && attachment.sender?.public_id===currentUser.public_id;
+                return <div key={`attachment-${attachment.public_id}`} className={`flex ${mine?'justify-start':'justify-end'}`}><div className={`max-w-[82%] rounded-2xl border p-3 ${mine?'border-[#2c6c5e] bg-[#174c42] text-white':'border-[#dce5e1] bg-white text-[#405851]'}`}><div className="flex items-center gap-2"><Paperclip size={16}/><div className="min-w-0"><p className="truncate text-sm font-bold">{attachment.original_name}</p><p className={`mt-1 text-[10px] ${mine?'text-white/60':'text-slate-400'}`}>فایل موقت مذاکره • حذف خودکار پس از ۴۸ ساعت</p></div></div><button type="button" onClick={()=>downloadAttachment(attachment.public_id)} className={`mt-3 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold ${mine?'bg-white/10 text-white hover:bg-white/20':'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}><Download size={13}/>دریافت فایل</button></div></div>;
+              }
               const message=entry.message; const mine=currentUser?.public_id && message.sender?.public_id===currentUser.public_id;
               return <div key={message.id || `${message.created_at}-${index}`} className={`flex ${mine?'justify-start':'justify-end'}`}><div className={`max-w-[78%] rounded-2xl px-4 py-3 ${mine?'bg-[#174c42] text-white':'border border-[#dce5e1] bg-white text-[#405851]'}`}><p className="whitespace-pre-wrap text-sm leading-7">{message.body}</p><p className={`mt-2 text-[10px] ${mine?'text-white/60':'text-[#9aa5a1]'}`}>{formatDate(message.created_at)}</p></div></div>;
             })}
           </div>
-          <div className="border-t border-[#e7ecea] bg-white p-4"><div className="flex gap-2"><textarea value={body} onChange={e=>{setBody(e.target.value);notifyTyping(Boolean(e.target.value));}} disabled={!canMessage||sending} rows={2} placeholder={canMessage?'پیام خود را بنویسید...':'این مذاکره فقط قابل مشاهده است.'} className="min-h-[52px] flex-1 resize-none rounded-xl border border-[#dbe5e1] bg-[#fbfdfc] px-4 py-3 text-sm outline-none focus:border-[#7aa096] disabled:opacity-60"/><button type="button" onClick={sendMessage} disabled={!canMessage||sending||!body.trim()} className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-xl bg-[#174c42] text-white disabled:opacity-40"><Send size={19}/></button></div></div>
+          <div className="border-t border-[#e7ecea] bg-white p-4">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-[10px] leading-5 text-slate-400">فایل‌های این بخش فقط برای مذاکره‌اند و ۴۸ ساعت بعد حذف می‌شوند. مدارک نهایی باید در Engagement ثبت شوند.</p>
+              <input ref={attachmentInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" className="hidden" onChange={e=>sendAttachment(e.target.files?.[0])}/>
+              <button type="button" disabled={!canAttach||attachmentBusy} onClick={()=>attachmentInputRef.current?.click()} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:border-[#7aa096] hover:bg-[#f3f8f6] disabled:opacity-40"><UploadCloud size={14}/>{attachmentBusy?'در حال ارسال...':'ارسال فایل موقت'}</button>
+            </div>
+            <div className="flex gap-2"><textarea value={body} onChange={e=>{setBody(e.target.value);notifyTyping(Boolean(e.target.value));}} disabled={!canMessage||sending} rows={2} placeholder={canMessage?'پیام خود را بنویسید...':'این مذاکره فقط قابل مشاهده است.'} className="min-h-[52px] flex-1 resize-none rounded-xl border border-[#dbe5e1] bg-[#fbfdfc] px-4 py-3 text-sm outline-none focus:border-[#7aa096] disabled:opacity-60"/><button type="button" onClick={sendMessage} disabled={!canMessage||sending||!body.trim()} className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-xl bg-[#174c42] text-white disabled:opacity-40"><Send size={19}/></button></div>
+          </div>
         </section>
       </div>
 

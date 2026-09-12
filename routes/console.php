@@ -5,10 +5,12 @@ use App\Models\Engagement;
 use App\Models\Invoice;
 use App\Models\LawyerProposal;
 use App\Models\Negotiation;
+use App\Models\NegotiationAttachment;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Storage;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -85,3 +87,14 @@ Schedule::call(function () {
             });
         });
 })->everyMinute();
+
+Schedule::call(function (): void {
+    NegotiationAttachment::query()
+        ->where('expires_at', '<=', now())
+        ->limit(500)
+        ->get()
+        ->each(function (NegotiationAttachment $attachment): void {
+            Storage::disk($attachment->disk)->delete($attachment->path);
+            $attachment->delete();
+        });
+})->everyTenMinutes();

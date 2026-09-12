@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\EngagementWorkflowController;
 use App\Http\Controllers\Api\LawyerCasesController;
 use App\Http\Controllers\Api\LawyerProposalController;
 use App\Http\Controllers\Api\NegotiationPresenceController;
+use App\Http\Controllers\Api\NegotiationAttachmentController;
 use Illuminate\Support\Facades\Route;
 
 Route::post(
@@ -55,4 +56,15 @@ Route::post(
 Route::post(
     '/engagement-document-requests/{documentRequest:public_id}/review',
     [EngagementDocumentRequestController::class, 'review'],
+);
+
+
+Route::post(
+    '/negotiations/{negotiation:public_id}/attachments',
+    [NegotiationAttachmentController::class, 'store'],
+);
+
+Route::get(
+    '/negotiation-attachments/{attachment:public_id}/download',
+    [NegotiationAttachmentController::class, 'download'],
 );

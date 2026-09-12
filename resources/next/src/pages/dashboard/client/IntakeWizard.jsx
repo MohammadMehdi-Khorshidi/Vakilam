@@ -26,11 +26,9 @@ import IntakeActions from '../../../features/client/legal-request/IntakeActions'
 import IntakeStepper from '../../../features/client/legal-request/IntakeStepper';
 import StepDescription from '../../../features/client/legal-request/steps/StepDescription';
 import StepCategory from '../../../features/client/legal-request/steps/StepCategory';
-import StepGuide from '../../../features/client/legal-request/steps/StepGuide';
 import StepAction from '../../../features/client/legal-request/steps/StepAction';
 import StepCity from '../../../features/client/legal-request/steps/StepCity';
 import StepUrgency from '../../../features/client/legal-request/steps/StepUrgency';
-import StepDocuments from '../../../features/client/legal-request/steps/StepDocuments';
 import StepPrivacy from '../../../features/client/legal-request/steps/StepPrivacy';
 import StepSummary from '../../../features/client/legal-request/steps/StepSummary';
 import StepConfirmation from '../../../features/client/legal-request/steps/StepConfirmation';
@@ -54,6 +52,20 @@ const DEFAULT_INTAKE = {
 let cachedStorageValue = null;
 let cachedIntakeSnapshot = DEFAULT_INTAKE;
 
+function sanitizeLegacyIntakeData(value) {
+    const next = {
+        ...initialData,
+        ...(value ?? {}),
+    };
+
+    // These fields belonged to the old intake document questions/upload step.
+    // They are deliberately ignored from now on.
+    delete next.answer;
+    delete next.documents;
+
+    return next;
+}
+
 function getStoredIntake() {
     if (typeof window === 'undefined') {
         return DEFAULT_INTAKE;
@@ -74,14 +86,14 @@ function getStoredIntake() {
 
         const parsed = JSON.parse(saved);
         const parsedStep = typeof parsed?.step === 'number' ? parsed.step : 0;
+
+        // Old wizard had 11 steps. The new version has 9.
+        // Clamping makes old localStorage snapshots safe after this update.
         const safeStep = Math.min(Math.max(parsedStep, 0), steps.length - 1);
 
         cachedStorageValue = saved;
         cachedIntakeSnapshot = {
-            data: {
-                ...initialData,
-                ...(parsed?.data ?? {}),
-            },
+            data: sanitizeLegacyIntakeData(parsed?.data),
             step: safeStep,
         };
 
@@ -202,11 +214,7 @@ function validationMessagesForStep(step, data) {
         }
     }
 
-    if (step === 2 && !String(data.answer || '').trim()) {
-        errors.push('لطفاً مشخص کنید آیا مدرک یا مستند مرتبط دارید.');
-    }
-
-    if (step === 4) {
+    if (step === 3) {
         if (!data.province_id) {
             errors.push('استان پرونده را انتخاب کنید.');
         }
@@ -216,22 +224,22 @@ function validationMessagesForStep(step, data) {
     }
 
     if (
-        step === 5 &&
+        step === 4 &&
         !VALID_URGENCIES.has(normalizeUrgencyValue(data.urgency))
     ) {
         errors.push('لطفاً میزان فوریت مسئله را انتخاب کنید.');
     }
 
-    if (step === 7 && !String(data.privacy || '').trim()) {
+    if (step === 5 && !String(data.privacy || '').trim()) {
         errors.push('لطفاً سطح محرمانگی پرونده را انتخاب کنید.');
     }
 
-    if (step === 9 && !data.confirmed) {
+    if (step === 7 && !data.confirmed) {
         errors.push('برای ادامه، تأیید نهایی اطلاعات را فعال کنید.');
     }
 
     if (
-        step === 10 &&
+        step === 8 &&
         !VALID_SERVICE_INTENTS.has(normalizeServiceIntent(data.path))
     ) {
         errors.push('یکی از مسیرهای فعال ادامه پرونده را انتخاب کنید.');
@@ -241,7 +249,7 @@ function validationMessagesForStep(step, data) {
 }
 
 function finalValidationMessages(data) {
-    return [0, 1, 2, 4, 5, 7, 9, 10].flatMap((step) =>
+    return [0, 1, 3, 4, 5, 7, 8].flatMap((step) =>
         validationMessagesForStep(step, data),
     );
 }
@@ -288,13 +296,13 @@ export default function IntakeWizard() {
                 }
 
                 setData((previousData) => {
-                    const nextData = {
+                    const nextData = sanitizeLegacyIntakeData({
                         ...previousData,
                         ...mapDraftToIntake(draft),
                         legalRequestId: draft.id ?? previousData.legalRequestId,
                         legalRequestPublicId:
                             draft.public_id ?? previousData.legalRequestPublicId,
-                    };
+                    });
 
                     saveIntakeToStorage(nextData, step);
                     return nextData;
@@ -321,15 +329,16 @@ export default function IntakeWizard() {
         if (typeof window === 'undefined') return;
 
         try {
+            const cleanData = sanitizeLegacyIntakeData(nextData);
             const serialized = JSON.stringify({
-                data: nextData,
+                data: cleanData,
                 step: nextStep,
             });
 
             window.localStorage.setItem(STORAGE_KEY, serialized);
             cachedStorageValue = serialized;
             cachedIntakeSnapshot = {
-                data: nextData,
+                data: cleanData,
                 step: nextStep,
             };
         } catch {
@@ -475,13 +484,13 @@ export default function IntakeWizard() {
                     ? draft
                     : await submitLegalRequest(draft.id);
 
-            const nextData = {
+            const nextData = sanitizeLegacyIntakeData({
                 ...data,
                 ...mapDraftToIntake(submitted),
                 legalRequestId: submitted?.id ?? draft.id,
                 legalRequestPublicId:
                     submitted?.public_id ?? draft.public_id ?? null,
-            };
+            });
 
             setData(nextData);
 
@@ -582,7 +591,7 @@ export default function IntakeWizard() {
                             ) : null}
 
                             {validationErrors.length > 0 &&
-                            ![1, 2, 4, 5, 7].includes(step) ? (
+                            ![1, 3, 4, 5].includes(step) ? (
                                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                                     <p className="text-sm font-black text-amber-800">
                                         موارد زیر را اصلاح کنید:
@@ -679,16 +688,8 @@ function StepRenderer({ step, data, update, validationError }) {
                 />
             );
         case 2:
-            return (
-                <StepGuide
-                    data={data}
-                    update={update}
-                    validationError={validationError}
-                />
-            );
-        case 3:
             return <StepAction data={data} update={update} />;
-        case 4:
+        case 3:
             return (
                 <StepCity
                     data={data}
@@ -696,7 +697,7 @@ function StepRenderer({ step, data, update, validationError }) {
                     validationError={validationError}
                 />
             );
-        case 5:
+        case 4:
             return (
                 <StepUrgency
                     data={data}
@@ -704,9 +705,7 @@ function StepRenderer({ step, data, update, validationError }) {
                     validationError={validationError}
                 />
             );
-        case 6:
-            return <StepDocuments data={data} update={update} />;
-        case 7:
+        case 5:
             return (
                 <StepPrivacy
                     data={data}
@@ -714,11 +713,11 @@ function StepRenderer({ step, data, update, validationError }) {
                     validationError={validationError}
                 />
             );
-        case 8:
+        case 6:
             return <StepSummary data={data} />;
-        case 9:
+        case 7:
             return <StepConfirmation data={data} update={update} />;
-        case 10:
+        case 8:
             return <StepPath data={data} update={update} />;
         default:
             return null;

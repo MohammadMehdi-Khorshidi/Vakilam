@@ -61,6 +61,11 @@ class Negotiation extends Model
         return $this->hasMany(NegotiationMessage::class)->orderBy('created_at');
     }
 
+    public function attachments()
+    {
+        return $this->hasMany(NegotiationAttachment::class)->orderBy('created_at');
+    }
+
     public function proposals()
     {
         return $this->hasMany(LawyerProposal::class)->orderBy('created_at');

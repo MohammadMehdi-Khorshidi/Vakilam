@@ -15,11 +15,9 @@ export default function StepSummary({ data }) {
                 ? 'دسته‌بندی ذخیره‌شده'
                 : categoryLabel(data.category),
         ],
-        ['پاسخ راهنما', data.answer || 'ثبت نشده'],
         ['اقدام ترجیحی', data.action || 'ثبت نشده'],
         ['شهر', data.city || 'ثبت نشده'],
         ['فوریت', urgencyLabel(data.urgency)],
-        ['تعداد مدارک', String(data.documents?.length ?? 0)],
         ['محرمانگی', data.privacy || 'ثبت نشده'],
     ];
 
@@ -34,7 +32,6 @@ export default function StepSummary({ data }) {
                     className="grid grid-cols-[140px_1fr] border-b last:border-0"
                 >
                     <b className="bg-[#e8f2ef] p-4 text-sm">{label}</b>
-
                     <span className="p-4 text-sm leading-6 text-slate-600">
                         {value}
                     </span>
