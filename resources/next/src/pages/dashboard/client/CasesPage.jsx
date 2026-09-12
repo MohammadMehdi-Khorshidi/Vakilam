@@ -19,6 +19,17 @@ import { getClientEngagements } from '@/lib/api/workflow';
 const vazirmatn = Vazirmatn({ subsets: ['arabic'], display: 'swap' });
 const faNumber = new Intl.NumberFormat('fa-IR');
 
+const requestStatusLabels = {
+    draft: 'پیش‌نویس',
+    submitted: 'در انتظار بررسی و انتخاب وکیل',
+    matched: 'در حال بررسی وکلا',
+    active: 'در جریان',
+    in_progress: 'در حال پیگیری',
+    completed: 'تکمیل‌شده',
+    closed: 'بسته‌شده',
+    cancelled: 'لغوشده',
+};
+
 function formatDate(value) {
     if (!value) return 'ثبت نشده';
     try {
@@ -186,7 +197,7 @@ export default function CasePage() {
                                         <article key={item.public_id || item.id} className="flex flex-col justify-between gap-4 px-5 py-5 lg:flex-row lg:items-center">
                                             <div>
                                                 <h3 className="font-extrabold text-[#294e46]">{item.title || 'موضوع حقوقی'}</h3>
-                                                <p className="mt-2 text-xs text-[#7f8e89]">وضعیت: {item.status}</p>
+                                                <p className="mt-2 text-xs text-[#7f8e89]">وضعیت: {requestStatusLabels[item.status] || item.status || 'نامشخص'}</p>
                                             </div>
                                             <Link href={`/client/cases/${encodeURIComponent(item.id)}?type=request`} className="rounded-xl border border-[#bcd2cb] bg-[#f7fbf9] px-4 py-2.5 text-sm font-bold text-[#174c42]">مشاهده جزئیات</Link>
                                         </article>

@@ -189,12 +189,11 @@ function DocumentRequestCard({
 
             {canUpload && item.status !== 'accepted' ? (
                 <div className="mt-3 rounded-xl border border-dashed border-[#b8cec7] bg-[#f8fbfa] p-3">
-                    <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                        onChange={(e) => setFile(e.target.files?.[0] || null)}
-                        className="block w-full text-xs text-slate-600 file:ml-3 file:rounded-lg file:border-0 file:bg-[#173f38] file:px-3 file:py-2 file:font-bold file:text-white"
-                    />
+                    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-[#d8e5e1] bg-white px-3 py-2.5 transition hover:border-[#8eb3a9]">
+                        <span className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#173f38] px-3 py-2 text-xs font-bold text-white"><Paperclip size={14} /> انتخاب فایل</span>
+                        <span className="min-w-0 flex-1 truncate text-left text-xs text-slate-500" dir="ltr">{file?.name || 'فایلی انتخاب نشده است'}</span>
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(e) => setFile(e.target.files?.[0] || null)} className="sr-only" />
+                    </label>
                     <div className="mt-2 flex items-center justify-between gap-3">
                         <p className="text-[10px] text-slate-400">PDF / JPG / PNG — حداکثر ۵ مگابایت</p>
                         <button
