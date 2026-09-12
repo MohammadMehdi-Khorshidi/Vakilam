@@ -8,11 +8,22 @@ import { Vazirmatn } from 'next/font/google';
 import { apiRequest, unwrapData } from '@/lib/api/client';
 import { createNegotiationProposal, getNegotiation, sendNegotiationMessage, submitLawyerProposal } from '@/lib/api/lawyer';
 import { contactWarning, containsContactInformation } from '@/lib/contactGuard';
-import useNegotiationRealtime from '@/hooks/useNegotiationRealtime';
+import useNegotiationPolling from '@/hooks/useNegotiationPolling';
 import { proposalStatusLabel } from '@/lib/proposalStatus';
 
 const vazir = Vazirmatn({ subsets: ['arabic'], weight: ['400','500','600','700','800'], display: 'swap' });
 const faNumber = new Intl.NumberFormat('fa-IR');
+
+function normalizeMoneyInput(value) {
+    return String(value ?? '').replace(/\D/g, '');
+}
+
+function formatMoneyInput(value) {
+    const digits = normalizeMoneyInput(value);
+    if (!digits) return '';
+
+    return Number(digits).toLocaleString('en-US');
+}
 const statusLabels = {
   active: 'مذاکره فعال',
   proposal_submitted: 'در انتظار تصمیم موکل',
@@ -83,21 +94,13 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
 
   useEffect(()=>{ load(); },[load]);
 
-  const onRealtimeMessage = useCallback((message)=>{
-    if (!message?.id) return;
-    setNegotiation(prev => {
-      if (!prev) return prev;
-      const messages = prev.messages ?? [];
-      if (messages.some(x=>x.id===message.id)) return prev;
-      return {...prev,messages:[...messages,message]};
-    });
+  const onPollingSync = useCallback((data)=>{
+    if (data) setNegotiation(data);
   },[]);
-  const onRealtimeState = useCallback(()=>{ load({silent:true}); },[load]);
-  const {connected,connectionState,connectionError,otherOnline,otherTyping,notifyTyping} = useNegotiationRealtime({
+  const {otherOnline,otherTyping,syncError,notifyTyping,refreshNow} = useNegotiationPolling({
     negotiationId,
-    currentUserPublicId: currentUser?.public_id,
-    onMessage:onRealtimeMessage,
-    onStateChanged:onRealtimeState,
+    enabled:Boolean(currentUser?.public_id),
+    onSync:onPollingSync,
   });
 
   const proposals = negotiation?.proposals ?? [];
@@ -119,7 +122,7 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
     setSending(true); setError('');
     try {
       const message = await sendNegotiationMessage(negotiationId, trimmed);
-      setBody(''); notifyTyping(false); onRealtimeMessage(message);
+      setBody(''); notifyTyping(false); await refreshNow();
     } catch(e) { setError(e?.validationMessages?.[0] || e?.message || 'ارسال پیام انجام نشد.'); }
     finally { setSending(false); }
   }
@@ -127,7 +130,7 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
   async function submitProposal() {
     const summary = proposalForm.summary.trim();
     const serviceScope = proposalForm.service_scope.trim();
-    const fee = Number(proposalForm.proposed_fee_rial);
+    const fee = Number(normalizeMoneyInput(proposalForm.proposed_fee_rial));
     const days = Number(proposalForm.estimated_days);
     if (!summary || !serviceScope) return setError('خلاصه پیشنهاد و محدوده خدمات را کامل کنید.');
     if (containsContactInformation(summary) || containsContactInformation(serviceScope)) return setError(contactWarning);
@@ -154,7 +157,7 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
         <Link href="/lawyer/negotiation" className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-[#315f54]"><ArrowRight size={17}/>بازگشت به مذاکرات</Link>
         <header className="rounded-[20px] border border-[#dce6e2] bg-white p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div><p className="text-xs font-bold text-[#a47b2c]">مذاکره با موکل</p><h1 className="mt-2 text-xl font-black text-[#173f38] md:text-2xl">{negotiation.legal_request?.title || 'درخواست حقوقی'}</h1><div className="mt-2 flex items-center gap-2 text-xs text-[#74847e]"><span className={`h-2 w-2 rounded-full ${otherOnline?'bg-emerald-500':'bg-slate-300'}`}/><span>{otherOnline?'موکل آنلاین است':connectionState==='error'?`خطای اتصال${connectionError ? `: ${connectionError}` : ''}`:connected?'موکل آفلاین است':'در حال اتصال...'}</span></div></div>
+            <div><p className="text-xs font-bold text-[#a47b2c]">مذاکره با موکل</p><h1 className="mt-2 text-xl font-black text-[#173f38] md:text-2xl">{negotiation.legal_request?.title || 'درخواست حقوقی'}</h1><div className="mt-2 flex items-center gap-2 text-xs text-[#74847e]"><span className={`h-2 w-2 rounded-full ${otherOnline?'bg-emerald-500':'bg-slate-300'}`}/><span>{otherOnline?'موکل آنلاین است':syncError?'اختلال در همگام‌سازی':'موکل آفلاین است'}</span></div></div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-[#edf5f2] px-4 py-2 text-xs font-bold text-[#315f54]">{statusLabels[negotiation.status] || negotiation.status}</span>
               {negotiation.engagement ? <button type="button" onClick={()=>setShowAgreement(v=>!v)} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700"><Handshake size={15}/>مشاهده توافق</button> : canCreateProposal ? <button type="button" onClick={()=>setProposalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#c7a154] px-4 py-2.5 text-sm font-bold text-[#173f38]"><FileSignature size={17}/>ثبت پیشنهاد رسمی</button> : null}
@@ -177,7 +180,22 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
         </section>
       </div>
 
-      {proposalOpen ? <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]"><div className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[22px] bg-white p-6 shadow-2xl"><button type="button" onClick={()=>setProposalOpen(false)} className="absolute left-4 top-4 rounded-lg p-2 text-slate-400"><X size={19}/></button><h2 className="text-xl font-black text-[#173f38]">ثبت پیشنهاد رسمی</h2><p className="mt-2 text-sm leading-7 text-[#788782]">اگر موکل نپذیرد، چت باز می‌ماند و می‌توانید Proposal جدید ثبت کنید.</p><div className="mt-5 space-y-4"><textarea rows={3} value={proposalForm.summary} onChange={e=>setProposalForm(p=>({...p,summary:e.target.value}))} className="w-full rounded-xl border p-3" placeholder="خلاصه پیشنهاد"/><textarea rows={5} value={proposalForm.service_scope} onChange={e=>setProposalForm(p=>({...p,service_scope:e.target.value}))} className="w-full rounded-xl border p-3" placeholder="محدوده خدمات"/><div className="grid gap-4 sm:grid-cols-2"><input type="number" min="1" value={proposalForm.proposed_fee_rial} onChange={e=>setProposalForm(p=>({...p,proposed_fee_rial:e.target.value}))} className="rounded-xl border p-3" placeholder="مبلغ به ریال"/><input type="number" min="1" value={proposalForm.estimated_days} onChange={e=>setProposalForm(p=>({...p,estimated_days:e.target.value}))} className="rounded-xl border p-3" placeholder="زمان تقریبی (روز)"/></div><button type="button" onClick={submitProposal} disabled={proposalBusy} className="w-full rounded-xl bg-[#174c42] px-5 py-3.5 font-bold text-white disabled:opacity-50">{proposalBusy?'در حال ثبت...':'ثبت و ارسال پیشنهاد رسمی'}</button></div></div></div> : null}
+      {proposalOpen ? <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]"><div className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[22px] bg-white p-6 shadow-2xl"><button type="button" onClick={()=>setProposalOpen(false)} className="absolute left-4 top-4 rounded-lg p-2 text-slate-400"><X size={19}/></button><h2 className="text-xl font-black text-[#173f38]">ثبت پیشنهاد رسمی</h2><p className="mt-2 text-sm leading-7 text-[#788782]">اگر موکل نپذیرد، چت باز می‌ماند و می‌توانید Proposal جدید ثبت کنید.</p><div className="mt-5 space-y-4"><textarea rows={3} value={proposalForm.summary} onChange={e=>setProposalForm(p=>({...p,summary:e.target.value}))} className="w-full rounded-xl border p-3" placeholder="خلاصه پیشنهاد"/><textarea rows={5} value={proposalForm.service_scope} onChange={e=>setProposalForm(p=>({...p,service_scope:e.target.value}))} className="w-full rounded-xl border p-3" placeholder="محدوده خدمات"/><div className="grid gap-4 sm:grid-cols-2"><div>
+  <input
+    type="text"
+    inputMode="numeric"
+    value={formatMoneyInput(proposalForm.proposed_fee_rial)}
+    onChange={(e)=>setProposalForm((p)=>({
+      ...p,
+      proposed_fee_rial: normalizeMoneyInput(e.target.value),
+    }))}
+    className="w-full rounded-xl border p-3"
+    placeholder="مبلغ به ریال"
+  />
+  <p className="mt-1.5 text-xs text-slate-500">
+    مثال: 10,000,000 ریال
+  </p>
+</div><input type="number" min="1" value={proposalForm.estimated_days} onChange={e=>setProposalForm(p=>({...p,estimated_days:e.target.value}))} className="rounded-xl border p-3" placeholder="زمان تقریبی (روز)"/></div><button type="button" onClick={submitProposal} disabled={proposalBusy} className="w-full rounded-xl bg-[#174c42] px-5 py-3.5 font-bold text-white disabled:opacity-50">{proposalBusy?'در حال ثبت...':'ثبت و ارسال پیشنهاد رسمی'}</button></div></div></div> : null}
     </main>
   );
 }

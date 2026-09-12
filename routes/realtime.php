@@ -1,38 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\LawyerProposalController;
-use App\Http\Controllers\Api\RealtimeAuthController;
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\NegotiationPresenceController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/realtime/config', function (Request $request): array {
-    $host = (string) config(
-        'broadcasting.connections.reverb.options.host',
-        '127.0.0.1',
-    );
-
-    if (in_array($host, ['0.0.0.0', '::', 'localhost'], true)) {
-        $host = $request->getHost();
-    }
-
-    return [
-        'key' => (string) config('broadcasting.connections.reverb.key'),
-        'host' => $host,
-        'port' => (int) config(
-            'broadcasting.connections.reverb.options.port',
-            8080,
-        ),
-        'scheme' => (string) config(
-            'broadcasting.connections.reverb.options.scheme',
-            'http',
-        ),
-        'auth_endpoint' => url('/api/realtime/auth'),
-    ];
-});
-
 Route::post(
-    '/realtime/auth',
-    [RealtimeAuthController::class, 'authorizeChannel'],
+    '/negotiations/{negotiation:public_id}/presence',
+    [NegotiationPresenceController::class, 'touch'],
 );
 
 Route::post(

@@ -24,7 +24,7 @@ import {
     contactWarning,
     containsContactInformation,
 } from '@/lib/contactGuard';
-import useNegotiationRealtime from '@/hooks/useNegotiationRealtime';
+import useNegotiationPolling from '@/hooks/useNegotiationPolling';
 import { proposalStatusLabel } from '@/lib/proposalStatus';
 
 const vazir = Vazirmatn({
@@ -255,40 +255,20 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
         load();
     }, [load]);
 
-    const onRealtimeMessage = useCallback((message) => {
-        if (!message?.id) return;
-
-        setNegotiation((previous) => {
-            if (!previous) return previous;
-            const messages = previous.messages ?? [];
-
-            if (messages.some((item) => item.id === message.id)) {
-                return previous;
-            }
-
-            return {
-                ...previous,
-                messages: [...messages, message],
-            };
-        });
+    const onPollingSync = useCallback((data) => {
+        if (data) setNegotiation(data);
     }, []);
 
-    const onRealtimeState = useCallback(() => {
-        load({ silent: true });
-    }, [load]);
-
     const {
-        connected,
-        connectionState,
-        connectionError,
         otherOnline,
         otherTyping,
+        syncError,
         notifyTyping,
-    } = useNegotiationRealtime({
+        refreshNow,
+    } = useNegotiationPolling({
         negotiationId,
-        currentUserPublicId: currentUser?.public_id,
-        onMessage: onRealtimeMessage,
-        onStateChanged: onRealtimeState,
+        enabled: Boolean(currentUser?.public_id),
+        onSync: onPollingSync,
     });
 
     const proposals = negotiation?.proposals ?? [];
@@ -344,7 +324,7 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
             );
             setBody('');
             notifyTyping(false);
-            onRealtimeMessage(message);
+            await refreshNow();
         } catch (requestError) {
             setError(
                 requestError?.validationMessages?.[0] ||
@@ -454,13 +434,7 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
                                     }`}
                                 />
                                 <span className="text-xs">
-                                    {otherOnline
-                                        ? 'آنلاین'
-                                        : connectionState === 'error'
-                                          ? `خطای اتصال${connectionError ? `: ${connectionError}` : ''}`
-                                          : connected
-                                            ? 'آفلاین'
-                                            : 'در حال اتصال...'}
+                                    {otherOnline ? 'آنلاین' : syncError ? 'اختلال در همگام‌سازی' : 'آفلاین'}
                                 </span>
                             </div>
                         </div>
