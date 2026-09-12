@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\EngagementWorkflowController;
+use App\Http\Controllers\Api\LawyerCasesController;
 use App\Http\Controllers\Api\LawyerProposalController;
 use App\Http\Controllers\Api\NegotiationPresenceController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,9 @@ Route::post(
     '/lawyer/proposals/{proposal:public_id}/reject',
     [LawyerProposalController::class, 'reject'],
 );
+
+Route::get('/lawyer/cases', [LawyerCasesController::class, 'index']);
+Route::get('/lawyer/cases/{engagement:public_id}', [LawyerCasesController::class, 'show']);
 
 Route::get(
     '/engagements/{engagement:public_id}/workspace',
