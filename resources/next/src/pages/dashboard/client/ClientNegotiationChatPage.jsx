@@ -494,7 +494,7 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
                                     }
                                     className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700"
                                 >
-                                    مشاهده توافق با وکیل
+                                    مشاهده توافق و قرارداد
                                 </button>
                             ) : null}
                         </div>

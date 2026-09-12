@@ -61,6 +61,57 @@ class ContractFlowService
         });
     }
 
+    public function issueFromEngagement(Engagement $engagement, User $lawyer): Contract
+    {
+        return DB::transaction(function () use ($engagement, $lawyer): Contract {
+            $locked = Engagement::query()
+                ->with(['proposal', 'lawyerProfile.user'])
+                ->whereKey($engagement->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                $locked->lawyerProfile?->user_id === $lawyer->id
+                    && $lawyer->mayActAsRole('lawyer'),
+                403,
+                'Only the selected lawyer may prepare this contract.',
+            );
+
+            $this->ensureWithinContractWindow($locked);
+
+            abort_unless(
+                $locked->status === 'pending_contract',
+                409,
+                'This engagement is not awaiting a contract.',
+            );
+
+            $details = (array) $locked->execution_details;
+
+            abort_unless(
+                trim((string) ($details['start_plan'] ?? '')) !== ''
+                    && trim((string) ($details['client_requirements'] ?? '')) !== '',
+                422,
+                'Complete the engagement execution details before sending the contract.',
+            );
+
+            if ($locked->prepared_at === null) {
+                $locked->forceFill(['prepared_at' => now()])->save();
+            }
+
+            $contract = $this->ensureContract($locked, $lawyer);
+
+            if ($locked->contract_sent_at === null) {
+                $locked->forceFill(['contract_sent_at' => now()])->save();
+            }
+
+            return $contract->fresh([
+                'engagement',
+                'versions.signatures',
+                'invoices.payments',
+            ]);
+        });
+    }
+
     public function signContract(Contract $contract, User $user): Contract
     {
         return DB::transaction(function () use ($contract, $user): Contract {
@@ -137,7 +188,8 @@ class ContractFlowService
             'current_version' => 1,
         ]);
 
-        $termsText = $this->termsFromProposal($engagement);
+        $termsText = $this->termsFromEngagement($engagement);
+
         $version = ContractVersion::query()->create([
             'contract_id' => $contract->id,
             'version_number' => 1,
@@ -162,17 +214,24 @@ class ContractFlowService
 
     private function ensureInvoice(Contract $contract, Engagement $engagement): Invoice
     {
-        $proposal = $engagement->proposal;
-        abort_unless($proposal !== null && $proposal->proposed_fee_rial !== null, 409, 'Proposal fee is not available.');
+        $snapshot = (array) $engagement->agreement_snapshot;
+        $fee = $snapshot['proposed_fee_rial']
+            ?? $engagement->proposal?->proposed_fee_rial;
+
+        abort_unless(
+            $fee !== null && (int) $fee > 0,
+            409,
+            'Accepted agreement fee is not available.',
+        );
 
         return Invoice::query()->firstOrCreate(
             ['contract_id' => $contract->id],
             [
                 'client_user_id' => $engagement->client_user_id,
-                'subtotal_rial' => $proposal->proposed_fee_rial,
+                'subtotal_rial' => (int) $fee,
                 'discount_rial' => 0,
                 'tax_rial' => 0,
-                'total_rial' => $proposal->proposed_fee_rial,
+                'total_rial' => (int) $fee,
                 'status' => 'issued',
                 'issued_at' => now(),
                 'due_at' => $engagement->contract_due_at,
@@ -202,17 +261,32 @@ class ContractFlowService
         );
     }
 
-    private function termsFromProposal(Engagement $engagement): string
+    private function termsFromEngagement(Engagement $engagement): string
     {
+        $snapshot = (array) $engagement->agreement_snapshot;
+        $details = (array) $engagement->execution_details;
         $proposal = $engagement->proposal;
 
-        return implode("\n", [
-            'Vakilam pre-contract terms',
-            'Proposal: '.$proposal->public_id,
-            'Service scope: '.trim((string) $proposal->service_scope),
-            'Summary: '.trim((string) $proposal->summary),
-            'Fee (Rial): '.(string) $proposal->proposed_fee_rial,
-            'Estimated days: '.(string) $proposal->estimated_days,
-        ]);
+        $scope = trim((string) ($snapshot['service_scope'] ?? $proposal?->service_scope ?? ''));
+        $summary = trim((string) ($snapshot['summary'] ?? $proposal?->summary ?? ''));
+        $fee = (int) ($snapshot['proposed_fee_rial'] ?? $proposal?->proposed_fee_rial ?? 0);
+        $days = (int) ($snapshot['estimated_days'] ?? $proposal?->estimated_days ?? 0);
+
+        return implode("\n\n", array_filter([
+            'قرارداد خدمات حقوقی وکیلم',
+            "شرح توافق: {$summary}",
+            "دامنه خدمات توافق‌شده: {$scope}",
+            'حق‌الزحمه توافق‌شده: '.number_format($fee).' ریال',
+            "مدت برآوردشده اجرای خدمات: {$days} روز",
+            'برنامه شروع و اجرای کار: '.trim((string) ($details['start_plan'] ?? '')),
+            'اقدامات و مدارک موردنیاز از موکل: '.trim((string) ($details['client_requirements'] ?? '')),
+            trim((string) ($details['deliverables'] ?? '')) !== ''
+                ? 'خروجی‌ها و تحویل‌دادنی‌ها: '.trim((string) $details['deliverables'])
+                : null,
+            trim((string) ($details['execution_notes'] ?? '')) !== ''
+                ? 'توضیحات اجرایی تکمیلی: '.trim((string) $details['execution_notes'])
+                : null,
+            'مبلغ، دامنه خدمات و مدت فوق مستقیماً از توافق پذیرفته‌شده استخراج شده‌اند و در این مرحله قابل تغییر نیستند.',
+        ]));
     }
 }

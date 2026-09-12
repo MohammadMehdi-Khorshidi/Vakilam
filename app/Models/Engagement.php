@@ -19,10 +19,13 @@ class Engagement extends Model
         'legal_request_id',
         'proposal_id',
         'agreement_snapshot',
+        'execution_details',
         'client_user_id',
         'lawyer_profile_id',
         'status',
         'contract_due_at',
+        'prepared_at',
+        'contract_sent_at',
         'started_at',
         'ended_at',
     ];
@@ -48,7 +51,10 @@ class Engagement extends Model
     {
         return [
             'agreement_snapshot' => 'array',
+            'execution_details' => 'array',
             'contract_due_at' => 'datetime',
+            'prepared_at' => 'datetime',
+            'contract_sent_at' => 'datetime',
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
         ];
