@@ -29,7 +29,6 @@ import StepCategory from '../../../features/client/legal-request/steps/StepCateg
 import StepAction from '../../../features/client/legal-request/steps/StepAction';
 import StepCity from '../../../features/client/legal-request/steps/StepCity';
 import StepUrgency from '../../../features/client/legal-request/steps/StepUrgency';
-import StepPrivacy from '../../../features/client/legal-request/steps/StepPrivacy';
 import StepSummary from '../../../features/client/legal-request/steps/StepSummary';
 import StepConfirmation from '../../../features/client/legal-request/steps/StepConfirmation';
 import StepPath from '../../../features/client/legal-request/steps/StepPath';
@@ -62,6 +61,7 @@ function sanitizeLegacyIntakeData(value) {
     // They are deliberately ignored from now on.
     delete next.answer;
     delete next.documents;
+    delete next.privacy;
 
     return next;
 }
@@ -87,7 +87,7 @@ function getStoredIntake() {
         const parsed = JSON.parse(saved);
         const parsedStep = typeof parsed?.step === 'number' ? parsed.step : 0;
 
-        // Old wizard had 11 steps. The new version has 9.
+        // Old wizard had 11 steps. The new version has 8.
         // Clamping makes old localStorage snapshots safe after this update.
         const safeStep = Math.min(Math.max(parsedStep, 0), steps.length - 1);
 
@@ -230,16 +230,12 @@ function validationMessagesForStep(step, data) {
         errors.push('لطفاً میزان فوریت مسئله را انتخاب کنید.');
     }
 
-    if (step === 5 && !String(data.privacy || '').trim()) {
-        errors.push('لطفاً سطح محرمانگی پرونده را انتخاب کنید.');
-    }
-
-    if (step === 7 && !data.confirmed) {
+    if (step === 6 && !data.confirmed) {
         errors.push('برای ادامه، تأیید نهایی اطلاعات را فعال کنید.');
     }
 
     if (
-        step === 8 &&
+        step === 7 &&
         !VALID_SERVICE_INTENTS.has(normalizeServiceIntent(data.path))
     ) {
         errors.push('یکی از مسیرهای فعال ادامه پرونده را انتخاب کنید.');
@@ -249,7 +245,7 @@ function validationMessagesForStep(step, data) {
 }
 
 function finalValidationMessages(data) {
-    return [0, 1, 3, 4, 5, 7, 8].flatMap((step) =>
+    return [0, 1, 3, 4, 6, 7].flatMap((step) =>
         validationMessagesForStep(step, data),
     );
 }
@@ -715,18 +711,10 @@ function StepRenderer({ step, data, update, validationError }) {
                 />
             );
         case 5:
-            return (
-                <StepPrivacy
-                    data={data}
-                    update={update}
-                    validationError={validationError}
-                />
-            );
-        case 6:
             return <StepSummary data={data} />;
-        case 7:
+        case 6:
             return <StepConfirmation data={data} update={update} />;
-        case 8:
+        case 7:
             return <StepPath data={data} update={update} />;
         default:
             return null;

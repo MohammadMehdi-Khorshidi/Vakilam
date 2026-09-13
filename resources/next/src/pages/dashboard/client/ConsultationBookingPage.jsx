@@ -92,6 +92,8 @@ export default function ConsultationBookingPage() {
     const [slotLoading, setSlotLoading] = useState(false);
     const [chosen, setChosen] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [slotRange, setSlotRange] = useState('week');
+    const [expandedDays, setExpandedDays] = useState({});
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -212,6 +214,8 @@ export default function ConsultationBookingPage() {
         setDuration(30);
         setSlots([]);
         setChosen(null);
+        setSlotRange('week');
+        setExpandedDays({});
         loadSlots(item, 30);
     }
 
@@ -220,15 +224,51 @@ export default function ConsultationBookingPage() {
         await loadSlots(selected, nextDuration);
     }
 
+    const filteredSlots = useMemo(() => {
+        if (slotRange === 'all') return slots;
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dayAfterTomorrow = new Date(today);
+        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+
+        return slots.filter((slot) => {
+            const value = new Date(slot.starts_at);
+
+            if (slotRange === 'today') {
+                return value >= today && value < tomorrow;
+            }
+
+            if (slotRange === 'tomorrow') {
+                return value >= tomorrow && value < dayAfterTomorrow;
+            }
+
+            return value >= today && value < weekEnd;
+        });
+    }, [slots, slotRange]);
+
     const grouped = useMemo(() => {
         const map = new Map();
-        slots.forEach((slot) => {
+
+        filteredSlots.forEach((slot) => {
             const key = dayKey(slot.starts_at);
             if (!map.has(key)) map.set(key, []);
             map.get(key).push(slot);
         });
+
         return [...map.entries()];
-    }, [slots]);
+    }, [filteredSlots]);
+
+    const toggleDay = (key) => {
+        setExpandedDays((previous) => ({
+            ...previous,
+            [key]: !previous[key],
+        }));
+    };
 
     async function continueReview() {
         if (!chosen || !selected || busy) return;
@@ -539,69 +579,122 @@ export default function ConsultationBookingPage() {
                             </p>
                         </div>
 
-                        <div className="mt-5">
+                        <div className="mt-5 rounded-[18px] border border-[#dfbd6c] bg-white p-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="ml-1 inline-flex items-center gap-2 text-sm font-extrabold text-[#173f38]">
+                                    <SlidersHorizontal size={17} />
+                                    بازه نمایش
+                                </span>
+
+                                {[
+                                    ['today', 'امروز'],
+                                    ['tomorrow', 'فردا'],
+                                    ['week', 'این هفته'],
+                                    ['all', 'همه زمان‌ها'],
+                                ].map(([key, label]) => (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => setSlotRange(key)}
+                                        className={`rounded-full border px-4 py-2 text-xs font-bold transition ${
+                                            slotRange === key
+                                                ? 'border-[#123f37] bg-[#123f37] text-white'
+                                                : 'border-[#dfe7e4] bg-white text-[#53645f] hover:border-[#9db7b0]'
+                                        }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mt-4">
                             {slotLoading ? (
                                 <div className="rounded-xl bg-[#f7faf8] p-10 text-center text-sm text-[#71817c]">
                                     در حال دریافت زمان‌ها...
                                 </div>
                             ) : grouped.length === 0 ? (
                                 <div className="rounded-xl bg-[#f7faf8] p-10 text-center text-sm text-[#71817c]">
-                                    برای این مدت زمان آزادی در ۳۰ روز آینده
+                                    در بازه انتخاب‌شده زمان آزادی برای این مدت
                                     وجود ندارد.
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {grouped.map(([key, list]) => (
-                                        <section
-                                            key={key}
-                                            className="rounded-2xl border border-[#dfe7e3] p-4"
-                                        >
-                                            <div className="flex items-center gap-2 font-black text-[#294e46]">
-                                                <CalendarClock size={17} />
-                                                {formatPersianDate(
-                                                    list[0].starts_at,
-                                                )}
-                                            </div>
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                {list.map((slot) => {
-                                                    const active =
-                                                        chosen?.starts_at ===
-                                                        slot.starts_at;
-                                                    return (
-                                                        <button
-                                                            key={
-                                                                slot.starts_at
-                                                            }
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setChosen(
-                                                                    slot,
-                                                                )
-                                                            }
-                                                            className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-black ${
-                                                                active
-                                                                    ? 'border-[#17634f] bg-[#edf7f3] text-[#17634f]'
-                                                                    : 'border-[#dfe7e4] text-[#53645f] hover:border-[#9db7b0]'
-                                                            }`}
-                                                        >
-                                                            {active ? (
-                                                                <Check
-                                                                    size={13}
-                                                                />
-                                                            ) : (
-                                                                <Clock3
-                                                                    size={13}
-                                                                />
-                                                            )}
-                                                            {formatTime24(
-                                                                slot.starts_at,
-                                                            )}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </section>
-                                    ))}
+                                    {grouped.map(([key, list]) => {
+                                        const expanded = Boolean(expandedDays[key]);
+                                        const visible = expanded
+                                            ? list
+                                            : list.slice(0, 4);
+                                        const remaining = Math.max(
+                                            list.length - 4,
+                                            0,
+                                        );
+
+                                        return (
+                                            <section
+                                                key={key}
+                                                className="rounded-[18px] border border-[#dfe7e3] bg-white p-4"
+                                            >
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div className="flex items-center gap-2 font-black text-[#294e46]">
+                                                        <CalendarClock size={17} />
+                                                        {formatPersianDate(
+                                                            list[0].starts_at,
+                                                        )}
+                                                    </div>
+
+                                                    <span className="text-[11px] font-bold text-[#87928f]">
+                                                        {fa.format(list.length)}{' '}
+                                                        زمان آزاد
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    {visible.map((slot) => {
+                                                        const active =
+                                                            chosen?.starts_at ===
+                                                            slot.starts_at;
+
+                                                        return (
+                                                            <button
+                                                                key={slot.starts_at}
+                                                                type="button"
+                                                                onClick={() => setChosen(slot)}
+                                                                className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-black transition ${
+                                                                    active
+                                                                        ? 'border-[#17634f] bg-[#edf7f3] text-[#17634f]'
+                                                                        : 'border-[#dfe7e4] bg-white text-[#53645f] hover:border-[#9db7b0]'
+                                                                }`}
+                                                            >
+                                                                {active ? (
+                                                                    <Check size={13} />
+                                                                ) : (
+                                                                    <Clock3 size={13} />
+                                                                )}
+                                                                {formatTime24(
+                                                                    slot.starts_at,
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {list.length > 4 ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleDay(key)}
+                                                        className="mt-3 rounded-lg px-1 py-1 text-xs font-extrabold text-[#17634f] transition hover:text-[#123f37]"
+                                                    >
+                                                        {expanded
+                                                            ? 'نمایش کمتر'
+                                                            : `مشاهده ${fa.format(
+                                                                  remaining,
+                                                              )} زمان دیگر`}
+                                                    </button>
+                                                ) : null}
+                                            </section>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
