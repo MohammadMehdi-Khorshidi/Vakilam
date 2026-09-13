@@ -1,227 +1,30 @@
 'use client';
-
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CalendarDays, Check, Clock3, Star, X } from 'lucide-react';
+import { CalendarClock, Check, Clock3, Search, Star, X } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
-
-import {
-    getConsultationLawyers,
-    getConsultationSlots,
-    reserveConsultation,
-} from '@/lib/api/consultations';
-
-const vazir = Vazirmatn({ subsets: ['arabic'], weight: ['400','500','600','700','800'] });
-const DURATIONS = [15,30,45,60];
-
-function dayKey(value) {
-    return new Date(value).toISOString().slice(0,10);
-}
-
-function formatDay(value) {
-    return new Intl.DateTimeFormat('fa-IR', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-    }).format(new Date(value));
-}
-
-function formatTime(value) {
-    return new Intl.DateTimeFormat('fa-IR', {
-        hour: '2-digit',
-        minute: '2-digit',
-    }).format(new Date(value));
-}
-
-export default function ConsultationBookingPage() {
-    const params = useSearchParams();
-    const router = useRouter();
-    const legalRequestId = params.get('legal_request_id');
-
-    const [lawyers, setLawyers] = useState([]);
-    const [selectedLawyer, setSelectedLawyer] = useState(null);
-    const [duration, setDuration] = useState(30);
-    const [slots, setSlots] = useState([]);
-    const [selectedSlot, setSelectedSlot] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [slotLoading, setSlotLoading] = useState(false);
-    const [booking, setBooking] = useState(false);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-        if (!legalRequestId) {
-            setError('شناسه درخواست مشاوره مشخص نیست.');
-            setLoading(false);
-            return;
-        }
-
-        getConsultationLawyers(legalRequestId)
-            .then((response) => setLawyers(response?.data ?? []))
-            .catch((e) => setError(e?.message || 'دریافت وکلا انجام نشد.'))
-            .finally(() => setLoading(false));
-    }, [legalRequestId]);
-
-    const loadSlots = useCallback(async (lawyer, nextDuration = duration) => {
-        if (!lawyer || !legalRequestId) return;
-        setSlotLoading(true);
-        setSelectedSlot(null);
-        setError('');
-        try {
-            const data = await getConsultationSlots(
-                legalRequestId,
-                lawyer.public_id,
-                nextDuration,
-            );
-            setSlots(data ?? []);
-        } catch (e) {
-            setSlots([]);
-            setError(e?.message || 'دریافت زمان‌های آزاد انجام نشد.');
-        } finally {
-            setSlotLoading(false);
-        }
-    }, [duration, legalRequestId]);
-
-    function openLawyer(item) {
-        const lawyer = item.lawyer;
-        setSelectedLawyer(lawyer);
-        setDuration(30);
-        setSlots([]);
-        setSelectedSlot(null);
-        loadSlots(lawyer, 30);
-    }
-
-    async function changeDuration(value) {
-        setDuration(value);
-        await loadSlots(selectedLawyer, value);
-    }
-
-    const grouped = useMemo(() => {
-        const map = new Map();
-        slots.forEach((slot) => {
-            const key = dayKey(slot.starts_at);
-            if (!map.has(key)) map.set(key, []);
-            map.get(key).push(slot);
-        });
-        return Array.from(map.entries());
-    }, [slots]);
-
-    async function confirmBooking() {
-        if (!selectedLawyer || !selectedSlot || booking) return;
-
-        setBooking(true);
-        setError('');
-        try {
-            await reserveConsultation(legalRequestId, {
-                lawyer_public_id: selectedLawyer.public_id,
-                starts_at: selectedSlot.starts_at,
-                duration_minutes: duration,
-            });
-            router.push('/client/consultations');
-        } catch (e) {
-            setError(e?.validationMessages?.[0] || e?.message || 'رزرو انجام نشد.');
-            await loadSlots(selectedLawyer, duration);
-        } finally {
-            setBooking(false);
-        }
-    }
-
-    return (
-        <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f6f9f7] px-4 py-8 sm:px-6 lg:px-10`}>
-            <div className="mx-auto max-w-[1180px]">
-                <header>
-                    <p className="text-sm font-bold text-[#a47b2c]">رزرو مشاوره</p>
-                    <h1 className="mt-2 text-3xl font-black text-[#173f38]">انتخاب وکیل و زمان مشاوره</h1>
-                    <p className="mt-2 text-sm leading-7 text-slate-500">
-                        وکلا بر اساس موضوع و موقعیت درخواست شما مرتب شده‌اند. قبل از رزرو، زمان‌های آزاد واقعی وکیل را ببینید.
-                    </p>
-                    <p className="mt-2 text-xs font-bold text-amber-700">رزرو فقط تا حداقل ۶۰ دقیقه قبل از شروع جلسه ممکن است.</p>
-                </header>
-
-                {error ? <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div> : null}
-
-                {loading ? <div className="mt-6 rounded-2xl border bg-white p-12 text-center text-slate-500">در حال دریافت وکلا...</div> :
-                lawyers.length === 0 ? <div className="mt-6 rounded-2xl border bg-white p-12 text-center text-slate-500">وکیل مناسبی برای این درخواست پیدا نشد.</div> :
-                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {lawyers.map((item)=> {
-                        const lawyer = item.lawyer ?? {};
-                        return (
-                            <article key={lawyer.public_id} className="rounded-3xl border border-slate-200 bg-white p-5">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <p className="text-xs font-bold text-[#a47b2c]">پیشنهاد #{item.rank}</p>
-                                        <h2 className="mt-2 text-lg font-black text-[#173f38]">{lawyer.full_name || 'وکیل'}</h2>
-                                    </div>
-                                    {lawyer.average_rating ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><Star size={13}/>{lawyer.average_rating}</span> : null}
-                                </div>
-                                {lawyer.specialties?.length ? <p className="mt-3 line-clamp-2 text-xs leading-6 text-slate-500">{lawyer.specialties.map((s)=>s.name).filter(Boolean).join('، ')}</p> : null}
-                                <button type="button" onClick={()=>openLawyer(item)} className="mt-5 w-full rounded-xl bg-[#173f38] px-4 py-3 text-sm font-black text-white">
-                                    مشاهده زمان‌های آزاد
-                                </button>
-                            </article>
-                        );
-                    })}
-                </div>}
-            </div>
-
-            {selectedLawyer ? (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]">
-                    <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <p className="text-xs font-bold text-[#a47b2c]">انتخاب زمان</p>
-                                <h2 className="mt-1 text-xl font-black text-[#173f38]">{selectedLawyer.full_name}</h2>
-                            </div>
-                            <button type="button" onClick={()=>setSelectedLawyer(null)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X size={20}/></button>
-                        </div>
-
-                        <div className="mt-5">
-                            <p className="text-xs font-bold text-slate-600">مدت مشاوره</p>
-                            <div className="mt-2 grid grid-cols-4 gap-2">
-                                {DURATIONS.map((item)=>(
-                                    <button key={item} type="button" onClick={()=>changeDuration(item)} className={`rounded-xl border px-2 py-3 text-xs font-black ${duration===item?'border-[#c7a154] bg-[#fff8e7] text-[#6e541d]':'border-slate-200 text-slate-500'}`}>
-                                        {item} دقیقه
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="mt-5">
-                            {slotLoading ? <div className="rounded-xl bg-slate-50 p-10 text-center text-sm text-slate-500">در حال دریافت زمان‌های آزاد...</div> :
-                            grouped.length === 0 ? <div className="rounded-xl bg-slate-50 p-10 text-center text-sm text-slate-500">برای این مدت، زمان آزادی در ۳۰ روز آینده وجود ندارد.</div> :
-                            <div className="space-y-4">
-                                {grouped.map(([key, items])=>(
-                                    <section key={key} className="rounded-2xl border border-slate-200 p-4">
-                                        <div className="flex items-center gap-2 font-black text-[#294e46]"><CalendarDays size={17}/>{formatDay(items[0].starts_at)}</div>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            {items.map((slot)=> {
-                                                const active = selectedSlot?.starts_at === slot.starts_at;
-                                                return (
-                                                    <button key={slot.starts_at} type="button" onClick={()=>setSelectedSlot(slot)} className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-black ${active?'border-[#17634f] bg-[#edf7f3] text-[#17634f]':'border-slate-200 text-slate-600 hover:border-[#9dbbb3]'}`}>
-                                                        {active ? <Check size={13}/> : <Clock3 size={13}/>}
-                                                        {formatTime(slot.starts_at)}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </section>
-                                ))}
-                            </div>}
-                        </div>
-
-                        {selectedSlot ? (
-                            <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                                <p className="font-black text-emerald-800">خلاصه رزرو</p>
-                                <p className="mt-2 text-sm leading-7 text-emerald-700">
-                                    {selectedLawyer.full_name} • {formatDay(selectedSlot.starts_at)} ساعت {formatTime(selectedSlot.starts_at)} • {duration} دقیقه
-                                </p>
-                                <button type="button" disabled={booking} onClick={confirmBooking} className="mt-3 w-full rounded-xl bg-[#17634f] px-5 py-3 text-sm font-black text-white disabled:opacity-50">
-                                    {booking ? 'در حال رزرو...' : 'تأیید رزرو'}
-                                </button>
-                            </div>
-                        ) : null}
-                    </div>
-                </div>
-            ) : null}
-        </main>
-    );
+import { createConsultationHold, getConsultationDirectory, getConsultationSlots } from '@/lib/api/consultations';
+import { formatPersianDate, formatTime24 } from '@/lib/persianDateTime';
+const vazir=Vazirmatn({subsets:['arabic'],weight:['400','500','600','700','800']}); const DURATIONS=[15,30,45,60]; const fa=new Intl.NumberFormat('fa-IR');
+function dayKey(v){return new Date(v).toISOString().slice(0,10)}
+export default function ConsultationBookingPage(){
+ const params=useSearchParams(),router=useRouter(),requestId=params.get('legal_request_id');
+ const [items,setItems]=useState([]),[meta,setMeta]=useState(null),[q,setQ]=useState(''),[sort,setSort]=useState('match'),[onlyFree,setOnlyFree]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const [selected,setSelected]=useState(null),[duration,setDuration]=useState(30),[slots,setSlots]=useState([]),[slotMeta,setSlotMeta]=useState({}),[slotLoading,setSlotLoading]=useState(false),[chosen,setChosen]=useState(null),[busy,setBusy]=useState(false);
+ useEffect(()=>{if(!requestId){setError('شناسه درخواست مشاوره مشخص نیست.');setLoading(false);return}const timer=setTimeout(async()=>{setLoading(true);try{const r=await getConsultationDirectory(requestId,{q,sort,has_availability:onlyFree?1:undefined});setItems(r?.data??[]);setMeta(r?.meta??null);setError('')}catch(e){setError(e?.message||'دریافت وکلا انجام نشد.')}finally{setLoading(false)}},250);return()=>clearTimeout(timer)},[requestId,q,sort,onlyFree]);
+ async function loadSlots(item,d=duration){setSlotLoading(true);setChosen(null);try{const r=await getConsultationSlots(requestId,item.lawyer.public_id,d);setSlots(r?.data??[]);setSlotMeta(r?.meta??{});setError('')}catch(e){setSlots([]);setSlotMeta({});setError(e?.message||'دریافت زمان‌های آزاد انجام نشد.')}finally{setSlotLoading(false)}}
+ function open(item){setSelected(item);setDuration(30);setSlots([]);setChosen(null);loadSlots(item,30)}
+ async function changeDuration(d){setDuration(d);await loadSlots(selected,d)}
+ const grouped=useMemo(()=>{const m=new Map();slots.forEach(s=>{const k=dayKey(s.starts_at);if(!m.has(k))m.set(k,[]);m.get(k).push(s)});return [...m.entries()]},[slots]);
+ async function continueReview(){if(!chosen||!selected)return;setBusy(true);try{const hold=await createConsultationHold(requestId,{lawyer_public_id:selected.lawyer.public_id,starts_at:chosen.starts_at,duration_minutes:duration});router.push(`/client/consultations/review?consultation_id=${encodeURIComponent(hold.public_id)}`)}catch(e){setError(e?.message||'نگه‌داری زمان انجام نشد.');await loadSlots(selected,duration)}finally{setBusy(false)}}
+ return <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f6f9f7] px-4 py-8 sm:px-6 lg:px-10`}><div className="mx-auto max-w-[1200px]"><header><p className="text-sm font-bold text-[#a47b2c]">رزرو مشاوره</p><h1 className="mt-2 text-3xl font-black text-[#173f38]">انتخاب وکیل</h1><p className="mt-2 text-sm leading-7 text-slate-500">همه وکلای فعال و تأییدشده نمایش داده می‌شوند؛ ترتیب اولیه بر اساس تطابق موضوع، موقعیت، سابقه و امتیاز است.</p></header>
+ {error?<div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>:null}
+ <div className="mt-6 grid gap-3 rounded-2xl border bg-white p-4 md:grid-cols-[1fr_220px_auto]"><div className="relative"><Search size={17} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="جستجوی نام یا تخصص وکیل" className="h-12 w-full rounded-xl border border-slate-200 pr-10 pl-3 outline-none focus:border-[#76a99c]"/></div><select value={sort} onChange={e=>setSort(e.target.value)} className="h-12 rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none"><option value="match">مرتبط‌ترین</option><option value="rating">بیشترین امتیاز</option><option value="experience">بیشترین سابقه</option><option value="soonest">نزدیک‌ترین زمان آزاد</option></select><label className="flex h-12 items-center gap-2 rounded-xl border border-slate-200 px-4 text-xs font-bold"><input type="checkbox" checked={onlyFree} onChange={e=>setOnlyFree(e.target.checked)}/>فقط دارای زمان آزاد</label></div>
+ {loading?<div className="mt-6 rounded-2xl border bg-white p-12 text-center text-slate-500">در حال دریافت وکلا...</div>:!items.length?<div className="mt-6 rounded-2xl border bg-white p-12 text-center text-slate-500">وکیلی با این فیلتر پیدا نشد.</div>:<div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map(item=>{const l=item.lawyer;return <article key={l.public_id} className="rounded-3xl border border-slate-200 bg-white p-5"><div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-black text-[#173f38]">{l.full_name||'وکیل'}</h2><p className="mt-1 text-xs text-slate-500">{item.years_experience?`${fa.format(item.years_experience)} سال سابقه مرتبط`:'سابقه ثبت نشده'}</p></div>{l.average_rating?<span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><Star size={13}/>{l.average_rating}</span>:null}</div>{l.specialties?.length?<p className="mt-3 line-clamp-2 text-xs leading-6 text-slate-500">{l.specialties.map(s=>s.name).filter(Boolean).join('، ')}</p>:null}<div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-600"><p>{item.nearest_available_at?<>نزدیک‌ترین زمان: <b>{formatPersianDate(item.nearest_available_at)} ساعت {formatTime24(item.nearest_available_at)}</b></>:'زمان آزاد ثبت نشده'}</p><p>{item.min_price_rial?<>شروع تعرفه از <b>{fa.format(Math.round(item.min_price_rial/10))} تومان</b></>:'تعرفه مشاوره ثبت نشده'}</p></div><button onClick={()=>open(item)} className="mt-4 w-full rounded-xl bg-[#173f38] px-4 py-3 text-sm font-black text-white">رزرو مشاوره</button></article>})}</div>}
+ </div>
+ {selected?<div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]"><div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-xs font-bold text-[#a47b2c]">رزرو مشاوره</p><h2 className="mt-1 text-xl font-black text-[#173f38]">{selected.lawyer.full_name}</h2></div><button onClick={()=>setSelected(null)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X size={20}/></button></div><p className="mt-5 text-xs font-bold text-slate-600">مدت مشاوره</p><div className="mt-2 grid grid-cols-4 gap-2">{DURATIONS.map(d=>{const price=selected.rates?.[String(d)];return <button key={d} disabled={!price} onClick={()=>changeDuration(d)} className={`rounded-xl border px-2 py-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-35 ${duration===d?'border-[#c7a154] bg-[#fff8e7] text-[#6e541d]':'border-slate-200 text-slate-500'}`}><span className="block">{d} دقیقه</span><span className="mt-1 block text-[10px]">{price?`${fa.format(Math.round(price/10))} تومان`:'بدون تعرفه'}</span></button>})}</div>
+ <div className="mt-5 rounded-xl bg-[#f7faf8] p-4"><p className="text-sm font-black text-[#294e46]">هزینه این مشاوره: {slotMeta?.price_rial?`${fa.format(Math.round(slotMeta.price_rial/10))} تومان`:'تعرفه ثبت نشده'}</p><p className="mt-1 text-xs text-slate-500">فقط زمان‌هایی نمایش داده می‌شوند که حداقل ۶۰ دقیقه تا شروع آن‌ها باقی مانده باشد.</p></div>
+ <div className="mt-5">{slotLoading?<div className="rounded-xl bg-slate-50 p-10 text-center text-sm text-slate-500">در حال دریافت زمان‌ها...</div>:!grouped.length?<div className="rounded-xl bg-slate-50 p-10 text-center text-sm text-slate-500">برای این مدت زمان آزادی در ۳۰ روز آینده وجود ندارد.</div>:<div className="space-y-4">{grouped.map(([key,list])=><section key={key} className="rounded-2xl border p-4"><div className="flex items-center gap-2 font-black text-[#294e46]"><CalendarClock size={17}/>{formatPersianDate(list[0].starts_at)}</div><div className="mt-3 flex flex-wrap gap-2">{list.map(slot=>{const active=chosen?.starts_at===slot.starts_at;return <button key={slot.starts_at} onClick={()=>setChosen(slot)} className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-black ${active?'border-[#17634f] bg-[#edf7f3] text-[#17634f]':'border-slate-200 text-slate-600'}`}>{active?<Check size={13}/>:<Clock3 size={13}/>} {formatTime24(slot.starts_at)}</button>})}</div></section>)}</div>}</div>
+ {chosen?<div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="font-black text-emerald-800">زمان انتخاب‌شده: {formatPersianDate(chosen.starts_at)} ساعت {formatTime24(chosen.starts_at)}</p><button disabled={busy} onClick={continueReview} className="mt-3 w-full rounded-xl bg-[#17634f] px-5 py-3 text-sm font-black text-white disabled:opacity-50">{busy?'در حال ثبت...':'ادامه و مشاهده جزئیات'}</button></div>:null}
+ </div></div>:null}</main>;
 }

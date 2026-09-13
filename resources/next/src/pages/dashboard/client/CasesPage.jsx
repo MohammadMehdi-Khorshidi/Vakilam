@@ -85,7 +85,7 @@ export default function CasePage() {
         [engagements],
     );
     const submittedRequests = (dashboard?.submitted_requests || []).filter(
-        (item) => !engagedRequestIds.has(item.public_id),
+        (item) => item.service_intent !== 'consultation' && !engagedRequestIds.has(item.public_id),
     );
     const preActiveEngagements = engagements.filter((item) => item.stage !== 'active');
 
@@ -119,7 +119,7 @@ export default function CasePage() {
                                 <Handshake className="text-[#416a88]" />
                             </div>
                             <div className="flex items-center justify-between rounded-[18px] border border-[#eadfbe] bg-[#fffaf0] p-5">
-                                <div><p className="text-xs font-bold text-[#8b7440]">درخواست‌های قبل از توافق</p><p className="mt-2 text-2xl font-black text-[#5d4c27]">{faNumber.format(submittedRequests.length)}</p></div>
+                                <div><p className="text-xs font-bold text-[#8b7440]">درخواست‌های انتخاب وکیل قبل از توافق</p><p className="mt-2 text-2xl font-black text-[#5d4c27]">{faNumber.format(submittedRequests.length)}</p></div>
                                 <Hourglass className="text-[#b38b38]" />
                             </div>
                         </section>
@@ -187,7 +187,7 @@ export default function CasePage() {
 
                         <section className="overflow-hidden rounded-[18px] border border-[#dfe7e3] bg-white">
                             <div className="border-b border-[#e8eeeb] px-5 py-5">
-                                <h2 className="font-extrabold text-[#173f38]">درخواست‌های قبل از توافق</h2>
+                                <h2 className="font-extrabold text-[#173f38]">درخواست‌های انتخاب وکیل قبل از توافق</h2>
                             </div>
                             {submittedRequests.length === 0 ? (
                                 <p className="px-5 py-10 text-center text-sm text-[#899691]">درخواست دیگری در انتظار انتخاب وکیل نیست.</p>

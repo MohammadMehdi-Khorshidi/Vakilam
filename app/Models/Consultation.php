@@ -22,6 +22,8 @@ class Consultation extends Model
         'scheduled_start_at',
         'scheduled_end_at',
         'duration_minutes',
+        'price_rial',
+        'hold_expires_at',
         'completed_at',
         'notes',
     ];
@@ -32,32 +34,15 @@ class Consultation extends Model
             'scheduled_start_at' => 'datetime',
             'scheduled_end_at' => 'datetime',
             'duration_minutes' => 'integer',
+            'price_rial' => 'integer',
+            'hold_expires_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
     }
 
-    public function legalRequest()
-    {
-        return $this->belongsTo(LegalRequest::class);
-    }
-
-    public function client()
-    {
-        return $this->belongsTo(User::class, 'client_user_id');
-    }
-
-    public function lawyerProfile()
-    {
-        return $this->belongsTo(LawyerProfile::class);
-    }
-
-    public function conversations()
-    {
-        return $this->hasMany(Conversation::class);
-    }
-
-    public function meetings()
-    {
-        return $this->hasMany(Meeting::class);
-    }
+    public function legalRequest() { return $this->belongsTo(LegalRequest::class); }
+    public function client() { return $this->belongsTo(User::class, 'client_user_id'); }
+    public function lawyerProfile() { return $this->belongsTo(LawyerProfile::class); }
+    public function conversations() { return $this->hasMany(Conversation::class); }
+    public function meetings() { return $this->hasMany(Meeting::class); }
 }

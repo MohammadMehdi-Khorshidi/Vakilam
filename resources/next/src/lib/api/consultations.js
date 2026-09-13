@@ -1,64 +1,16 @@
 import { apiRequest, unwrapData } from './client';
 
-export async function getLawyerAvailabilities() {
-    return unwrapData(await apiRequest('lawyer/availabilities'));
-}
-
-export async function createLawyerAvailability(payload) {
-    return unwrapData(
-        await apiRequest('lawyer/availabilities', {
-            method: 'POST',
-            data: payload,
-        }),
-    );
-}
-
-export async function updateLawyerAvailability(id, payload) {
-    return unwrapData(
-        await apiRequest(`lawyer/availabilities/${encodeURIComponent(id)}`, {
-            method: 'PATCH',
-            data: payload,
-        }),
-    );
-}
-
-export async function deleteLawyerAvailability(id) {
-    return apiRequest(
-        `lawyer/availabilities/${encodeURIComponent(id)}`,
-        { method: 'DELETE' },
-    );
-}
-
-export async function getConsultationLawyers(legalRequestId) {
-    return apiRequest(
-        `legal-requests/${encodeURIComponent(legalRequestId)}/consultation-lawyers`,
-    );
-}
-
-export async function getConsultationSlots(legalRequestId, lawyerPublicId, duration) {
-    return unwrapData(
-        await apiRequest(
-            `legal-requests/${encodeURIComponent(legalRequestId)}/consultation-lawyers/${encodeURIComponent(lawyerPublicId)}/slots?duration=${encodeURIComponent(duration)}`,
-        ),
-    );
-}
-
-export async function reserveConsultation(legalRequestId, payload) {
-    return unwrapData(
-        await apiRequest(
-            `legal-requests/${encodeURIComponent(legalRequestId)}/consultations`,
-            {
-                method: 'POST',
-                data: payload,
-            },
-        ),
-    );
-}
-
-export async function getClientConsultations() {
-    return unwrapData(await apiRequest('client/consultations'));
-}
-
-export async function getLawyerConsultations() {
-    return unwrapData(await apiRequest('lawyer/consultations'));
-}
+export const getLawyerAvailabilities = async () => unwrapData(await apiRequest('lawyer/availabilities'));
+export const createLawyerAvailability = async (payload) => unwrapData(await apiRequest('lawyer/availabilities',{method:'POST',data:payload}));
+export const updateLawyerAvailability = async (id,payload) => unwrapData(await apiRequest(`lawyer/availabilities/${encodeURIComponent(id)}`,{method:'PATCH',data:payload}));
+export const deleteLawyerAvailability = async (id) => apiRequest(`lawyer/availabilities/${encodeURIComponent(id)}`,{method:'DELETE'});
+export const getConsultationRates = async () => unwrapData(await apiRequest('lawyer/consultation-rates'));
+export const saveConsultationRates = async (rates) => unwrapData(await apiRequest('lawyer/consultation-rates',{method:'PUT',data:{rates}}));
+export const getConsultationDirectory = (legalRequestId, query={}) => apiRequest(`legal-requests/${encodeURIComponent(legalRequestId)}/consultation-directory`,{query});
+export const getConsultationSlots = (legalRequestId,lawyerPublicId,duration) => apiRequest(`legal-requests/${encodeURIComponent(legalRequestId)}/consultation-lawyers/${encodeURIComponent(lawyerPublicId)}/slots`,{query:{duration}});
+export const createConsultationHold = async (legalRequestId,payload) => unwrapData(await apiRequest(`legal-requests/${encodeURIComponent(legalRequestId)}/consultation-holds`,{method:'POST',data:payload}));
+export const getConsultation = async (publicId) => unwrapData(await apiRequest(`consultations/${encodeURIComponent(publicId)}`));
+export const cancelConsultationHold = (publicId) => apiRequest(`consultations/${encodeURIComponent(publicId)}/hold`,{method:'DELETE'});
+export const prepareConsultationPayment = async (publicId) => unwrapData(await apiRequest(`consultations/${encodeURIComponent(publicId)}/payment-step`,{method:'POST'}));
+export const getClientConsultations = async () => unwrapData(await apiRequest('client/consultations'));
+export const getLawyerConsultations = async () => unwrapData(await apiRequest('lawyer/consultations'));

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\ConsultationBookingController;
+use App\Http\Controllers\Api\LawyerConsultationRateController;
+use App\Http\Controllers\Api\ConsultationDirectoryController;
 use App\Http\Controllers\Api\LawyerAvailabilityController;
 
 use App\Http\Controllers\Api\ClientEngagementController;
@@ -72,23 +74,17 @@ Route::get(
     [NegotiationAttachmentController::class, 'download'],
 );
 
-
-// Consultation phase 1
+// Consultation booking
+Route::get('/lawyer/consultation-rates', [LawyerConsultationRateController::class, 'index']);
+Route::put('/lawyer/consultation-rates', [LawyerConsultationRateController::class, 'update']);
 Route::get('/lawyer/availabilities', [LawyerAvailabilityController::class, 'index']);
 Route::patch('/lawyer/availabilities/{availability}', [LawyerAvailabilityController::class, 'update']);
 Route::delete('/lawyer/availabilities/{availability}', [LawyerAvailabilityController::class, 'destroy']);
 
-Route::post(
-    '/legal-requests/{legalRequest}/consultations',
-    [ConsultationBookingController::class, 'store'],
-);
-
-Route::get(
-    '/client/consultations',
-    [ConsultationBookingController::class, 'clientIndex'],
-);
-
-Route::get(
-    '/lawyer/consultations',
-    [ConsultationBookingController::class, 'lawyerIndex'],
-);
+Route::get('/legal-requests/{legalRequest}/consultation-directory', [ConsultationDirectoryController::class, 'index']);
+Route::post('/legal-requests/{legalRequest}/consultation-holds', [ConsultationBookingController::class, 'hold']);
+Route::get('/consultations/{consultation:public_id}', [ConsultationBookingController::class, 'show']);
+Route::delete('/consultations/{consultation:public_id}/hold', [ConsultationBookingController::class, 'cancelHold']);
+Route::post('/consultations/{consultation:public_id}/payment-step', [ConsultationBookingController::class, 'paymentStep']);
+Route::get('/client/consultations', [ConsultationBookingController::class, 'clientIndex']);
+Route::get('/lawyer/consultations', [ConsultationBookingController::class, 'lawyerIndex']);
