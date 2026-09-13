@@ -13,6 +13,7 @@ class LawyerAvailability extends Model
         'lawyer_profile_id',
         'starts_at',
         'ends_at',
+        'allowed_durations',
         'status',
         'reserved_until',
         'consultation_id',
@@ -25,23 +26,21 @@ class LawyerAvailability extends Model
         return [
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'allowed_durations' => 'array',
             'reserved_until' => 'datetime',
         ];
     }
 
-    /** Lawyer who published this availability slot. */
     public function lawyerProfile()
     {
         return $this->belongsTo(LawyerProfile::class);
     }
 
-    /** Consultation booked for this slot, if any. */
     public function consultation()
     {
         return $this->belongsTo(Consultation::class);
     }
 
-    /** Meeting linked to this slot, if any. */
     public function meeting()
     {
         return $this->belongsTo(Meeting::class);

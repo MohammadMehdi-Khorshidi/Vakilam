@@ -513,6 +513,15 @@ export default function IntakeWizard() {
                 return;
             }
 
+            if (submitted?.service_intent === 'consultation') {
+                router.push(
+                    `/client/consultation-booking?legal_request_id=${encodeURIComponent(
+                        submitted.id,
+                    )}`,
+                );
+                return;
+            }
+
             setMessage('درخواست حقوقی با موفقیت ثبت نهایی شد.');
         } catch (requestError) {
             const serverValidation = requestError?.validationMessages ?? [];

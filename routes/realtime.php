@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\ConsultationBookingController;
+use App\Http\Controllers\Api\LawyerAvailabilityController;
+
 use App\Http\Controllers\Api\ClientEngagementController;
 use App\Http\Controllers\Api\EngagementDocumentRequestController;
 use App\Http\Controllers\Api\EngagementWorkflowController;
@@ -67,4 +70,25 @@ Route::post(
 Route::get(
     '/negotiation-attachments/{attachment:public_id}/download',
     [NegotiationAttachmentController::class, 'download'],
+);
+
+
+// Consultation phase 1
+Route::get('/lawyer/availabilities', [LawyerAvailabilityController::class, 'index']);
+Route::patch('/lawyer/availabilities/{availability}', [LawyerAvailabilityController::class, 'update']);
+Route::delete('/lawyer/availabilities/{availability}', [LawyerAvailabilityController::class, 'destroy']);
+
+Route::post(
+    '/legal-requests/{legalRequest}/consultations',
+    [ConsultationBookingController::class, 'store'],
+);
+
+Route::get(
+    '/client/consultations',
+    [ConsultationBookingController::class, 'clientIndex'],
+);
+
+Route::get(
+    '/lawyer/consultations',
+    [ConsultationBookingController::class, 'lawyerIndex'],
 );
