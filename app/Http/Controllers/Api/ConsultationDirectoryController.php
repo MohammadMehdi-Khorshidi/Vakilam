@@ -47,6 +47,12 @@ class ConsultationDirectoryController extends Controller
             'data' => $slice->map(fn (array $item): array => [
                 'lawyer' => LawyerPublicResource::make($item['lawyer'])->resolve(),
                 'years_experience' => $item['years_experience'],
+                'sort_metrics' => [
+                    'topic_match' => (bool) $item['topic_match'],
+                    'location' => (int) $item['location_level'],
+                    'experience' => (int) $item['years_experience'],
+                    'rating' => (float) ($item['lawyer']->average_rating ?? 0),
+                ],
                 'nearest_available_at' => $item['nearest_available_at'],
                 'has_availability' => $item['has_availability'],
                 'rates' => $item['rates'],
