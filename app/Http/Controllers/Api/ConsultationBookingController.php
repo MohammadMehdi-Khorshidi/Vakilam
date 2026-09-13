@@ -130,8 +130,14 @@ class ConsultationBookingController extends Controller
         $consultations = Consultation::query()->where('client_user_id',$user->id)->with(['legalRequest:id,public_id,title,service_intent','lawyerProfile:id,public_id,full_name'])->orderByDesc('created_at')->get();
         return response()->json(['data' => [
             'requests' => $requests->map(fn ($r) => [
-                'public_id'=>$r->public_id,'title'=>$r->title,'description'=>$r->description,'status'=>$r->status,'service_intent'=>$r->service_intent,
-                'legal_category'=>$r->legalCategory ? ['name'=>$r->legalCategory->name] : null,'updated_at'=>$r->updated_at?->toISOString(),
+                'id'=>$r->id,
+                'public_id'=>$r->public_id,
+                'title'=>$r->title,
+                'description'=>$r->description,
+                'status'=>$r->status,
+                'service_intent'=>$r->service_intent,
+                'legal_category'=>$r->legalCategory ? ['name'=>$r->legalCategory->name] : null,
+                'updated_at'=>$r->updated_at?->toISOString(),
             ])->values(),
             'consultations' => $consultations->map(fn ($c) => $this->serialize($c))->values(),
         ]]);

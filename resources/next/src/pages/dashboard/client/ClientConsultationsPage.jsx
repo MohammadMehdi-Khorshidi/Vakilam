@@ -187,14 +187,6 @@ export default function ClientConsultationsPage() {
                                                 </div>
 
                                                 <div className="flex flex-wrap gap-2">
-                                                    <Link
-                                                        href={`/client/consultations/request/${encodeURIComponent(
-                                                            request.public_id,
-                                                        )}`}
-                                                        className="rounded-xl border border-[#bcd2cb] bg-[#f7fbf9] px-4 py-2.5 text-xs font-bold text-[#174c42] transition hover:bg-[#eef7f3]"
-                                                    >
-                                                        مشاهده جزئیات
-                                                    </Link>
 
                                                     {consultation?.status ===
                                                     'held' ? (
@@ -215,7 +207,7 @@ export default function ClientConsultationsPage() {
                                                       ) ? (
                                                         <Link
                                                             href={`/client/consultation-booking?legal_request_id=${encodeURIComponent(
-                                                                request.public_id,
+                                                                request.id,
                                                             )}`}
                                                             className="rounded-xl bg-[#123f37] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#0d332c]"
                                                         >
