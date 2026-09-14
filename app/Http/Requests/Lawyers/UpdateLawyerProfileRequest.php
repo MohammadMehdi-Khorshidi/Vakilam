@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Lawyers;
 
+use App\Models\City;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -56,6 +57,31 @@ class UpdateLawyerProfileRequest extends LawyerProfileRequest
         ];
     }
 
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'first_name.required' => 'نام را وارد کنید.',
+            'first_name.max' => 'نام نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد.',
+            'last_name.required' => 'نام خانوادگی را وارد کنید.',
+            'last_name.max' => 'نام خانوادگی نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد.',
+            'bio.max' => 'متن معرفی نمی‌تواند بیشتر از ۵۰۰۰ کاراکتر باشد.',
+            'specialties.array' => 'فهرست تخصص‌ها معتبر نیست.',
+            'specialties.max' => 'حداکثر ۲۰ تخصص قابل انتخاب است.',
+            'specialties.*.specialty_id.required' => 'تخصص را انتخاب کنید.',
+            'specialties.*.specialty_id.exists' => 'تخصص انتخاب‌شده معتبر یا فعال نیست.',
+            'specialties.*.specialty_id.distinct' => 'تخصص تکراری مجاز نیست.',
+            'specialties.*.years_experience.integer' => 'سابقه تخصص باید عدد صحیح باشد.',
+            'specialties.*.years_experience.min' => 'سابقه تخصص نمی‌تواند منفی باشد.',
+            'specialties.*.years_experience.max' => 'سابقه تخصص نمی‌تواند بیشتر از ۱۰۰ سال باشد.',
+            'service_areas.array' => 'فهرست محدوده‌های فعالیت معتبر نیست.',
+            'service_areas.max' => 'حداکثر ۱۰۰ محدوده فعالیت قابل ثبت است.',
+            'service_areas.*.province_id.required' => 'استان را انتخاب کنید.',
+            'service_areas.*.province_id.exists' => 'استان انتخاب‌شده معتبر نیست.',
+            'service_areas.*.city_id.exists' => 'شهر انتخاب‌شده معتبر نیست.',
+        ];
+    }
+
     /** @return array<int, callable(Validator): void> */
     public function after(): array
     {
@@ -78,13 +104,13 @@ class UpdateLawyerProfileRequest extends LawyerProfileRequest
                         continue;
                     }
 
-                    if ($cityId !== null && ! \App\Models\City::query()
+                    if ($cityId !== null && ! City::query()
                         ->whereKey($cityId)
                         ->where('province_id', $provinceId)
                         ->exists()) {
                         $validator->errors()->add(
                             "service_areas.{$index}.city_id",
-                            'The selected city does not belong to the selected province.',
+                            'شهر انتخاب‌شده متعلق به استان انتخاب‌شده نیست.',
                         );
                     }
 
@@ -93,7 +119,7 @@ class UpdateLawyerProfileRequest extends LawyerProfileRequest
                     if (isset($seen[$key])) {
                         $validator->errors()->add(
                             "service_areas.{$index}",
-                            'Duplicate service areas are not allowed.',
+                            'محدوده فعالیت تکراری مجاز نیست.',
                         );
                     }
 
@@ -104,7 +130,7 @@ class UpdateLawyerProfileRequest extends LawyerProfileRequest
                         && $provinceModes[$provinceId] !== $mode) {
                         $validator->errors()->add(
                             "service_areas.{$index}",
-                            'A whole province and specific cities from it cannot be selected together.',
+                            'نمی‌توانید هم‌زمان کل استان و چند شهر از همان استان را انتخاب کنید.',
                         );
                     }
 

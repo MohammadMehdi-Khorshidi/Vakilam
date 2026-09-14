@@ -77,7 +77,7 @@ class LawyerProfileController extends Controller
         $this->loadProfileRelations($profile);
 
         return response()->json([
-            'message' => 'Lawyer profile updated successfully.',
+            'message' => 'اطلاعات پروفایل با موفقیت ذخیره شد.',
             'lawyer_profile' => LawyerProfileResource::make($profile)->resolve(),
         ]);
     }

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Vazirmatn } from 'next/font/google';
 import {
     BriefcaseBusiness, CalendarClock, House, Inbox, MessageSquareText,
-    ShieldCheck, WalletCards, X,
+    ShieldCheck, UserRoundCheck, WalletCards, X,
 } from 'lucide-react';
 
 import photoSaidbar from '@/assets/images/photoSaidbar.svg';
@@ -19,6 +19,7 @@ const menuItems = [
     { href: '/lawyer/negotiation', label: 'مذاکرات', icon: MessageSquareText },
     { href: '/lawyer/cases', label: 'پرونده‌های من', icon: BriefcaseBusiness },
     { href: '/lawyer/consultations', label: 'مشاوره‌های من', icon: CalendarClock },
+    { href: '/lawyer/profile-completion', label: 'تکمیل پروفایل', icon: UserRoundCheck },
     { href: '/lawyer/earnings', label: 'پرداخت‌ها و درآمدها', icon: WalletCards },
     { href: '/lawyer/security', label: 'امنیت و محرمانگی', icon: ShieldCheck },
 ];

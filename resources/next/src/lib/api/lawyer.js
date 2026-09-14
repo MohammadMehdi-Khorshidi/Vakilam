@@ -1,5 +1,19 @@
 import { apiRequest, unwrapData } from './client';
 
+export const getLawyerProfile = async () => {
+    const payload = await apiRequest('lawyer/profile');
+    return payload?.lawyer_profile ?? unwrapData(payload);
+};
+
+export const updateLawyerProfile = async (data) => {
+    const payload = await apiRequest('lawyer/profile', {
+        method: 'PATCH',
+        data,
+    });
+
+    return payload?.lawyer_profile ?? unwrapData(payload);
+};
+
 export const getLawyerInvitations = async (query = {}) =>
     apiRequest('lawyer/invitations', { query });
 
@@ -55,7 +69,6 @@ export const submitLawyerProposal = async (proposalPublicId) => {
 
     return payload?.proposal ?? unwrapData(payload);
 };
-
 
 export const getEngagement = async (publicId) =>
     unwrapData(
