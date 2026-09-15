@@ -1,21 +1,31 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+    ArrowLeft,
     Bot,
     BriefcaseBusiness,
+    CalendarClock,
+    Clock3,
     FilePlus2,
     FileText,
-    MessageSquareText,
 } from 'lucide-react';
+import { Vazirmatn } from 'next/font/google';
 
-import HomeIntro from '@/features/client/home/HomeIntro';
 import { apiRequest, unwrapData } from '@/lib/api/client';
+import { getClientConsultations } from '@/lib/api/consultations';
+import { formatPersianDate, formatTime24 } from '@/lib/persianDateTime';
 
-const statusLabels = {
-    draft: 'پیش‌نویس',
-    submitted: 'ثبت‌شده',
+const vazir = Vazirmatn({
+    subsets: ['arabic'],
+    weight: ['400', '500', '600', '700', '800'],
+});
+
+const fa = new Intl.NumberFormat('fa-IR');
+
+const requestStatusLabels = {
+    submitted: 'در انتظار ادامه',
     matched: 'وکلا پیشنهاد شده‌اند',
     in_progress: 'در حال پیگیری',
     active: 'فعال',
@@ -23,59 +33,29 @@ const statusLabels = {
     cancelled: 'لغوشده',
 };
 
-const numberFormatter = new Intl.NumberFormat('fa-IR');
-
-function RecordList({ title, emptyText, items }) {
-    return (
-        <section className="rounded-2xl border border-[#dfe8e3] bg-white p-5 shadow-[0_4px_20px_rgba(13,48,42,0.035)]">
-            <h2 className="border-b border-[#edf1ef] pb-4 font-bold text-[#173f37]">
-                {title}
-            </h2>
-
-            {items.length === 0 ? (
-                <p className="py-8 text-center text-sm text-[#8a9994]">
-                    {emptyText}
-                </p>
-            ) : (
-                <div className="divide-y divide-[#edf1ef]">
-                    {items.map((item) => (
-                        <div
-                            key={item.public_id || item.id}
-                            className="flex items-center justify-between gap-4 py-4"
-                        >
-                            <div className="min-w-0">
-                                <p className="truncate text-sm font-bold text-[#294d46]">
-                                    {item.title || 'موضوع حقوقی بدون عنوان'}
-                                </p>
-                                <p className="mt-1 text-xs text-[#8a9994]">
-                                    شناسه: {item.public_id}
-                                </p>
-                            </div>
-                            <span className="shrink-0 rounded-full bg-[#f4f0e5] px-3 py-1.5 text-xs font-semibold text-[#6f5b2e]">
-                                {statusLabels[item.status] || item.status}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </section>
-    );
-}
-
 export default function ClientHomePage() {
+    const [user, setUser] = useState(null);
     const [dashboard, setDashboard] = useState(null);
+    const [consultations, setConsultations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     useEffect(() => {
         let mounted = true;
 
-        apiRequest('client/dashboard')
-            .then((response) => {
-                if (mounted) setDashboard(unwrapData(response));
+        Promise.all([
+            apiRequest('user'),
+            apiRequest('client/dashboard'),
+            getClientConsultations(),
+        ])
+            .then(([userPayload, dashboardPayload, consultationPayload]) => {
+                if (!mounted) return;
+                setUser(unwrapData(userPayload) ?? userPayload);
+                setDashboard(unwrapData(dashboardPayload));
+                setConsultations(consultationPayload?.consultations ?? []);
             })
-            .catch((requestError) => {
-                if (mounted) setError(requestError.message);
+            .catch((e) => {
+                if (mounted) setError(e?.message || 'دریافت اطلاعات داشبورد انجام نشد.');
             })
             .finally(() => {
                 if (mounted) setLoading(false);
@@ -86,131 +66,164 @@ export default function ClientHomePage() {
         };
     }, []);
 
-    const drafts = dashboard?.draft_cases || [];
-    const submitted = dashboard?.submitted_requests || [];
-    const activeCases = dashboard?.active_cases || [];
+    const activeCases = dashboard?.active_cases ?? [];
+    const submittedRequests = (dashboard?.submitted_requests ?? []).filter(
+        (item) => item.service_intent !== 'consultation',
+    );
+
+    const upcomingConsultations = useMemo(() => {
+        const now = Date.now();
+        return consultations
+            .filter(
+                (item) =>
+                    ['reserved', 'confirmed'].includes(item.status) &&
+                    item.scheduled_start_at &&
+                    new Date(item.scheduled_start_at).getTime() > now,
+            )
+            .sort(
+                (a, b) =>
+                    new Date(a.scheduled_start_at) - new Date(b.scheduled_start_at),
+            );
+    }, [consultations]);
+
+    const heldConsultations = consultations.filter((item) => item.status === 'held');
+    const nextConsultation = upcomingConsultations[0] ?? null;
+    const fullName = [user?.name, user?.last_name].filter(Boolean).join(' ') || 'موکل';
 
     const stats = [
-        {
-            label: 'پرونده فعال',
-            value: activeCases.length,
-            icon: BriefcaseBusiness,
-        },
-        {
-            label: 'درخواست ثبت‌شده',
-            value: submitted.length,
-            icon: FileText,
-        },
-        {
-            label: 'پیش‌نویس',
-            value: drafts.length,
-            icon: FilePlus2,
-        },
+        { label: 'پرونده فعال', value: activeCases.length, icon: BriefcaseBusiness, href: '/client/cases' },
+        { label: 'درخواست در انتظار', value: submittedRequests.length, icon: FileText, href: '/client/cases' },
+        { label: 'مشاوره آینده', value: upcomingConsultations.length, icon: CalendarClock, href: '/client/consultations' },
+        { label: 'در انتظار پرداخت', value: heldConsultations.length, icon: Clock3, href: '/client/consultations' },
     ];
 
     return (
-        <div dir="rtl" className="min-h-[calc(100vh-80px)] bg-[#f8faf9]">
-            <div className="mx-auto max-w-[1400px] px-5 py-15 lg:px-8">
-                <HomeIntro />
-
-                <div className="my-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <Link
-                        href="/client/legal-assistant"
-                        className="flex items-center gap-4 rounded-2xl bg-[#0d4a40] p-5 text-white transition hover:-translate-y-0.5"
-                    >
-                        <Bot className="text-[#dfc58f]" />
-                        <div>
-                            <p className="font-bold">گفتگو با دستیار وکیلم</p>
-                            <p className="mt-1 text-xs text-white/65">
-                                دریافت راهنمایی اولیه و ذخیره تاریخچه
-                            </p>
-                        </div>
-                    </Link>
-                    <Link
-                        href="/client/legal-request"
-                        className="flex items-center gap-4 rounded-2xl border border-[#dfe8e3] bg-white p-5 text-[#173f37] transition hover:-translate-y-0.5"
-                    >
-                        <FilePlus2 className="text-[#b28b43]" />
-                        <div>
-                            <p className="font-bold">ثبت موضوع حقوقی</p>
-                            <p className="mt-1 text-xs text-[#8a9994]">
-                                ایجاد یا ادامه پیش‌نویس درخواست
-                            </p>
-                        </div>
-                    </Link>
-                    <Link
-                        href="/client/messages"
-                        className="flex items-center gap-4 rounded-2xl border border-[#dfe8e3] bg-white p-5 text-[#173f37] transition hover:-translate-y-0.5"
-                    >
-                        <MessageSquareText className="text-[#b28b43]" />
-                        <div>
-                            <p className="font-bold">گفتگو با وکیل</p>
-                            <p className="mt-1 text-xs text-[#8a9994]">
-                                پس از رزرو یا شروع همکاری
-                            </p>
-                        </div>
-                    </Link>
-                </div>
-
-                {loading && (
-                    <div className="rounded-2xl border border-[#dfe8e3] bg-white py-16 text-center text-[#71817c]">
-                        در حال دریافت اطلاعات داشبورد...
+        <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-8 lg:px-8`}>
+            <div className="mx-auto max-w-[1250px]">
+                <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p className="text-xs font-bold text-[#a17d37]">خانه موکل</p>
+                        <h1 className="mt-1 text-2xl font-black text-[#173f38]">
+                            {loading ? 'در حال دریافت اطلاعات...' : `سلام ${fullName}`}
+                        </h1>
+                        <p className="mt-2 text-sm leading-7 text-[#71817c]">
+                            وضعیت پرونده‌ها، درخواست‌ها و مشاوره‌های خود را از اینجا دنبال کنید.
+                        </p>
                     </div>
-                )}
 
-                {error && (
-                    <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700">
+                    <Link href="/client/legal-request" className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#123f37] px-5 py-3 text-sm font-black text-white transition hover:bg-[#0d332c]">
+                        <FilePlus2 size={17} />
+                        شرح مسئله جدید
+                    </Link>
+                </header>
+
+                {error ? (
+                    <div className="mb-5 rounded-[18px] border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">
                         {error}
                     </div>
-                )}
+                ) : null}
 
-                {!loading && !error && (
-                    <>
-                        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            {stats.map((item) => {
-                                const Icon = item.icon;
+                <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {stats.map((stat) => {
+                        const Icon = stat.icon;
+                        return (
+                            <Link key={stat.label} href={stat.href} className="rounded-[18px] border border-[#dfe7e3] bg-white p-5 transition hover:border-[#bcd2cb]">
+                                <div className="flex items-center justify-between">
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eff8f4] text-[#17634f]">
+                                        <Icon size={19} />
+                                    </span>
+                                    <ArrowLeft size={17} className="text-[#94a19d]" />
+                                </div>
+                                <p className="mt-4 text-2xl font-black text-[#173f38]">
+                                    {loading ? '—' : fa.format(stat.value)}
+                                </p>
+                                <p className="mt-1 text-sm font-bold text-[#687873]">{stat.label}</p>
+                            </Link>
+                        );
+                    })}
+                </section>
 
-                                return (
-                                    <div
-                                        key={item.label}
-                                        className="flex items-center justify-between rounded-2xl border border-[#dfe8e3] bg-white p-5"
-                                    >
-                                        <div>
-                                            <p className="text-sm text-[#60736d]">
-                                                {item.label}
-                                            </p>
-                                            <p className="mt-2 text-2xl font-bold text-[#0d302a]">
-                                                {numberFormatter.format(item.value)}
-                                            </p>
-                                        </div>
-                                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f4f0e5] text-[#0d302a]">
-                                            <Icon size={20} />
-                                        </span>
-                                    </div>
-                                );
-                            })}
-                        </section>
-
-                        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-                            <RecordList
-                                title="پرونده‌های فعال"
-                                emptyText="در حال حاضر پرونده فعالی ندارید."
-                                items={activeCases}
-                            />
-                            <RecordList
-                                title="درخواست‌های ثبت‌شده"
-                                emptyText="درخواست ثبت‌شده‌ای وجود ندارد."
-                                items={submitted}
-                            />
-                            <RecordList
-                                title="پیش‌نویس‌ها"
-                                emptyText="پیش‌نویسی ذخیره نشده است."
-                                items={drafts}
-                            />
+                {nextConsultation ? (
+                    <section className="mt-5 rounded-[20px] border border-[#d6e7e0] bg-[#eff8f4] p-5 md:p-6">
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                                <p className="text-xs font-bold text-[#648078]">مشاوره بعدی</p>
+                                <h2 className="mt-2 text-lg font-black text-[#173f38]">
+                                    {nextConsultation.legal_request?.title || 'مشاوره حقوقی'}
+                                </h2>
+                                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[#60736d]">
+                                    <span>وکیل: <b>{nextConsultation.lawyer?.full_name || '—'}</b></span>
+                                    <span>
+                                        {formatPersianDate(nextConsultation.scheduled_start_at)} ساعت {formatTime24(nextConsultation.scheduled_start_at)}
+                                    </span>
+                                    <span>{nextConsultation.duration_minutes} دقیقه</span>
+                                </div>
+                            </div>
+                            <Link href="/client/consultations" className="inline-flex w-fit rounded-xl bg-[#123f37] px-5 py-3 text-sm font-bold text-white">
+                                مشاهده مشاوره
+                            </Link>
                         </div>
-                    </>
-                )}
+                    </section>
+                ) : null}
+
+                <div className="mt-5 grid gap-5 xl:grid-cols-2">
+                    <section className="overflow-hidden rounded-[18px] border border-[#dfe7e3] bg-white">
+                        <div className="flex items-center justify-between border-b border-[#edf1ef] px-5 py-4">
+                            <h2 className="font-extrabold text-[#173f38]">پرونده‌های فعال</h2>
+                            <Link href="/client/cases" className="text-xs font-bold text-[#17634f]">مشاهده همه</Link>
+                        </div>
+                        <List items={activeCases.slice(0, 3)} empty="پرونده فعالی ندارید." />
+                    </section>
+
+                    <section className="overflow-hidden rounded-[18px] border border-[#dfe7e3] bg-white">
+                        <div className="flex items-center justify-between border-b border-[#edf1ef] px-5 py-4">
+                            <h2 className="font-extrabold text-[#173f38]">درخواست‌های اخیر</h2>
+                            <Link href="/client/cases" className="text-xs font-bold text-[#17634f]">مشاهده همه</Link>
+                        </div>
+                        <List items={submittedRequests.slice(0, 3)} empty="درخواست در انتظاری ندارید." />
+                    </section>
+                </div>
+
+                <section className="mt-5 flex flex-col gap-4 rounded-[18px] border border-[#eadfbe] bg-[#fffaf0] p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#9b772c]">
+                            <Bot size={18} />
+                        </span>
+                        <div>
+                            <h2 className="font-extrabold text-[#5d4c27]">دستیار حقوقی وکیلم</h2>
+                            <p className="mt-1 text-xs leading-6 text-[#8b7440]">
+                                برای راهنمایی اولیه می‌توانید از دستیار حقوقی استفاده کنید.
+                            </p>
+                        </div>
+                    </div>
+                    <Link href="/client/legal-assistant" className="inline-flex w-fit rounded-xl border border-[#d7bd82] bg-white px-4 py-2.5 text-xs font-bold text-[#70561e]">
+                        ورود به دستیار
+                    </Link>
+                </section>
             </div>
+        </main>
+    );
+}
+
+function List({ items, empty }) {
+    if (!items.length) {
+        return <p className="px-5 py-10 text-center text-sm text-[#899691]">{empty}</p>;
+    }
+
+    return (
+        <div className="divide-y divide-[#edf1ef]">
+            {items.map((item) => (
+                <div key={item.public_id || item.id} className="flex items-center justify-between gap-4 px-5 py-4">
+                    <div className="min-w-0">
+                        <p className="truncate text-sm font-extrabold text-[#294e46]">
+                            {item.title || 'موضوع حقوقی'}
+                        </p>
+                        <p className="mt-1 text-xs text-[#84918d]">
+                            {requestStatusLabels[item.status] || 'در حال پیگیری'}
+                        </p>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }

@@ -4,9 +4,15 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-    Bell, Bot, BriefcaseBusiness, CalendarClock, CalendarDays, ClipboardList,
-    FilePenLine, FilePlus2, Files, House, ListTodo, MessageSquareText,
-    UsersRound, X,
+    Bot,
+    BriefcaseBusiness,
+    CalendarClock,
+    CreditCard,
+    FilePlus2,
+    House,
+    MessageSquareText,
+    Settings2,
+    X,
 } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 
@@ -16,50 +22,86 @@ import LogoutButton from '@/features/auth/LogoutButton';
 
 const menuItems = [
     { href: '/client', label: 'خانه', icon: House },
-    { href: '/client/actions', label: 'مرکز اقدامات', icon: ListTodo },
-    { href: '/client/smart-box', label: 'صندوق هوشمند', icon: Bell },
-    { href: '/client/legal-assistant', label: 'دستیار حقوقی', icon: Bot },
     { href: '/client/legal-request', label: 'شرح مسئله جدید', icon: FilePlus2 },
     { href: '/client/cases', label: 'پرونده‌های من', icon: BriefcaseBusiness },
     { href: '/client/consultations', label: 'مشاوره‌های من', icon: CalendarClock },
-    { href: '/client/lawyersAdmin', label: 'همه وکلا', icon: UsersRound },
-    { href: '/client/suggestions', label: 'پیشنهادها', icon: ClipboardList },
-    { href: '/client/messages', label: 'پیام‌ها و تماس‌ها', icon: MessageSquareText },
-    { href: '/client/sessions', label: 'جلسات', icon: CalendarDays },
-    { href: '/client/documents', label: 'اسناد', icon: Files },
-    { href: '/client/contracts', label: 'قرارداد و پرداخت', icon: FilePenLine },
+    { href: '/client/negotiation', label: 'مذاکرات', icon: MessageSquareText },
+    { href: '/client/legal-assistant', label: 'دستیار حقوقی', icon: Bot },
+    { href: '/client/contracts', label: 'پرداخت‌ها', icon: CreditCard },
+    { href: '/client/profile-settings', label: 'پروفایل و تنظیمات', icon: Settings2 },
 ];
 
-const vazir = Vazirmatn({ subsets: ['arabic'], weight: ['400','500','600','700'] });
+const vazir = Vazirmatn({
+    subsets: ['arabic'],
+    weight: ['400', '500', '600', '700'],
+});
 
 export default function ClientSidebar({ mobileOpen, setMobileOpen }) {
     const pathname = usePathname();
     const closeSidebar = () => setMobileOpen(false);
 
-    return <>
-        {mobileOpen ? <button type="button" aria-label="بستن منو" className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] lg:hidden" onClick={closeSidebar}/> : null}
-        <aside dir="rtl" className={`${vazir.className} fixed right-0 top-[80px] z-40 flex h-[calc(100vh-80px)] w-[270px] flex-col overflow-hidden border-l border-white/[0.06] bg-[radial-gradient(circle_at_20%_0,#c5a35a2e,#0000_24%),linear-gradient(#174b42_0%,#0e332d_55%,#092620_100%)] text-white transition-transform duration-300 lg:sticky lg:top-0 lg:z-30 lg:h-[calc(100vh-80px)] lg:translate-x-0 ${mobileOpen?'translate-x-0':'translate-x-full'}`}>
-            <div className="relative flex h-[92px] shrink-0 items-center justify-center border-b border-white/10">
-                <Link href="/client" onClick={closeSidebar} className="flex items-center gap-2">
-                    <Image src={saidbar} alt="وکیلم" width={105} height={48} className="h-[48px] w-auto"/>
-                    <Image src={photoSaidbar} alt="" width={32} height={42} className="h-[42px] w-auto"/>
-                </Link>
-                <button type="button" aria-label="بستن منو" onClick={closeSidebar} className="absolute left-4 rounded-xl bg-white/10 p-2 lg:hidden"><X size={19}/></button>
-            </div>
-            <nav className="sidebar-scrollbar flex-1 overflow-y-auto py-5">
-                <ul className="space-y-1 px-2">
-                    {menuItems.map((item)=>{
-                        const Icon=item.icon;
-                        const active=pathname===item.href || (item.href!=='/client' && pathname.startsWith(`${item.href}/`));
-                        return <li key={item.href}><Link href={item.href} onClick={closeSidebar} className={`group relative flex min-h-[48px] items-center gap-3 rounded-2xl px-4 pr-5 text-[14px] font-semibold transition ${active?'bg-[#405f4e] text-white':'text-white/75 hover:bg-[#405f4e] hover:text-white'}`}>
-                            <span className={`absolute right-2 h-8 w-[3px] rounded-full bg-[#c9a96e] ${active?'opacity-100':'opacity-0 group-hover:opacity-100'}`}/>
-                            <span className={`flex h-9 w-9 items-center justify-center rounded-2xl ${active?'bg-[#c9a96e] text-black':'bg-white/[0.07] group-hover:bg-[#c9a96e] group-hover:text-black'}`}><Icon size={19}/></span>
-                            <span>{item.label}</span>
-                        </Link></li>;
-                    })}
-                </ul>
-            </nav>
-            <div className="shrink-0 px-4 pb-4"><LogoutButton onLogout={closeSidebar}/></div>
-        </aside>
-    </>;
+    return (
+        <>
+            {mobileOpen ? (
+                <button
+                    type="button"
+                    aria-label="بستن منو"
+                    className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] lg:hidden"
+                    onClick={closeSidebar}
+                />
+            ) : null}
+
+            <aside
+                dir="rtl"
+                className={`${vazir.className} fixed right-0 top-0 z-50 flex h-screen w-[270px] flex-col overflow-hidden border-l border-white/[0.06] bg-[radial-gradient(circle_at_20%_0,#c5a35a2e,#0000_24%),linear-gradient(#174b42_0%,#0e332d_55%,#092620_100%)] text-white transition-transform duration-300 lg:sticky lg:z-30 lg:translate-x-0 ${
+                    mobileOpen ? 'translate-x-0' : 'translate-x-full'
+                }`}
+            >
+                <div className="relative flex h-[92px] shrink-0 items-center justify-center border-b border-white/10">
+                    <Link href="/client" onClick={closeSidebar} className="flex items-center gap-2">
+                        <Image src={saidbar} alt="وکیلم" width={105} height={48} className="h-[48px] w-auto" />
+                        <Image src={photoSaidbar} alt="" width={32} height={42} className="h-[42px] w-auto" />
+                    </Link>
+                    <button type="button" aria-label="بستن منو" onClick={closeSidebar} className="absolute left-4 rounded-xl bg-white/10 p-2 lg:hidden">
+                        <X size={19} />
+                    </button>
+                </div>
+
+                <nav className="sidebar-scrollbar flex-1 overflow-y-auto py-5">
+                    <ul className="space-y-1 px-2">
+                        {menuItems.map((item) => {
+                            const Icon = item.icon;
+                            const active =
+                                pathname === item.href ||
+                                (item.href !== '/client' && pathname.startsWith(`${item.href}/`));
+
+                            return (
+                                <li key={item.href}>
+                                    <Link
+                                        href={item.href}
+                                        onClick={closeSidebar}
+                                        className={`group relative flex min-h-[48px] items-center gap-3 rounded-2xl px-4 pr-5 text-[14px] font-semibold transition ${
+                                            active
+                                                ? 'bg-[#405f4e] text-white'
+                                                : 'text-white/75 hover:bg-[#405f4e] hover:text-white'
+                                        }`}
+                                    >
+                                        <span className={`absolute right-2 h-8 w-[3px] rounded-full bg-[#c9a96e] ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                                        <span className={`flex h-9 w-9 items-center justify-center rounded-2xl ${active ? 'bg-[#c9a96e] text-black' : 'bg-white/[0.07] group-hover:bg-[#c9a96e] group-hover:text-black'}`}>
+                                            <Icon size={19} />
+                                        </span>
+                                        <span>{item.label}</span>
+                                    </Link>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </nav>
+
+                <div className="shrink-0 px-4 pb-4">
+                    <LogoutButton onLogout={closeSidebar} />
+                </div>
+            </aside>
+        </>
+    );
 }

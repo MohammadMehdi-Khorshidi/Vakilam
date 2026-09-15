@@ -359,9 +359,9 @@ export default function LawyerProfileCompletionPage() {
         <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8]`}>
             <div className="mx-auto mt-12 max-w-[1180px] px-5 py-7">
                 <header className="mb-6">
-                    <h1 className="text-2xl font-extrabold text-[#173f38]">تکمیل پروفایل وکیل</h1>
+                    <h1 className="text-2xl font-extrabold text-[#173f38]">پروفایل و تنظیمات</h1>
                     <p className="mt-2 max-w-3xl text-sm leading-7 text-[#71817c]">
-                        اطلاعات حرفه‌ای شما در تطبیق درخواست‌ها، معرفی به موکل و ترتیب نمایش وکلا استفاده می‌شود.
+                        اطلاعات حرفه‌ای، محدوده فعالیت و وضعیت پذیرش پرونده را از این بخش مدیریت کنید.
                     </p>
                 </header>
 
