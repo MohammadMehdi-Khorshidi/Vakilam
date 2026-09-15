@@ -2,249 +2,207 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import {
-    getEcho,
-    leaveNegotiationChannel,
-    resetEcho,
-} from '@/lib/realtime/echo';
+import { getNegotiation } from '@/lib/api/negotiations';
+import { getRealtimeEcho } from '@/lib/realtime';
+
+const FALLBACK_SYNC_MS = 30_000;
+const TYPING_IDLE_MS = 1_400;
 
 export default function useNegotiationRealtime({
     negotiationId,
-    currentUserPublicId,
+    enabled = true,
+    currentUserId = null,
     onMessage,
-    onStateChanged,
+    onSync,
 }) {
-    const [connectionState, setConnectionState] =
-        useState('connecting');
-    const [connectionError, setConnectionError] =
-        useState('');
     const [otherOnline, setOtherOnline] = useState(false);
     const [otherTyping, setOtherTyping] = useState(false);
+    const [syncError, setSyncError] = useState(false);
 
+    const mountedRef = useRef(false);
     const channelRef = useRef(null);
+    const echoRef = useRef(null);
     const typingTimerRef = useRef(null);
-    const remoteTypingTimerRef = useRef(null);
+    const fallbackTimerRef = useRef(null);
+    const syncingRef = useRef(false);
+    const realtimeHealthyRef = useRef(false);
+
+    const syncNegotiation = useCallback(async () => {
+        if (!enabled || !negotiationId || syncingRef.current) return;
+
+        syncingRef.current = true;
+        try {
+            const data = await getNegotiation(negotiationId);
+            if (mountedRef.current) onSync?.(data);
+        } catch {
+            if (mountedRef.current) setSyncError(true);
+        } finally {
+            syncingRef.current = false;
+        }
+    }, [enabled, negotiationId, onSync]);
+
+    const isOtherUser = useCallback(
+        (user) =>
+            Boolean(
+                user?.id &&
+                    (!currentUserId || user.id !== currentUserId),
+            ),
+        [currentUserId],
+    );
 
     useEffect(() => {
-        if (!negotiationId || !currentUserPublicId) {
-            return undefined;
+        mountedRef.current = true;
+        realtimeHealthyRef.current = false;
+
+        if (!enabled || !negotiationId) {
+            return () => {
+                mountedRef.current = false;
+            };
         }
 
-        let disposed = false;
-        setConnectionState('connecting');
-        setConnectionError('');
+        let cancelled = false;
+        const channelName = `negotiation.${negotiationId}`;
 
-        async function connect() {
+        (async () => {
             try {
-                const echo = await getEcho();
+                const echo = await getRealtimeEcho();
 
-                if (!echo || disposed) return;
+                if (cancelled || !mountedRef.current) return;
+                if (!echo) throw new Error('Realtime unavailable.');
 
-                const pusher = echo.connector?.pusher;
-
-                pusher?.connection?.bind(
-                    'state_change',
-                    (states) => {
-                        if (disposed) return;
-
-                        const current = states?.current;
-
-                        if (current === 'connected') {
-                            setConnectionState('connected');
-                            setConnectionError('');
-                        } else if (
-                            ['failed', 'unavailable', 'disconnected'].includes(
-                                current,
-                            )
-                        ) {
-                            setConnectionState('error');
-                            setConnectionError(
-                                `WebSocket: ${current}`,
-                            );
-                        } else {
-                            setConnectionState('connecting');
-                        }
-                    },
-                );
-
-                pusher?.connection?.bind('error', (error) => {
-                    if (disposed) return;
-
-                    setConnectionState('error');
-                    setConnectionError(
-                        error?.error?.data?.message ||
-                            error?.error?.message ||
-                            error?.message ||
-                            'WebSocket connection failed',
-                    );
-                });
-
-                const channel = echo.join(
-                    `negotiation.${negotiationId}`,
-                );
-
+                echoRef.current = echo;
+                const channel = echo.join(channelName);
                 channelRef.current = channel;
 
                 channel
                     .here((members) => {
-                        if (disposed) return;
+                        if (cancelled || !mountedRef.current) return;
 
-                        setConnectionState('connected');
-                        setConnectionError('');
-
+                        realtimeHealthyRef.current = true;
+                        setSyncError(false);
                         setOtherOnline(
-                            (members || []).some(
-                                (member) =>
-                                    member?.id !==
-                                    currentUserPublicId,
-                            ),
+                            Array.isArray(members) &&
+                                members.some(isOtherUser),
                         );
                     })
                     .joining((member) => {
-                        if (
-                            !disposed &&
-                            member?.id !== currentUserPublicId
-                        ) {
+                        if (mountedRef.current && isOtherUser(member)) {
                             setOtherOnline(true);
                         }
                     })
                     .leaving((member) => {
-                        if (
-                            !disposed &&
-                            member?.id !== currentUserPublicId
-                        ) {
+                        if (mountedRef.current && isOtherUser(member)) {
                             setOtherOnline(false);
                             setOtherTyping(false);
                         }
                     })
-                    .error((error) => {
-                        if (disposed) return;
+                    .listen('.negotiation.message.sent', (event) => {
+                        if (!mountedRef.current) return;
 
-                        setConnectionState('error');
-                        setConnectionError(
-                            error?.message ||
-                                error?.error ||
-                                `Presence auth failed${
-                                    error?.status
-                                        ? ` (${error.status})`
-                                        : ''
-                                }`,
-                        );
+                        const message = event?.message;
+                        if (!message?.id) return;
+
+                        realtimeHealthyRef.current = true;
+                        setSyncError(false);
+                        onMessage?.(message);
                     })
-                    .listen(
-                        '.negotiation.message.sent',
-                        (event) => {
-                            if (!disposed) {
-                                onMessage?.(event?.message);
-                            }
-                        },
-                    )
-                    .listen(
-                        '.negotiation.state.changed',
-                        (event) => {
-                            if (!disposed) {
-                                onStateChanged?.(event?.change);
-                            }
-                        },
-                    )
                     .listenForWhisper('typing', (event) => {
+                        if (!mountedRef.current) return;
                         if (
-                            disposed ||
-                            event?.user_id ===
-                                currentUserPublicId
+                            event?.user_public_id &&
+                            currentUserId &&
+                            event.user_public_id === currentUserId
                         ) {
                             return;
                         }
 
                         setOtherTyping(Boolean(event?.typing));
-
-                        if (remoteTypingTimerRef.current) {
-                            clearTimeout(
-                                remoteTypingTimerRef.current,
-                            );
-                        }
-
-                        if (event?.typing) {
-                            remoteTypingTimerRef.current =
-                                setTimeout(
-                                    () =>
-                                        setOtherTyping(false),
-                                    1800,
-                                );
-                        }
+                    })
+                    .error(() => {
+                        if (!mountedRef.current) return;
+                        realtimeHealthyRef.current = false;
+                        setSyncError(true);
                     });
-            } catch (error) {
-                if (disposed) return;
-
-                resetEcho();
-                setConnectionState('error');
-                setConnectionError(
-                    error?.message ||
-                        'Realtime connection failed',
-                );
+            } catch {
+                if (!cancelled && mountedRef.current) {
+                    realtimeHealthyRef.current = false;
+                    setSyncError(true);
+                    syncNegotiation();
+                }
             }
-        }
+        })();
 
-        connect();
+        fallbackTimerRef.current = window.setInterval(() => {
+            if (!realtimeHealthyRef.current) {
+                syncNegotiation();
+            }
+        }, FALLBACK_SYNC_MS);
 
         return () => {
-            disposed = true;
-            setOtherOnline(false);
-            setOtherTyping(false);
+            cancelled = true;
+            mountedRef.current = false;
+            realtimeHealthyRef.current = false;
 
             if (typingTimerRef.current) {
-                clearTimeout(typingTimerRef.current);
+                window.clearTimeout(typingTimerRef.current);
             }
 
-            if (remoteTypingTimerRef.current) {
-                clearTimeout(
-                    remoteTypingTimerRef.current,
-                );
+            if (fallbackTimerRef.current) {
+                window.clearInterval(fallbackTimerRef.current);
             }
+
+            try {
+                echoRef.current?.leave(channelName);
+            } catch {}
 
             channelRef.current = null;
-            leaveNegotiationChannel(negotiationId);
+            echoRef.current = null;
         };
     }, [
+        enabled,
         negotiationId,
-        currentUserPublicId,
+        currentUserId,
+        isOtherUser,
         onMessage,
-        onStateChanged,
+        syncNegotiation,
     ]);
 
     const notifyTyping = useCallback(
         (typing = true) => {
             const channel = channelRef.current;
 
-            if (!channel || !currentUserPublicId) return;
-
-            channel.whisper('typing', {
-                user_id: currentUserPublicId,
-                typing,
-            });
+            if (channel) {
+                try {
+                    channel.whisper('typing', {
+                        typing: Boolean(typing),
+                        user_public_id: currentUserId,
+                    });
+                } catch {}
+            }
 
             if (typingTimerRef.current) {
-                clearTimeout(typingTimerRef.current);
+                window.clearTimeout(typingTimerRef.current);
             }
 
             if (typing) {
-                typingTimerRef.current = setTimeout(() => {
-                    channelRef.current?.whisper('typing', {
-                        user_id: currentUserPublicId,
-                        typing: false,
-                    });
-                }, 1100);
+                typingTimerRef.current = window.setTimeout(() => {
+                    try {
+                        channelRef.current?.whisper('typing', {
+                            typing: false,
+                            user_public_id: currentUserId,
+                        });
+                    } catch {}
+                }, TYPING_IDLE_MS);
             }
         },
-        [currentUserPublicId],
+        [currentUserId],
     );
 
     return {
-        connected: connectionState === 'connected',
-        connectionState,
-        connectionError,
         otherOnline,
         otherTyping,
+        syncError,
         notifyTyping,
+        refreshNow: syncNegotiation,
     };
 }

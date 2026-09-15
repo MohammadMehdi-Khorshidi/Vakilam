@@ -14,6 +14,23 @@ use App\Http\Controllers\Api\NegotiationPresenceController;
 use App\Http\Controllers\Api\NegotiationAttachmentController;
 use Illuminate\Support\Facades\Route;
 
+
+Route::get('/realtime/config', function () {
+    $app = config('reverb.apps.apps.0', []);
+    $options = $app['options'] ?? [];
+
+    return response()->json([
+        'data' => [
+            'key' => (string) ($app['key'] ?? ''),
+            'host' => (string) ($options['host'] ?? '127.0.0.1'),
+            'port' => (int) ($options['port'] ?? 8080),
+            'scheme' => (string) ($options['scheme'] ?? 'http'),
+            'auth_endpoint' => request()->getSchemeAndHttpHost().'/api/broadcasting/auth',
+        ],
+    ]);
+});
+
+
 Route::post(
     '/negotiations/{negotiation:public_id}/presence',
     [NegotiationPresenceController::class, 'touch'],

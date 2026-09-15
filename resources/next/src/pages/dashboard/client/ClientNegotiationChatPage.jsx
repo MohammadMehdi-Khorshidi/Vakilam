@@ -27,7 +27,7 @@ import {
     contactWarning,
     containsContactInformation,
 } from '@/lib/contactGuard';
-import useNegotiationPolling from '@/hooks/useNegotiationPolling';
+import useNegotiationRealtime from '@/hooks/useNegotiationRealtime';
 import { proposalStatusLabel } from '@/lib/proposalStatus';
 import { downloadNegotiationAttachment, uploadNegotiationAttachment } from '@/lib/api/negotiationAttachments';
 
@@ -289,8 +289,26 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
         load();
     }, [load]);
 
-    const onPollingSync = useCallback((data) => {
+    const onRealtimeSync = useCallback((data) => {
         if (data) setNegotiation(data);
+    }, []);
+
+    const onRealtimeMessage = useCallback((message) => {
+        if (!message?.id) return;
+
+        setNegotiation((current) => {
+            if (!current) return current;
+
+            const messages = current.messages ?? [];
+            if (messages.some((item) => item.id === message.id)) {
+                return current;
+            }
+
+            return {
+                ...current,
+                messages: [...messages, message],
+            };
+        });
     }, []);
 
     const {
@@ -299,10 +317,12 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
         syncError,
         notifyTyping,
         refreshNow,
-    } = useNegotiationPolling({
+    } = useNegotiationRealtime({
         negotiationId,
         enabled: Boolean(currentUser?.public_id),
-        onSync: onPollingSync,
+        currentUserId: currentUser?.public_id ?? null,
+        onMessage: onRealtimeMessage,
+        onSync: onRealtimeSync,
     });
 
     const proposals = negotiation?.proposals ?? [];
@@ -377,9 +397,10 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
                 negotiationId,
                 trimmed,
             );
+
+            onRealtimeMessage(message);
             setBody('');
             notifyTyping(false);
-            await refreshNow();
         } catch (requestError) {
             setError(
                 requestError?.validationMessages?.[0] ||
