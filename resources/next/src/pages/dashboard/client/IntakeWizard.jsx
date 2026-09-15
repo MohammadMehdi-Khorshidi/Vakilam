@@ -539,9 +539,9 @@ export default function IntakeWizard() {
     return (
         <div
             dir="ltr"
-            className={`${vazir.className} mt-15 min-h-screen bg-[#f8faf9]`}
+            className={`${vazir.className} mt-0 min-h-screen bg-[#f8faf9]`}
         >
-            <main className="mx-auto max-w-7xl px-4 py-7 lg:px-8">
+            <main className="mx-auto max-w-7xl px-4 py-5 lg:px-8 lg:py-6">
                 <div dir="rtl" className="mb-6 text-sm text-slate-500">
                     خانه /
                     <b className="mr-1 text-[#183b34]">راهنمای تشکیل پرونده</b>
