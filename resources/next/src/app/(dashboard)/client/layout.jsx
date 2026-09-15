@@ -28,7 +28,7 @@ export default function DashboardLayout({ children }) {
                             <Menu size={20} />
                         </button>
 
-                        <main className="min-h-screen">{children}</main>
+                        <main className="dashboard-content min-h-screen">{children}</main>
                     </div>
                 </div>
             </div>

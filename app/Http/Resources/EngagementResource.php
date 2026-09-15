@@ -10,6 +10,8 @@ class EngagementResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $legalRequest = $this->legalRequest;
+
         return [
             'public_id' => $this->public_id,
             'status' => $this->status,
@@ -18,10 +20,25 @@ class EngagementResource extends JsonResource
             'started_at' => $this->started_at,
             'ended_at' => $this->ended_at,
             'created_at' => $this->created_at,
-            'legal_request' => $this->legalRequest === null ? null : [
-                'public_id' => $this->legalRequest->public_id,
-                'title' => $this->legalRequest->title,
-                'status' => $this->legalRequest->status,
+            'legal_request' => $legalRequest === null ? null : [
+                'id' => $legalRequest->id,
+                'public_id' => $legalRequest->public_id,
+                'title' => $legalRequest->title,
+                'description' => $legalRequest->description,
+                'status' => $legalRequest->status,
+                'legal_category' => $legalRequest->legalCategory === null ? null : [
+                    'id' => $legalRequest->legalCategory->id,
+                    'code' => $legalRequest->legalCategory->code,
+                    'name' => $legalRequest->legalCategory->name,
+                ],
+                'province' => $legalRequest->province === null ? null : [
+                    'id' => $legalRequest->province->id,
+                    'name' => $legalRequest->province->name,
+                ],
+                'city' => $legalRequest->city === null ? null : [
+                    'id' => $legalRequest->city->id,
+                    'name' => $legalRequest->city->name,
+                ],
             ],
             'proposal' => $this->proposal === null ? null : [
                 'public_id' => $this->proposal->public_id,
@@ -30,13 +47,10 @@ class EngagementResource extends JsonResource
                 'service_scope' => $this->proposal->service_scope,
                 'proposed_fee_rial' => $this->proposal->proposed_fee_rial,
                 'estimated_days' => $this->proposal->estimated_days,
-                'negotiation' => $this->proposal->relationLoaded('negotiation')
-                    && $this->proposal->negotiation !== null
-                    ? [
-                        'public_id' => $this->proposal->negotiation->public_id,
-                        'status' => $this->proposal->negotiation->status,
-                    ]
-                    : null,
+                'negotiation' => $this->proposal->relationLoaded('negotiation') && $this->proposal->negotiation !== null ? [
+                    'public_id' => $this->proposal->negotiation->public_id,
+                    'status' => $this->proposal->negotiation->status,
+                ] : null,
             ],
             'lawyer' => $this->lawyerProfile === null ? null : [
                 'public_id' => $this->lawyerProfile->public_id,

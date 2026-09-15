@@ -15,17 +15,26 @@ class ClientDashboardController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        $requestRelations = ['legalCategory', 'province', 'city'];
+
         $draftCases = $user->legalRequests()
+            ->with($requestRelations)
             ->where('status', 'draft')
             ->latest('updated_at')
             ->get();
 
         $submittedRequests = $user->legalRequests()
+            ->with($requestRelations)
             ->whereIn('status', ['submitted', 'matched'])
             ->latest('updated_at')
             ->get();
 
         $activeCases = $user->legalMatters()
+            ->with([
+                'sourceLegalRequest.legalCategory',
+                'sourceLegalRequest.province',
+                'sourceLegalRequest.city',
+            ])
             ->latest('updated_at')
             ->get();
 

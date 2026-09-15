@@ -53,3 +53,11 @@ body {
     text-rendering: optimizeLegibility;
     font-size: 15px;
 }
+
+/*
+ * Dashboard no longer renders the public/header bars.
+ * Only remove the legacy top margin from the page's outer container.
+ */
+.dashboard-content > main > div {
+    margin-top: 0 !important;
+}
