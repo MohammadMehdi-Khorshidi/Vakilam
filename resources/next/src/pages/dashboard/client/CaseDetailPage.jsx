@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-    ArrowRight, BriefcaseBusiness, CheckCircle2, Circle, Clock3, FileText,
-    Handshake, MessageCircle, Plus, Scale, Users, WalletCards,
+    ArrowLeft, ArrowRight, BriefcaseBusiness, Clock3,
+    Handshake, MessageCircle, Plus, Users,
 } from 'lucide-react';
 import { Vazirmatn } from 'next/font/google';
 import { apiRequest, unwrapData } from '@/lib/api/client';
@@ -23,29 +23,74 @@ function formatDate(value) { if (!value) return 'ثبت نشده'; try { return 
 function DetailItem({label,value}) { return <div className="rounded-xl bg-[#f8faf9] px-4 py-3"><p className="text-[11px] font-bold text-[#8a9793]">{label}</p><p className="mt-1.5 text-sm font-extrabold text-[#31534b]">{value || 'ثبت نشده'}</p></div>; }
 function SectionCard({icon:Icon,title,description,children}) { return <section className="rounded-[18px] border border-[#dfe7e3] bg-white p-5"><div className="flex items-start gap-3 border-b border-[#e8eeeb] pb-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#edf5f2] text-[#174c42]"><Icon size={19}/></div><div><h2 className="font-extrabold text-[#173f38]">{title}</h2>{description?<p className="mt-1 text-xs leading-6 text-[#7e8d88]">{description}</p>:null}</div></div><div className="pt-4">{children}</div></section>; }
 
-function Timeline({isActiveMatter,invitations,proposals}) {
-    const steps=['درخواست ثبت شد','در انتظار پاسخ وکلا','مذاکره','توافق با وکیل','قرارداد و پرداخت','پرونده در جریان']; let currentIndex=0;
-    if(invitations.length>0) currentIndex=1; if(invitations.some(x=>x.status==='negotiating')) currentIndex=2; if(proposals.some(x=>['selected','accepted'].includes(x.status))) currentIndex=3; if(isActiveMatter) currentIndex=5;
-    return <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">{steps.map((step,index)=>{const done=index<=currentIndex; return <div key={step} className={`rounded-xl border p-3 ${done?'border-[#c7dfd7] bg-[#f1f8f5]':'border-[#e4e9e7] bg-[#fbfcfc]'}`}><div className="flex items-center gap-2">{done?<CheckCircle2 size={17} className="text-[#1e705e]"/>:<Circle size={17} className="text-[#a8b2ae]"/>}<span className={`text-xs font-bold ${done?'text-[#315f54]':'text-[#8c9995]'}`}>{step}</span></div></div>})}</div>;
-}
-
 function InvitationCard({invitation}) { const rejected=invitation.status==='rejected'; const hasNegotiation=Boolean(invitation.negotiation_public_id); return <article className={`rounded-xl border p-4 ${rejected?'border-red-200 bg-red-50/50':'border-[#dde7e3] bg-[#fafcfb]'}`}><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-extrabold text-[#31534b]">{invitation.lawyer?.full_name || 'وکیل'}</h3><p className="mt-1 text-xs text-[#81908b]">ارسال درخواست: {formatDate(invitation.sent_at)}</p></div><div className="flex flex-wrap items-center gap-2"><span className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold ${rejected?'bg-red-100 text-red-700':invitation.status==='negotiating'?'bg-emerald-100 text-emerald-700':'bg-[#eef4f2] text-[#536d65]'}`}>{invitationStatusLabels[invitation.status] || invitation.status}</span>{hasNegotiation?<Link href={`/client/negotiation/${encodeURIComponent(invitation.negotiation_public_id)}`} className="inline-flex items-center gap-2 rounded-lg bg-[#174c42] px-3.5 py-2 text-xs font-bold text-white"><MessageCircle size={15}/> ورود به گفتگو</Link>:null}</div></div></article>; }
 
 function ProposalCard({proposal}) { return <article className="rounded-2xl border border-[#e4ddc6] bg-[#fffdf6] p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-[#907849]">پیشنهاد رسمی در مذاکره</p><h3 className="mt-1 font-extrabold text-[#4d4a3b]">{proposal.lawyer?.full_name || 'وکیل'}</h3></div></div>{proposal.summary?<p className="mt-4 text-sm leading-7 text-[#626056]">{proposal.summary}</p>:null}<div className="mt-4 grid gap-2 sm:grid-cols-2"><DetailItem label="مبلغ پیشنهادی" value={proposal.proposed_fee_rial?`${faNumber.format(proposal.proposed_fee_rial)} ریال`:'ثبت نشده'}/><DetailItem label="زمان تقریبی" value={proposal.estimated_days?`${faNumber.format(proposal.estimated_days)} روز`:'ثبت نشده'}/></div></article>; }
 
 export default function CaseDetailPage({caseId}) {
     const searchParams=useSearchParams(); const type=searchParams.get('type')==='case'?'case':'request';
-    const [item,setItem]=useState(null), [proposals,setProposals]=useState([]), [invitations,setInvitations]=useState([]), [loading,setLoading]=useState(true), [error,setError]=useState('');
-    useEffect(()=>{ let mounted=true; (async()=>{ setLoading(true); setError(''); try { if(type==='case'){ const response=await apiRequest('client/dashboard'); const dashboard=unwrapData(response); const found=(dashboard?.active_cases||[]).find(entry=>String(entry.id)===String(caseId)||String(entry.public_id)===String(caseId)); if(!found) throw new Error('پرونده موردنظر پیدا نشد.'); if(mounted){setItem(found);setProposals([]);setInvitations([]);} return; } const [request,requestProposals,invitationResponse]=await Promise.all([getLegalRequest(caseId),getLegalRequestProposals(caseId).catch(()=>[]),getClientLawyerRequests(caseId).catch(()=>({data:[]}))]); if(mounted){setItem(request);setProposals(Array.isArray(requestProposals)?requestProposals:[]);setInvitations(Array.isArray(invitationResponse?.data)?invitationResponse.data:[]);} } catch(e){if(mounted)setError(e?.message||'دریافت جزئیات با خطا مواجه شد.');} finally {if(mounted)setLoading(false);} })(); return()=>{mounted=false}; },[caseId,type]);
+    const [item,setItem]=useState(null), [proposals,setProposals]=useState([]), [invitations,setInvitations]=useState([]), [engagement,setEngagement]=useState(null), [loading,setLoading]=useState(true), [error,setError]=useState('');
+    useEffect(()=>{ let mounted=true; (async()=>{ setLoading(true); setError(''); try { if(type==='case'){ const response=await apiRequest('client/dashboard'); const dashboard=unwrapData(response); const found=(dashboard?.active_cases||[]).find(entry=>String(entry.id)===String(caseId)||String(entry.public_id)===String(caseId)); if(!found) throw new Error('پرونده موردنظر پیدا نشد.'); if(mounted){setItem(found);setProposals([]);setInvitations([]);setEngagement(null);} return; } const [request,requestProposals,invitationResponse]=await Promise.all([
+                    getLegalRequest(caseId),
+                    getLegalRequestProposals(caseId).catch(()=>[]),
+                    getClientLawyerRequests(caseId).catch(()=>({data:[]})),
+                ]);
+                const normalizedProposals=Array.isArray(requestProposals)?requestProposals:[];
+                const accepted=normalizedProposals.some((proposal)=>['selected','accepted'].includes(proposal.status));
+                let resolvedEngagement=null;
+                if(accepted && request?.id){
+                    try {
+                        const engagementResponse=await apiRequest(`legal-requests/${encodeURIComponent(request.id)}/engagement`);
+                        resolvedEngagement=unwrapData(engagementResponse) ?? engagementResponse?.data ?? engagementResponse;
+                    } catch {
+                        resolvedEngagement=null;
+                    }
+                }
+                if(mounted){
+                    setItem(request);
+                    setProposals(normalizedProposals);
+                    setInvitations(Array.isArray(invitationResponse?.data)?invitationResponse.data:[]);
+                    setEngagement(resolvedEngagement);
+                } } catch(e){if(mounted)setError(e?.message||'دریافت جزئیات با خطا مواجه شد.');} finally {if(mounted)setLoading(false);} })(); return()=>{mounted=false}; },[caseId,type]);
     const isActiveMatter=type==='case'; const source=isActiveMatter?(item?.source_request||null):item; const pageTitle=useMemo(()=>item?.title||source?.title||'موضوع حقوقی بدون عنوان',[item,source]); const activeInvitationCount=invitations.filter(x=>ACTIVE_INVITATION_STATUSES.has(x.status)).length; const remainingInvitationCount=Math.max(0,5-activeInvitationCount); const hasAcceptedProposal=proposals.some(x=>['selected','accepted'].includes(x.status));
-    if(loading) return <main dir="rtl" className={`${vazirmatn.className} min-h-screen bg-[#f7faf8]`}><div className="mx-auto max-w-[1180px] px-5 py-7"><div className="rounded-[18px] border border-[#dfe7e3] bg-white py-20 text-center text-[#899691]">در حال دریافت جزئیات...</div></div></main>;
-    if(error||!item) return <main dir="rtl" className={`${vazirmatn.className} min-h-screen bg-[#f7faf8]`}><div className="mx-auto max-w-[1180px] px-5 py-7"><Link href="/client/cases" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-[#315f54]"><ArrowRight size={17}/>بازگشت به پرونده‌های من</Link><div className="rounded-[18px] border border-red-200 bg-red-50 p-5 text-red-700">{error||'پرونده موردنظر پیدا نشد.'}</div></div></main>;
-    return <main dir="rtl" className={`${vazirmatn.className} min-h-screen bg-[#f7faf8]`}><div className="mx-auto max-w-[1180px] px-5 py-7"><Link href="/client/cases" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-[#42685e]"><ArrowRight size={17}/>بازگشت به پرونده‌های من</Link>
+    if(loading) return <main dir="rtl" className={`${vazirmatn.className} min-h-screen bg-[#f7faf8]`}><div className="mx-auto max-w-[1180px] px-5 py-6"><div className="rounded-[18px] border border-[#dfe7e3] bg-white py-20 text-center text-[#899691]">در حال دریافت جزئیات...</div></div></main>;
+    if(error||!item) return <main dir="rtl" className={`${vazirmatn.className} min-h-screen bg-[#f7faf8]`}><div className="mx-auto max-w-[1180px] px-5 py-6"><Link href="/client/cases" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-[#315f54]"><ArrowRight size={17}/>بازگشت به پرونده‌های من</Link><div className="rounded-[18px] border border-red-200 bg-red-50 p-5 text-red-700">{error||'پرونده موردنظر پیدا نشد.'}</div></div></main>;
+    return <main dir="rtl" className={`${vazirmatn.className} min-h-screen bg-[#f7faf8]`}><div className="mx-auto max-w-[1180px] px-5 py-6"><Link href="/client/cases" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-[#42685e]"><ArrowRight size={17}/>بازگشت به پرونده‌های من</Link>
         <header className="mb-5 rounded-[20px] border border-[#dbe6e2] bg-white p-5 md:p-6"><div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div className="min-w-0"><p className="text-xs font-bold text-[#87958f]">{isActiveMatter?'پرونده در جریان':'درخواست حقوقی'}</p><h1 className="mt-2 text-xl font-black text-[#173f38] md:text-2xl">{pageTitle}</h1>{source?.description?<div className="mt-4 rounded-xl bg-[#f8faf9] p-4"><p className="text-xs font-bold text-[#79908a]">شرح درخواست</p><p className="mt-2 whitespace-pre-wrap text-sm leading-8 text-[#52665f]">{source.description}</p></div>:null}<div className="mt-4 flex flex-wrap gap-3 text-xs text-[#84918d]"><span className="inline-flex items-center gap-1.5"><Clock3 size={14}/>آخرین بروزرسانی: {formatDate(item.updated_at)}</span></div></div><span className="w-fit shrink-0 rounded-full border border-[#d6e4df] bg-[#f2f8f5] px-4 py-2 text-xs font-extrabold text-[#35665a]">{statusLabels[item.status]||item.status||'نامشخص'}</span></div>
         {source?<div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><DetailItem label="دسته‌بندی" value={source.legal_category?.name}/><DetailItem label="موقعیت" value={[source.province?.name,source.city?.name].filter(Boolean).join('، ')||null}/>{!isActiveMatter?<><DetailItem label="فوریت" value={urgencyLabels[source.urgency]}/><DetailItem label="نوع خدمت" value={serviceIntentLabels[source.service_intent]}/></>:<DetailItem label="تاریخ شروع" value={formatDate(item.opened_at)}/>}</div>:null}</header>
-        <div className="space-y-5"><SectionCard icon={Scale} title="روند پرونده" description="موقعیت فعلی درخواست از زمان ثبت تا شروع پرونده."><Timeline isActiveMatter={isActiveMatter} invitations={invitations} proposals={proposals}/></SectionCard>
-        {!isActiveMatter?<><SectionCard icon={Users} title="وکلا و مذاکرات" description="دعوت‌ها، پاسخ وکلا و مذاکرات این درخواست را از این بخش مدیریت کنید."><div className="mb-4 flex flex-col gap-3 rounded-xl bg-[#f6faf8] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-extrabold text-[#31534b]">{faNumber.format(activeInvitationCount)} دعوت فعال از ۵ جایگاه</p></div>{!hasAcceptedProposal&&remainingInvitationCount>0?<Link href={`/client/lawyersAdmin?legal_request_id=${encodeURIComponent(item.id)}&mode=additional`} className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#174c42] px-4 py-2.5 text-sm font-bold text-white"><Plus size={16}/> دعوت وکیل جدید</Link>:null}</div>{invitations.length===0?<div className="rounded-xl border border-dashed border-[#d4dfdb] bg-[#fafcfb] p-5 text-center text-sm text-[#7b8984]">هنوز درخواستی برای وکیلی ارسال نشده است.</div>:<div className="grid gap-3 md:grid-cols-2">{invitations.map(inv=><InvitationCard key={inv.distribution_id} invitation={inv}/>)}</div>}</SectionCard>
+        <div className="space-y-5">
+        {!isActiveMatter?<>
+        {hasAcceptedProposal ? (
+            <section className="rounded-[18px] border border-[#cfe0da] bg-[#f1f8f5] p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p className="text-sm font-extrabold text-[#245e50]">توافق با وکیل نهایی شده است</p>
+                        <p className="mt-1 text-xs leading-6 text-[#668078]">
+                            ادامه فرآیند، قرارداد و پرداخت از بخش «همکاری با وکیل منتخب» انجام می‌شود.
+                        </p>
+                    </div>
+                    {engagement?.public_id ? (
+                        <Link
+                            href={`/client/engagement/${encodeURIComponent(engagement.public_id)}`}
+                            className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#174c42] px-4 py-2.5 text-sm font-bold text-white"
+                        >
+                            مشاهده همکاری با وکیل منتخب
+                            <ArrowLeft size={15}/>
+                        </Link>
+                    ) : (
+                        <Link
+                            href="/client/cases"
+                            className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#174c42] px-4 py-2.5 text-sm font-bold text-white"
+                        >
+                            رفتن به پرونده‌های من
+                            <ArrowLeft size={15}/>
+                        </Link>
+                    )}
+                </div>
+            </section>
+        ) : null}
+        <SectionCard icon={Users} title="وکلا و مذاکرات" description="دعوت‌ها، پاسخ وکلا و مذاکرات این درخواست را از این بخش مدیریت کنید."><div className="mb-4 flex flex-col gap-3 rounded-xl bg-[#f6faf8] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-extrabold text-[#31534b]">{faNumber.format(activeInvitationCount)} دعوت فعال از ۵ جایگاه</p></div>{!hasAcceptedProposal&&remainingInvitationCount>0?<Link href={`/client/lawyersAdmin?legal_request_id=${encodeURIComponent(item.id)}&mode=additional`} className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#174c42] px-4 py-2.5 text-sm font-bold text-white"><Plus size={16}/> دعوت وکیل جدید</Link>:null}</div>{invitations.length===0?<div className="rounded-xl border border-dashed border-[#d4dfdb] bg-[#fafcfb] p-5 text-center text-sm text-[#7b8984]">هنوز درخواستی برای وکیلی ارسال نشده است.</div>:<div className="grid gap-3 md:grid-cols-2">{invitations.map(inv=><InvitationCard key={inv.distribution_id} invitation={inv}/>)}</div>}</SectionCard>
         <SectionCard icon={Handshake} title="پیشنهادهای رسمی" description="پیشنهادهای مالی و اجرایی وکلا در طول مذاکره.">{proposals.length===0?<div className="rounded-xl bg-[#fafcfb] px-4 py-8 text-center text-sm text-[#87958f]">هنوز پیشنهاد رسمی ثبت نشده است.</div>:<div className="space-y-3">{proposals.map(p=><ProposalCard key={p.public_id||p.id} proposal={p}/>)}</div>}</SectionCard>
-        <SectionCard icon={FileText} title="قرارداد"><p className="rounded-xl bg-[#fafcfb] px-4 py-5 text-sm leading-7 text-[#7b8984]">قرارداد پس از نهایی‌شدن توافق با وکیل در این بخش نمایش داده می‌شود.</p></SectionCard><SectionCard icon={WalletCards} title="پرداخت"><p className="rounded-xl bg-[#fafcfb] px-4 py-5 text-sm leading-7 text-[#7b8984]">پرداخت بعد از نهایی‌شدن قرارداد فعال می‌شود.</p></SectionCard></>:<SectionCard icon={BriefcaseBusiness} title="پرونده فعال"><p className="rounded-xl bg-[#f3f8f6] px-4 py-5 text-sm leading-7 text-[#587168]">این پرونده وارد مرحله ارائه خدمت شده است.</p></SectionCard>}</div>
+        </>:<SectionCard icon={BriefcaseBusiness} title="پرونده فعال"><p className="rounded-xl bg-[#f3f8f6] px-4 py-5 text-sm leading-7 text-[#587168]">این پرونده وارد مرحله ارائه خدمت شده است.</p></SectionCard>}</div>
     </div></main>;
 }

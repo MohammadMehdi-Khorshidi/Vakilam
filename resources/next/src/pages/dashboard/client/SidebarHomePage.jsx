@@ -98,7 +98,7 @@ export default function ClientHomePage() {
     ];
 
     return (
-        <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-8 lg:px-8`}>
+        <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-6 lg:px-8`}>
             <div className="mx-auto max-w-[1250px]">
                 <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
@@ -180,7 +180,7 @@ export default function ClientHomePage() {
                             <h2 className="font-extrabold text-[#173f38]">درخواست‌های اخیر</h2>
                             <Link href="/client/cases" className="text-xs font-bold text-[#17634f]">مشاهده همه</Link>
                         </div>
-                        <List items={submittedRequests.slice(0, 3)} empty="درخواست در انتظاری ندارید." />
+                        <RecentRequestList items={submittedRequests.slice(0, 3)} empty="درخواست در انتظاری ندارید." />
                     </section>
                 </div>
 
@@ -202,6 +202,55 @@ export default function ClientHomePage() {
                 </section>
             </div>
         </main>
+    );
+}
+
+
+function RecentRequestList({ items, empty }) {
+    if (!items.length) {
+        return <p className="px-5 py-10 text-center text-sm text-[#899691]">{empty}</p>;
+    }
+
+    return (
+        <div className="divide-y divide-[#edf1ef]">
+            {items.map((item) => {
+                const location = [item.province?.name, item.city?.name]
+                    .filter(Boolean)
+                    .join('، ');
+
+                return (
+                    <div
+                        key={item.public_id || item.id}
+                        className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <div className="min-w-0">
+                            <p className="truncate text-sm font-extrabold text-[#294e46]">
+                                {item.title || 'موضوع حقوقی'}
+                            </p>
+
+                            {item.description ? (
+                                <p className="mt-2 line-clamp-2 text-xs leading-6 text-[#71817c]">
+                                    {item.description}
+                                </p>
+                            ) : null}
+
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold text-[#8a9793]">
+                                <span>{item.legal_category?.name || 'بدون دسته‌بندی'}</span>
+                                {location ? <span>{location}</span> : null}
+                                <span>{requestStatusLabels[item.status] || 'در حال پیگیری'}</span>
+                            </div>
+                        </div>
+
+                        <Link
+                            href={`/client/cases/${encodeURIComponent(item.id)}?type=request`}
+                            className="inline-flex w-fit shrink-0 rounded-xl border border-[#cfded8] bg-[#f6faf8] px-4 py-2.5 text-xs font-extrabold text-[#17634f]"
+                        >
+                            مشاهده جزئیات
+                        </Link>
+                    </div>
+                );
+            })}
+        </div>
     );
 }
 

@@ -302,10 +302,10 @@ export default function ConsultationBookingPage() {
     return (
         <main
             dir="rtl"
-            className={`${vazir.className} mt-12 min-h-screen bg-[#f7faf8] px-5 py-10 sm:px-8`}
+            className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-6 sm:px-8`}
         >
             <div className="mx-auto max-w-[1200px]">
-                <section className="mb-6 mt-2">
+                <section className="mb-6">
                     <h1 className="text-right text-2xl font-bold tracking-tight text-[#123f37]">
                         همه وکلا؛ مرتبط‌ترین‌ها ابتدا
                     </h1>

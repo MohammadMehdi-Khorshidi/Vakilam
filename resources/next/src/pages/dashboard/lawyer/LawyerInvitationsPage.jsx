@@ -99,7 +99,7 @@ export default function LawyerInvitationsPage() {
     const selectedPending = selected?.status === 'pending';
 
     return (
-        <main dir="rtl" className="min-h-screen bg-[#f6f8f5] px-4 py-8 sm:px-6 lg:px-10">
+        <main dir="rtl" className="min-h-screen bg-[#f6f8f5] px-4 py-6 sm:px-6 lg:px-10">
             <div className="mx-auto max-w-[1180px]">
                 <header>
                     <p className="text-sm font-bold text-[#a47b2c]">پنل وکیل</p>

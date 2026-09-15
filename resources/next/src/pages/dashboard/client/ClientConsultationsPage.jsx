@@ -80,7 +80,7 @@ export default function ClientConsultationsPage() {
             dir="rtl"
             className={`${vazir.className} min-h-screen bg-[#f7faf8]`}
         >
-            <div className="mx-auto mt-12 max-w-[1280px] px-5 py-7">
+            <div className="mx-auto max-w-[1280px] px-5 py-6">
                 <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-extrabold text-[#173f38]">

@@ -3,9 +3,8 @@ import LawyersList from '../../../features/client/lawyers/LawyersList';
 
 const LawyersPage = () => {
     return (
-        <main dir="rtl" className="mt-12 min-h-screen bg-[#f7faf8] px-8 py-10">
+        <main dir="rtl" className="min-h-screen bg-[#f7faf8] px-5 py-6 sm:px-8">
             <LawyersHeader />
-
             <LawyersList />
         </main>
     );

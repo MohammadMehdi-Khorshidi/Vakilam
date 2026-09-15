@@ -36,9 +36,6 @@ class StoreLegalRequestRequest extends FormRequest
             $values['title'] = trim($this->input('title'));
         }
 
-        // The intake UI works with stable category codes (civil, family, ...),
-        // while legal_requests stores the UUID FK. Accept either a UUID or a
-        // seeded category code and normalize the code before validation.
         if ($this->has('legal_category_id') && is_string($this->input('legal_category_id'))) {
             $categoryValue = trim($this->input('legal_category_id'));
 
@@ -57,17 +54,12 @@ class StoreLegalRequestRequest extends FormRequest
         $this->merge($values);
     }
 
-    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
             'title' => ['nullable', 'string', 'max:200'],
             'description' => ['required', 'string'],
-            'legal_category_id' => [
-                'nullable',
-                'uuid',
-                Rule::exists('legal_categories', 'id')->where('status', true),
-            ],
+            'legal_category_id' => ['nullable', 'uuid', Rule::exists('legal_categories', 'id')->where('status', true)],
             'province_id' => ['nullable', 'integer', Rule::exists('provinces', 'id')],
             'city_id' => [
                 'nullable',
@@ -79,22 +71,15 @@ class StoreLegalRequestRequest extends FormRequest
                 }),
             ],
             'urgency' => ['nullable', Rule::in(['low', 'normal', 'high', 'urgent'])],
-            'service_intent' => [
-                'nullable',
-                Rule::in(LegalRequestServiceIntent::draftValues()),
-            ],
+            'service_intent' => ['nullable', Rule::in(LegalRequestServiceIntent::draftValues())],
             'parties' => ['sometimes', 'array'],
-            'parties.*.party_role' => [
-                'required',
-                Rule::in(['plaintiff', 'defendant', 'witness', 'other']),
-            ],
+            'parties.*.party_role' => ['required', Rule::in(['plaintiff', 'defendant', 'witness', 'other'])],
             'parties.*.full_name' => ['nullable', 'string', 'max:120'],
             'parties.*.relation_note' => ['nullable', 'string', 'max:255'],
             'parties.*.is_client' => ['sometimes', 'boolean'],
         ];
     }
 
-    /** @return array<int, callable(Validator): void> */
     public function after(): array
     {
         return [
@@ -105,9 +90,23 @@ class StoreLegalRequestRequest extends FormRequest
                     ->count();
 
                 if ($clientPartyCount > 1) {
+                    $validator->errors()->add('parties', 'فقط یک طرف می‌تواند به‌عنوان موکل مشخص شود.');
+                }
+
+                $user = $this->user();
+
+                if (! $user instanceof User) {
+                    return;
+                }
+
+                $hasDraft = $user->legalRequests()
+                    ->where('status', 'draft')
+                    ->exists();
+
+                if (! $hasDraft && $user->legalRequests()->count() >= 5) {
                     $validator->errors()->add(
-                        'parties',
-                        'Only one party may be marked as the client.',
+                        'legal_request_limit',
+                        'هر موکل حداکثر می‌تواند ۵ شرح مسئله حقوقی ثبت کند.',
                     );
                 }
             },

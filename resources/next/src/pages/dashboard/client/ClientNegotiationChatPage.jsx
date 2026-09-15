@@ -455,7 +455,7 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
         return (
             <main
                 dir="rtl"
-                className={`${vazir.className} min-h-screen bg-[#f5f8f6] p-8`}
+                className={`${vazir.className} min-h-screen bg-[#f5f8f6] px-5 py-6 lg:px-8`}
             >
                 <div className="mx-auto max-w-[1200px] rounded-2xl border bg-white p-16 text-center text-[#81908b]">
                     در حال دریافت مذاکره...
@@ -468,7 +468,7 @@ export default function ClientNegotiationChatPage({ negotiationId }) {
         return (
             <main
                 dir="rtl"
-                className={`${vazir.className} min-h-screen bg-[#f5f8f6] p-8`}
+                className={`${vazir.className} min-h-screen bg-[#f5f8f6] px-5 py-6 lg:px-8`}
             >
                 <div className="mx-auto max-w-[1200px]">
                     <Link

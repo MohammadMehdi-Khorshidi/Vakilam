@@ -347,8 +347,8 @@ export default function LawyerProfileCompletionPage() {
 
     if (loading) {
         return (
-            <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-10`}>
-                <div className="mx-auto mt-12 max-w-[1180px] rounded-[18px] border border-[#dfe7e3] bg-white py-16 text-center text-[#899691]">
+            <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-6`}>
+                <div className="mx-auto max-w-[1180px] rounded-[18px] border border-[#dfe7e3] bg-white py-16 text-center text-[#899691]">
                     در حال دریافت اطلاعات پروفایل...
                 </div>
             </main>
@@ -357,7 +357,7 @@ export default function LawyerProfileCompletionPage() {
 
     return (
         <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8]`}>
-            <div className="mx-auto mt-12 max-w-[1180px] px-5 py-7">
+            <div className="mx-auto max-w-[1180px] px-5 py-7">
                 <header className="mb-6">
                     <h1 className="text-2xl font-extrabold text-[#173f38]">پروفایل و تنظیمات</h1>
                     <p className="mt-2 max-w-3xl text-sm leading-7 text-[#71817c]">

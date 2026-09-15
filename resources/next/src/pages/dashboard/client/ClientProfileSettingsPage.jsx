@@ -24,7 +24,7 @@ export default function ClientProfileSettingsPage() {
     }, []);
 
     return (
-        <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-8 lg:px-8`}>
+        <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-6 lg:px-8`}>
             <div className="mx-auto max-w-[1000px]">
                 <header className="mb-6">
                     <h1 className="text-2xl font-extrabold text-[#173f38]">پروفایل و تنظیمات</h1>

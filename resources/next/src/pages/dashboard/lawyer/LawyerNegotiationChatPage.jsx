@@ -195,8 +195,8 @@ export default function LawyerNegotiationChatPage({ negotiationId }) {
     finally { setProposalBusy(false); }
   }
 
-  if (loading) return <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f5f8f6] p-8`}><div className="mx-auto max-w-[1200px] rounded-2xl border bg-white p-16 text-center text-[#81908b]">در حال دریافت مذاکره...</div></main>;
-  if (!negotiation) return <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f5f8f6] p-8`}><div className="mx-auto max-w-[1200px]"><Link href="/lawyer/negotiation" className="inline-flex items-center gap-2 text-sm font-bold text-[#315f54]"><ArrowRight size={17}/>بازگشت به مذاکرات</Link><div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{error || 'مذاکره پیدا نشد.'}</div></div></main>;
+  if (loading) return <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f5f8f6] px-5 py-6 lg:px-8`}><div className="mx-auto max-w-[1200px] rounded-2xl border bg-white p-16 text-center text-[#81908b]">در حال دریافت مذاکره...</div></main>;
+  if (!negotiation) return <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f5f8f6] px-5 py-6 lg:px-8`}><div className="mx-auto max-w-[1200px]"><Link href="/lawyer/negotiation" className="inline-flex items-center gap-2 text-sm font-bold text-[#315f54]"><ArrowRight size={17}/>بازگشت به مذاکرات</Link><div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{error || 'مذاکره پیدا نشد.'}</div></div></main>;
 
   return (
     <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f5f8f6] px-4 py-7 sm:px-6 lg:px-8`}>

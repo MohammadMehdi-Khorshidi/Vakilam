@@ -113,7 +113,7 @@ export default function LawyerHomePage() {
     ];
 
     return (
-        <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-8 lg:px-8`}>
+        <main dir="rtl" className={`${vazir.className} min-h-screen bg-[#f7faf8] px-5 py-6 lg:px-8`}>
             <div className="mx-auto max-w-[1250px]">
                 <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
