@@ -5,6 +5,7 @@ import { Menu } from 'lucide-react';
 
 import LawyerSidebar from '../../../components/sidebar/LawyerSidebar';
 import DashboardAuthGuard from '../../../components/auth/DashboardAuthGuard';
+import DashboardNotifications from '../../../components/dashboard/DashboardNotifications';
 
 export default function DashboardLayout({ children }) {
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -19,6 +20,7 @@ export default function DashboardLayout({ children }) {
                     />
 
                     <div className="min-w-0 flex-1">
+                        <DashboardNotifications />
                         <button
                             type="button"
                             onClick={() => setMobileOpen(true)}

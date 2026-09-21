@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ConsultationBookingController;
 use App\Http\Controllers\Api\LawyerConsultationRateController;
 use App\Http\Controllers\Api\ConsultationDirectoryController;
 use App\Http\Controllers\Api\LawyerAvailabilityController;
+use App\Http\Controllers\Api\NotificationController;
 
 use App\Http\Controllers\Api\ClientEngagementController;
 use App\Http\Controllers\Api\EngagementDocumentRequestController;
@@ -14,6 +15,11 @@ use App\Http\Controllers\Api\NegotiationPresenceController;
 use App\Http\Controllers\Api\NegotiationAttachmentController;
 use Illuminate\Support\Facades\Route;
 
+
+
+Route::get('/notifications', [NotificationController::class, 'index']);
+Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
+Route::post('/notifications/{notification}/read', [NotificationController::class, 'read']);
 
 Route::get('/realtime/config', function () {
     $app = config('reverb.apps.apps.0', []);

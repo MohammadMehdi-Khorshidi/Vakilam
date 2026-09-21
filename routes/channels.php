@@ -39,3 +39,10 @@ Broadcast::channel(
     },
     ['guards' => ['sanctum']],
 );
+
+Broadcast::channel(
+    'user.{publicId}',
+    fn (User $user, string $publicId): bool =>
+        $user->status === 'active' && $user->public_id === $publicId,
+    ['guards' => ['sanctum']],
+);
