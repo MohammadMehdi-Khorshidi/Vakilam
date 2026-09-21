@@ -50,14 +50,28 @@ class ManageUsers extends Page
 
     public function suspend(string $userId, AdminActionService $service): void
     {
+        $reason = trim($this->reasons[$userId] ?? '');
+
+        if ($reason === '') {
+            Notification::make()
+                ->title('برای تعلیق کاربر، دلیل را وارد کنید.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
         $service->setUserStatus(
             auth()->user(),
             User::query()->findOrFail($userId),
             'suspended',
-            $this->reasons[$userId] ?? '',
+            $reason,
         );
 
-        Notification::make()->title('حساب کاربر تعلیق شد.')->success()->send();
+        Notification::make()
+            ->title('حساب کاربر تعلیق شد و به او اعلان ارسال شد.')
+            ->success()
+            ->send();
     }
 
     public function activate(string $userId, AdminActionService $service): void
