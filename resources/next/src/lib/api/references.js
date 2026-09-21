@@ -17,3 +17,20 @@ export async function getSpecialties() {
     );
 }
 
+
+export async function listLawyers(query = {}) {
+    return unwrapData(await apiRequest('lawyers', { query, auth: false }));
+}
+
+
+export async function getLawyer(publicId) {
+    if (publicId === undefined || publicId === null || publicId === '') {
+        throw new Error('شناسه وکیل معتبر نیست.');
+    }
+
+    return unwrapData(
+        await apiRequest(`lawyers/${encodePathSegment(publicId)}`, {
+            auth: false,
+        }),
+    );
+}

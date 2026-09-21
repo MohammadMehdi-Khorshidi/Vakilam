@@ -1,40 +1,37 @@
 'use client';
 
 import { useState } from 'react';
+import { Menu } from 'lucide-react';
 
-import DashboardHeader from '../../../components/sidebar/DashboardHeader';
 import AdminSidebar from '../../../components/sidebar/AdminSidebar';
 import DashboardAuthGuard from '../../../components/auth/DashboardAuthGuard';
 
-const ClientDashboardLayout = ({ children }) => {
+export default function AdminDashboardLayout({ children }) {
     const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
         <DashboardAuthGuard requiredRole="admin">
-        <div dir="rtl" className="min-h-screen bg-[#f8faf9]">
-            {/* ================= Dashboard Layout ================= */}
-            <div className="flex min-h-screen">
-                {/* ================= Sidebar ================= */}
-                <AdminSidebar
-                    mobileOpen={mobileOpen}
-                    setMobileOpen={setMobileOpen}
-                />
-
-                {/* ================= Main Area ================= */}
-                <div className="min-w-0 flex-1">
-                    {/* Header */}
-                    <DashboardHeader
+            <div dir="rtl" className="min-h-screen bg-[#f7faf8]">
+                <div className="flex min-h-screen">
+                    <AdminSidebar
                         mobileOpen={mobileOpen}
                         setMobileOpen={setMobileOpen}
                     />
 
-                    {/* Page */}
-                    <main className="min-h-[calc(100vh-80px)]">{children}</main>
+                    <div className="min-w-0 flex-1">
+                        <button
+                            type="button"
+                            onClick={() => setMobileOpen(true)}
+                            aria-label="باز کردن منو"
+                            className="fixed right-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-xl border border-[#d6e3df] bg-white text-[#174c42] shadow-sm lg:hidden"
+                        >
+                            <Menu size={20} />
+                        </button>
+
+                        <main className="min-h-screen">{children}</main>
+                    </div>
                 </div>
             </div>
-        </div>
         </DashboardAuthGuard>
     );
-};
-
-export default ClientDashboardLayout;
+}

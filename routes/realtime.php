@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\LawyerConsultationRateController;
 use App\Http\Controllers\Api\ConsultationDirectoryController;
 use App\Http\Controllers\Api\LawyerAvailabilityController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\Admin\AdminPanelController;
 
 use App\Http\Controllers\Api\ClientEngagementController;
 use App\Http\Controllers\Api\EngagementDocumentRequestController;
@@ -16,6 +17,20 @@ use App\Http\Controllers\Api\NegotiationAttachmentController;
 use Illuminate\Support\Facades\Route;
 
 
+
+
+Route::prefix('admin')->controller(AdminPanelController::class)->group(function () {
+    Route::get('/dashboard', 'dashboard');
+    Route::get('/users', 'users');
+    Route::patch('/users/{user}/status', 'setUserStatus');
+    Route::get('/lawyers', 'lawyers');
+    Route::post('/lawyer-verifications/{verification}/review', 'reviewLawyer');
+    Route::get('/legal-requests', 'legalRequests');
+    Route::get('/consultations', 'consultations');
+    Route::get('/activity', 'activity');
+    Route::get('/admins', 'admins');
+    Route::patch('/admins/{user}', 'setAdminRole');
+});
 
 Route::get('/notifications', [NotificationController::class, 'index']);
 Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);

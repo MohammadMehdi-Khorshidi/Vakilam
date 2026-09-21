@@ -2,7 +2,13 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\AdminActivity;
 use App\Filament\Pages\Auth\AdminLogin;
+use App\Filament\Pages\ConsultationsOverview;
+use App\Filament\Pages\LegalRequestsOverview;
+use App\Filament\Pages\ManageAdmins;
+use App\Filament\Pages\ManageUsers;
+use App\Filament\Pages\ReviewLawyers;
 use App\Filament\Widgets\AdminOverviewWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -35,12 +41,15 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->sidebarWidth('17rem')
             ->sidebarCollapsibleOnDesktop()
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
+                ReviewLawyers::class,
+                ManageUsers::class,
+                LegalRequestsOverview::class,
+                ConsultationsOverview::class,
+                AdminActivity::class,
+                ManageAdmins::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 AdminOverviewWidget::class,
             ])

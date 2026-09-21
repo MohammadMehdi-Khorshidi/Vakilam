@@ -17,7 +17,7 @@ class ReviewLawyers extends Page
     protected static string|UnitEnum|null $navigationGroup = 'کاربران';
     protected static ?string $navigationLabel = 'بررسی وکلا';
     protected static ?string $title = 'بررسی و تأیید وکلا';
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 10;
     protected string $view = 'filament.pages.review-lawyers';
 
     public string $filter = 'pending';

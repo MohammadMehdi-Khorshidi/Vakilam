@@ -15,7 +15,7 @@ class AdminActivity extends Page
     protected static string|UnitEnum|null $navigationGroup = 'نظارت';
     protected static ?string $navigationLabel = 'لاگ مدیریتی';
     protected static ?string $title = 'لاگ فعالیت مدیران';
-    protected static ?int $navigationSort = 70;
+    protected static ?int $navigationSort = 50;
     protected string $view = 'filament.pages.admin-activity';
 
     public static function canAccess(): bool

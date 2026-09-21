@@ -1,271 +1,85 @@
-// 'use client';
-//
-// import { useMemo, useState } from 'react';
-//
-//
-// import { lawyers } from './(lawyers)/lawyersData';
-// import LawyersHeader from '@/components/pages/dashboard/admin/(lawyersAdmin)/LawyersHeader';
-// import LawyersFilters from '@/components/pages/dashboard/admin/(lawyersAdmin)/LawyersFilters';
-// import LawyersTable from '@/components/pages/dashboard/admin/(lawyersAdmin)/LawyersTable';
-//
-// export default function LawyersPage() {
-//     const [activeFilter, setActiveFilter] = useState('all');
-//
-//     const filteredLawyers = useMemo(() => {
-//         if (activeFilter === 'all') {
-//             return lawyers;
-//         }
-//
-//         return lawyers.filter(
-//             (lawyer) => lawyer.verificationStatus === activeFilter,
-//         );
-//     }, [activeFilter]);
-//
-//     return (
-//         <div className="mx-auto w-full max-w-[1500px]">
-//             <LawyersHeader />
-//
-//             <LawyersFilters
-//                 activeFilter={activeFilter}
-//                 onFilterChange={setActiveFilter}
-//             />
-//
-//             <LawyersTable lawyers={filteredLawyers} />
-//         </div>
-//     );
-// }
-
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
- import LawyersHeader from '../../../features/admin/lawyers/LawyersHeader';
- import LawyersTable from '../../../features/admin/lawyers/LawyersTable';
-import LawyersFilters from '../../../features/admin/lawyers/LawyersFilters';
-import { listLawyers } from '@/lib/api/references';
+import { getAdminLawyers, reviewAdminLawyer } from '@/lib/api/admin';
 
 export default function LawyersPage() {
-    const [lawyers, setLawyers] = useState([]);
+    const [items, setItems] = useState([]);
+    const [search, setSearch] = useState('');
+    const [status, setStatus] = useState('');
+    const [notes, setNotes] = useState({});
+    const [message, setMessage] = useState('');
 
-    const [activeFilter, setActiveFilter] = useState('all');
-
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-
-    // =====================================================
-    // دریافت وکلا از API
-    // =====================================================
+    const load = useCallback(async () => {
+        setItems(await getAdminLawyers({ search, status }));
+    }, [search, status]);
 
     useEffect(() => {
-        const getLawyers = async () => {
-            try {
-                setLoading(true);
-                setError('');
+        const timer = window.setTimeout(load, 250);
+        return () => window.clearTimeout(timer);
+    }, [load]);
 
-                const result = await listLawyers({ perPage: 50 });
-
-                console.log('Lawyers API Response:', result);
-
-                // =================================================
-                // گرفتن data
-                // =================================================
-
-                let lawyersData = [];
-
-                if (Array.isArray(result.data)) {
-                    lawyersData = result.data;
-                } else if (Array.isArray(result)) {
-                    lawyersData = result;
-                } else if (Array.isArray(result.lawyers)) {
-                    lawyersData = result.lawyers;
-                } else if (Array.isArray(result.data?.data)) {
-                    lawyersData = result.data.data;
-                }
-
-                // =================================================
-                // تبدیل اطلاعات API برای UI
-                // =================================================
-
-                const formattedLawyers = lawyersData.map((lawyer) => {
-                    return {
-                        ...lawyer,
-
-                        id: lawyer.id ?? lawyer.lawyer_id ?? lawyer.user_id,
-
-                        name:
-                            lawyer.name ??
-                            lawyer.full_name ??
-                            lawyer.user?.name ??
-                            lawyer.user?.full_name ??
-                            'بدون نام',
-
-                        firstName:
-                            lawyer.first_name ?? lawyer.user?.first_name ?? '',
-
-                        lastName:
-                            lawyer.last_name ?? lawyer.user?.last_name ?? '',
-
-                        phone:
-                            lawyer.phone ??
-                            lawyer.mobile ??
-                            lawyer.user?.phone ??
-                            lawyer.user?.mobile ??
-                            '-',
-
-                        email: lawyer.email ?? lawyer.user?.email ?? '-',
-
-                        nationalCode:
-                            lawyer.national_code ??
-                            lawyer.nationalCode ??
-                            lawyer.user?.national_code ??
-                            '-',
-
-                        barNumber:
-                            lawyer.bar_number ??
-                            lawyer.barNumber ??
-                            lawyer.license_number ??
-                            lawyer.licenseNumber ??
-                            '-',
-
-                        specialization:
-                            lawyer.specialization ??
-                            lawyer.specialty ??
-                            lawyer.field ??
-                            lawyer.practice_area ??
-                            '-',
-
-                        city:
-                            lawyer.city ??
-                            lawyer.city_name ??
-                            lawyer.user?.city ??
-                            '-',
-
-                        province:
-                            lawyer.province ?? lawyer.province_name ?? '-',
-
-                        verificationStatus:
-                            lawyer.verification_status ??
-                            lawyer.verificationStatus ??
-                            lawyer.status ??
-                            'pending',
-                    };
-                });
-
-                console.log('Formatted Lawyers:', formattedLawyers);
-
-                setLawyers(formattedLawyers);
-            } catch (error) {
-                console.error('Lawyers API Error:', error);
-
-                setError('ارتباط با سرور برقرار نشد.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        getLawyers();
-    }, []);
-
-    // =====================================================
-    // فیلتر وکلا
-    // =====================================================
-
-    const filteredLawyers = useMemo(() => {
-        if (activeFilter === 'all') {
-            return lawyers;
+    const review = async (lawyer, nextStatus) => {
+        if (!lawyer.verification?.id) {
+            setMessage('برای این وکیل رکورد احراز هویت قابل بررسی وجود ندارد.');
+            return;
         }
 
-        return lawyers.filter(
-            (lawyer) => lawyer.verificationStatus === activeFilter,
-        );
-    }, [lawyers, activeFilter]);
+        const note = String(notes[lawyer.id] || '').trim();
+        if (nextStatus === 'rejected' && !note) {
+            setMessage('برای رد وکیل، دلیل الزامی است.');
+            return;
+        }
 
-    // =====================================================
-    // Loading
-    // =====================================================
-
-    if (loading) {
-        return (
-            <div
-                dir="rtl"
-                className="mx-auto flex min-h-[500px] w-full max-w-[1500px] items-center justify-center"
-            >
-                <div className="text-center">
-                    <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dfe8e4] border-t-[#123f37]" />
-
-                    <p className="mt-4 text-sm font-semibold text-[#123f37]">
-                        در حال دریافت لیست وکلا...
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-    // =====================================================
-    // Error
-    // =====================================================
-
-    if (error) {
-        return (
-            <div
-                dir="rtl"
-                className="mx-auto flex min-h-[500px] w-full max-w-[1500px] items-center justify-center px-5"
-            >
-                <div className="w-full max-w-[500px] rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-xl font-bold text-red-500">
-                        !
-                    </div>
-
-                    <h2 className="mt-4 text-lg font-extrabold text-[#123f37]">
-                        خطا در دریافت اطلاعات
-                    </h2>
-
-                    <p className="mt-3 text-sm leading-7 text-slate-500">
-                        {error}
-                    </p>
-
-                    <button
-                        type="button"
-                        onClick={() => window.location.reload()}
-                        className="mt-6 rounded-xl bg-[#123f37] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#1c554a]"
-                    >
-                        تلاش مجدد
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    // =====================================================
-    // Page
-    // =====================================================
+        await reviewAdminLawyer(lawyer.verification.id, nextStatus, note);
+        setMessage(nextStatus === 'approved' ? 'وکیل تأیید شد و به او اعلان ارسال شد.' : 'وکیل رد شد و دلیل برای او ارسال شد.');
+        await load();
+    };
 
     return (
-        <div dir="rtl" className="mx-auto w-full max-w-[1500px]">
-            {/* Header */}
+        <div dir="rtl" className="mx-auto w-full max-w-[1500px] px-5 py-7">
+            <h1 className="text-3xl font-black text-[#10382f]">بررسی وکلا</h1>
+            <p className="mt-2 text-sm text-[#788883]">پروفایل، تخصص‌ها و وضعیت واقعی احراز وکیل.</p>
 
-            <LawyersHeader />
+            <div className="mt-5 flex flex-wrap gap-3">
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="نام، موبایل یا شماره پروانه" className="min-h-11 min-w-[280px] rounded-xl border border-[#d7e2dd] bg-white px-4 text-sm" />
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className="min-h-11 rounded-xl border border-[#d7e2dd] bg-white px-4 text-sm">
+                    <option value="">همه</option><option value="pending">در انتظار</option><option value="approved">تأییدشده</option><option value="rejected">ردشده</option>
+                </select>
+            </div>
 
-            {/* Filters */}
+            {message ? <div className="mt-4 rounded-xl border border-[#dce6e2] bg-white px-4 py-3 text-sm text-[#31564d]">{message}</div> : null}
 
-            <LawyersFilters
-                activeFilter={activeFilter}
-                onFilterChange={setActiveFilter}
-            />
+            <div className="mt-5 grid gap-4">
+                {items.map((lawyer) => (
+                    <section key={lawyer.id} className="rounded-2xl border border-[#dce6e2] bg-white p-5 shadow-sm">
+                        <div className="flex flex-col justify-between gap-4 lg:flex-row">
+                            <div>
+                                <div className="flex items-center gap-3">
+                                    <h2 className="text-lg font-black text-[#174c42]">{lawyer.full_name || 'بدون نام'}</h2>
+                                    <span className="rounded-full bg-[#f1f6f4] px-3 py-1 text-xs font-bold text-[#526d65]">{lawyer.verification_status}</span>
+                                </div>
+                                <p className="mt-2 text-sm text-[#71827c]">موبایل: {lawyer.phone || '—'} · پروانه: {lawyer.license_number || '—'}</p>
+                                <p className="mt-2 text-sm text-[#71827c]">تخصص‌ها: {(lawyer.specialties ?? []).join('، ') || 'ثبت نشده'}</p>
+                            </div>
 
-            {/* Table */}
-
-            {filteredLawyers.length > 0 ? (
-                <LawyersTable lawyers={filteredLawyers} />
-            ) : (
-                <div className="mt-5 rounded-2xl border border-[#e0e8e5] bg-white p-10 text-center">
-                    <p className="text-sm font-semibold text-[#52635f]">
-                        {lawyers.length === 0
-                            ? 'هیچ وکیلی برای نمایش وجود ندارد.'
-                            : 'وکیلی با این وضعیت پیدا نشد.'}
-                    </p>
-                </div>
-            )}
+                            {lawyer.verification_status === 'pending' ? (
+                                <div className="w-full lg:max-w-md">
+                                    <textarea value={notes[lawyer.id] || ''} onChange={(e) => setNotes((s) => ({ ...s, [lawyer.id]: e.target.value }))} placeholder="یادداشت بررسی؛ برای رد اجباری است" className="min-h-20 w-full rounded-xl border border-[#d8e2de] p-3 text-sm" />
+                                    <div className="mt-2 flex gap-2">
+                                        <button onClick={() => review(lawyer, 'approved')} className="rounded-xl bg-[#174c42] px-4 py-2 text-xs font-black text-white">تأیید وکیل</button>
+                                        <button onClick={() => review(lawyer, 'rejected')} className="rounded-xl bg-red-600 px-4 py-2 text-xs font-black text-white">رد با دلیل</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-[#71827c]">یادداشت بررسی: {lawyer.verification?.review_note || '—'}</div>
+                            )}
+                        </div>
+                    </section>
+                ))}
+                {!items.length ? <div className="rounded-2xl border border-[#dce6e2] bg-white p-10 text-center text-sm text-[#83908c]">وکیلی پیدا نشد.</div> : null}
+            </div>
         </div>
     );
 }

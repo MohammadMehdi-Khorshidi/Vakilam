@@ -17,7 +17,7 @@ class ManageUsers extends Page
     protected static string|UnitEnum|null $navigationGroup = 'کاربران';
     protected static ?string $navigationLabel = 'کاربران';
     protected static ?string $title = 'مدیریت کاربران';
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 20;
     protected string $view = 'filament.pages.manage-users';
 
     public string $search = '';

@@ -17,7 +17,7 @@ class ManageAdmins extends Page
     protected static string|UnitEnum|null $navigationGroup = 'مدیریت ارشد';
     protected static ?string $navigationLabel = 'مدیران سامانه';
     protected static ?string $title = 'مدیریت ادمین‌ها';
-    protected static ?int $navigationSort = 90;
+    protected static ?int $navigationSort = 60;
     protected string $view = 'filament.pages.manage-admins';
 
     public string $search = '';
