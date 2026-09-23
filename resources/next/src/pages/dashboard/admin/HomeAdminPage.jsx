@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { getAdminDashboard } from '@/lib/api/admin';
+import { actionLabel } from '@/features/admin/shared/adminFormat';
 
 const card = 'rounded-2xl border border-[#dce6e2] bg-white p-5 shadow-[0_8px_28px_rgba(13,51,44,0.045)]';
 
@@ -45,7 +46,7 @@ export default function HomeAdminPage() {
                     ['درخواست‌های حقوقی', stats.legal_requests],
                     ['مشاوره‌ها', stats.consultations],
                 ].map(([label, value]) => (
-                    <div key={label} className={card}>
+                    <div key={label} className={`${card} min-h-[128px]`}>
                         <p className="text-xs font-bold text-[#7a8a84]">{label}</p>
                         <p className="mt-3 text-3xl font-black text-[#174c42]">{Number(value ?? 0).toLocaleString('fa-IR')}</p>
                     </div>
@@ -80,7 +81,7 @@ export default function HomeAdminPage() {
                     <div className="mt-4">
                         {(data.recent_actions ?? []).length ? data.recent_actions.map((item) => (
                             <div key={item.id} className="border-b border-[#edf2ef] py-3 last:border-0">
-                                <p className="text-sm font-bold text-[#31564d]">{item.action_type}</p>
+                                <p className="text-sm font-bold text-[#31564d]">{actionLabel(item.action_type)}</p>
                                 <p className="mt-1 text-xs text-[#899691]">{item.admin?.name || 'مدیر'} · {item.reason || 'بدون توضیح'}</p>
                             </div>
                         )) : <p className="py-8 text-center text-sm text-[#87958f]">هنوز فعالیتی ثبت نشده است.</p>}

@@ -26,16 +26,22 @@ export async function reviewAdminLawyer(verificationId, status, note = '') {
     );
 }
 
-export async function getAdminLegalRequests() {
-    return unwrapData(await apiRequest('admin/legal-requests'));
+export async function getAdminLawyer(lawyerId) {
+    return unwrapData(
+        await apiRequest(`admin/lawyers/${encodeURIComponent(lawyerId)}`),
+    );
 }
 
-export async function getAdminConsultations() {
-    return unwrapData(await apiRequest('admin/consultations'));
+export async function getAdminLegalRequests(query = {}) {
+    return unwrapData(await apiRequest('admin/legal-requests', { query }));
 }
 
-export async function getAdminActivity() {
-    return unwrapData(await apiRequest('admin/activity'));
+export async function getAdminConsultations(query = {}) {
+    return unwrapData(await apiRequest('admin/consultations', { query }));
+}
+
+export async function getAdminActivity(query = {}) {
+    return unwrapData(await apiRequest('admin/activity', { query }));
 }
 
 export async function getAdmins() {

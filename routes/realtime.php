@@ -24,6 +24,7 @@ Route::prefix('admin')->controller(AdminPanelController::class)->group(function 
     Route::get('/users', 'users');
     Route::patch('/users/{user}/status', 'setUserStatus');
     Route::get('/lawyers', 'lawyers');
+    Route::get('/lawyers/{lawyerProfile}', 'lawyer');
     Route::post('/lawyer-verifications/{verification}/review', 'reviewLawyer');
     Route::get('/legal-requests', 'legalRequests');
     Route::get('/consultations', 'consultations');
